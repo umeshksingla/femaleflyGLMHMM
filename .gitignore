@@ -1,0 +1,9 @@
+models
+data
+
+**/*.pdf
+**/*.svg
+
+.DS_Store
+.idea
+__pycache__/
