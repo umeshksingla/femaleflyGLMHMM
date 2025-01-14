@@ -1,5 +1,3 @@
-import sys
-
 import joblib
 import numpy as np
 from scipy.stats import zscore
@@ -7,14 +5,14 @@ import scipy
 from collections import OrderedDict
 from scipy.signal import savgol_filter
 
-from utils import create_x_and_y_windows
-from cosine_transform import get_cosine_basis, BasisProjection, identity, raised_cosine, multifeature_basis
+from utils.utils import create_x_and_y_windows
+from cosine_transform import BasisProjection, identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
 
 DATA = 'wt'
 # BASE_FOLDER = f' notebooks/eda/{DATA}/'
-sessions_features = joblib.load('data/sessions_features_82_isong.pkl')
+sessions_features = joblib.load('../data/sessions_features_82_isong.pkl')
 
 
 def smooth_moving_average(x, smooth_window):

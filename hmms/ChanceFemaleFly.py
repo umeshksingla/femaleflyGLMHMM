@@ -6,7 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 from sklearn.metrics import r2_score
 
-import utils
+from utils import utils
 from BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
@@ -77,7 +77,7 @@ class ChanceFemaleFly(BaseFemaleFly):
 
 if __name__ == '__main__':
 
-    data = joblib.load(f'data/fly_data_cos=4_ortho_o=15.pkl')
+    data = joblib.load(f'../data/fly_data_cos=4_ortho_o=15.pkl')
     model_config = {}
 
     data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']

@@ -1,25 +1,14 @@
-import datetime
-import os
-import time
 from functools import partial
-from wonderwords import RandomWord
 
 import joblib
-import matplotlib.pyplot as plt
 
-import scipy
 import jax
 import numpy as np
 from jax import vmap
-import jax.numpy as jnp
 import jax.random as jr
-import optax
 from dynamax.hidden_markov_model import GaussianHMM
-from sklearn.metrics import r2_score
 
-import fitting
-import simulate
-import utils
+from utils import utils, fitting
 from BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
