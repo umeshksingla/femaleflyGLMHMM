@@ -11,7 +11,7 @@ def create_array_file(model_configs):
     values = [model_configs[k] for k in keys]
     for combo in itertools.product(*values):
         combo_dict = dict(zip(keys, combo))
-        arrays.append(str(combo_dict))
+        arrays.append(str(combo_dict) + '\n')
 
     with open('array_args.txt', 'w') as w:
         w.writelines(arrays)
@@ -41,6 +41,6 @@ if __name__ == '__main__':
         f"array_args.txt",
     ]
     print(">>> SLURM COMMAND ran:", " ".join(command))
-    # subprocess.run(command)
+    subprocess.run(command)
 
 
