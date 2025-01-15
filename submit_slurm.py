@@ -1,4 +1,6 @@
-import numpy as np
+import json
+
+import random
 import itertools
 import subprocess
 
@@ -11,7 +13,7 @@ def create_array_file(model_configs):
     values = [model_configs[k] for k in keys]
     for combo in itertools.product(*values):
         combo_dict = dict(zip(keys, combo))
-        arrays.append(str(combo_dict) + '\n')
+        arrays.append(json.dumps(combo_dict) + '\n')
 
     with open('array_args.txt', 'w') as w:
         w.writelines(arrays)
@@ -22,9 +24,10 @@ def create_array_file(model_configs):
 if __name__ == '__main__':
     model_configs = {
         'names': ['lrhmm', 'ghmm'],
-        'seeds': np.random.randint(10000, size=2),
+        'seeds': [random.randint(1, 10000) for _ in range(2)],
         'num_states': [
-            2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50
+            2,
+            #3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50
         ],
         'transition_matrix_stickiness': [10],
     }
@@ -41,6 +44,6 @@ if __name__ == '__main__':
         f"array_args.txt",
     ]
     print(">>> SLURM COMMAND ran:", " ".join(command))
-    subprocess.run(command)
+    # subprocess.run(command)
 
 

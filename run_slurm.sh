@@ -9,7 +9,7 @@
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 
-PY_SCRIPT="crossvalidation/run_single.py"
+PY_SCRIPT="run_single.py"
 echo "$PY_SCRIPT"
 
 array_args_file="$1"
@@ -19,6 +19,8 @@ linenum=$SLURM_ARRAY_TASK_ID
 echo "SLURM_ARRAY_TASK_ID: $linenum"
 model_config=$(sed -n "$linenum p" $array_args_file)
 
-#source activate keypoint_moseq_new
+source activate /scratch/gpfs/MMURTHY/usingla/femaleflyenv
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 python "$PY_SCRIPT" -mc "$model_config"
+
+
