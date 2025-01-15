@@ -1,5 +1,6 @@
 import argparse
 import joblib
+import json
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
@@ -7,7 +8,6 @@ from utils import utils
 
 
 def create_cli_parser():
-    """Create an argument parser for the command line interface."""
     parser = argparse.ArgumentParser(
         description="Model config."
     )
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     print()
 
     model_config_str = args.mc
-    model_config = model_config_str
+    model_config = json.loads(model_config_str)
 
     model_prefix = model_config['names']
     print(f"Fitting {model_prefix} with model_config: {model_config}")
@@ -51,5 +51,10 @@ if __name__ == '__main__':
     dump_filepath = utils.getafilepath(f'cv/{model.prefix}_{model.model_config["num_states"]}_cv')
     print(">> Saving at:", dump_filepath)
     utils.save(model, train_emissions, train_inputs, train_session_keys, test_emissions, test_inputs, test_session_keys, output_indices, dump_filepath)
+    print("Saved.\n")
+    print(model.score(train_emissions, train_inputs))
+    print(model.score(test_emissions, test_inputs))
+    print(model.score_by_z_and_o(test_emissions, test_inputs))
+    print(model.correlation_by_o(test_emissions, test_inputs))
     print("Finished.\n")
 
