@@ -4,14 +4,14 @@ import sys
 import numpy as np
 
 from plotting import plots
-from utils import utils
+import utils
 
 # Display plots
-display = False
+display = True
 savefig = True
 
 # Load model
-m1 = 'lrhmm_10/20250114_144257_curly'
+m1 = 'lrhmm_15/20250114_155847_version'
 model_ckp, data_config, model_config = utils.load_specific_path(f'models/{m1}')
 
 # Create directory to output figures
@@ -37,17 +37,14 @@ input_raw_each_dim = data_config['input_raw_each_dim']
 
 # Plots
 plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
-
 plots.plot_prob_states(train_stateseq, model_config, title='train', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_prob_states(test_stateseq, model_config, title='held-out', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_transition_matrix(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_steady_state(utils.calculate_steady_state_p(learned_params.transitions.transition_matrix), savefig=savefig, fig_dir=fig_dir, display=display)
-
 plots.plot_filters(learned_params.emissions.weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_var_explained_by_z(model_ckp['train_data']['train_score_by_z'], title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_var_explained_by_z_o(model_ckp['train_data']['train_score_by_z_and_o'], emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_correlation_by_o(model_ckp['train_data']['train_correlation_by_o'], emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
-
 plots.plot_var_explained_by_z(model_ckp['test_data']['test_score_by_z'], title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_var_explained_by_z_o(model_ckp['test_data']['test_score_by_z_and_o'], emission_labels, title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
 plots.plot_correlation_by_o(model_ckp['test_data']['test_correlation_by_o'], emission_labels, title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
@@ -55,12 +52,12 @@ plots.plot_correlation_by_o(model_ckp['test_data']['test_correlation_by_o'], emi
 os.makedirs(f'{fig_dir}/trajs', exist_ok=True)
 for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),][:2]:
     for batch in np.random.choice(range(len(train_stateseq)), size=5, replace=False):
-        plots.plot_trajectories(model_ckp, data_config, batch, prefix_data='train', xlim=xlim, savefig=True, fig_path=f'{fig_dir}/trajs/train_xlim={xlim}.pdf', display=False)
+        plots.plot_trajectories(model_ckp, data_config, batch, prefix_data='train', xlim=xlim, savefig=True, fig_path=f'{fig_dir}/trajs/train_xlim={xlim}.pdf', display=display)
 
 for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),][:2]:
     for batch in np.random.choice(range(len(test_stateseq)), size=5, replace=False):
-        plots.plot_trajectories(model_ckp, data_config, batch, prefix_data='test', xlim=xlim, savefig=True, fig_path=f'{fig_dir}/trajs/test_xlim={xlim}.pdf', display=False)
-print("Done with trajectories.\n\n")
+        plots.plot_trajectories(model_ckp, data_config, batch, prefix_data='test', xlim=xlim, savefig=True, fig_path=f'{fig_dir}/trajs/test_xlim={xlim}.pdf', display=display)
+print("Done with trajectories.")
 
 sys.exit()
 

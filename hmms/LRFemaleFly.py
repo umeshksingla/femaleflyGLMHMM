@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 from sklearn.linear_model import LinearRegression
 
-from BaseFemaleFly import BaseFemaleFly
+from hmms.BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
 jax.config.update("jax_enable_x64", True)
@@ -17,11 +17,16 @@ class LRFemaleFly(BaseFemaleFly):
     prefix = 'lr'
 
     def __init__(self, data_config, model_config):
+        """
+        model_config in Linear Regression is unused.
+        :param data_config:
+        :param model_config:
+        """
         self.data_config = data_config
-        self.model_config = model_config
+        self.model_config = {}
         self.num_states = 1
         self.model_config['num_states'] = self.num_states
-        self.model = LinearRegression(fit_intercept=model_config['fit_intercept'])
+        self.model = LinearRegression(fit_intercept=True)
         self.learned_params = None
         self.learned_lps = None
         super().__init__()
@@ -70,13 +75,6 @@ class LRFemaleFly(BaseFemaleFly):
         emissions_pred = jnp.array(self.predict(None, inputs)[0])
         lp = vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
         return lp
-
-
-if __name__ == '__main__':
-
-    model_config = {
-        'fit_intercept': True,
-    }
 
 # 20241213_143304_uncle with LR
 # 20241213_151742_meter _noLR

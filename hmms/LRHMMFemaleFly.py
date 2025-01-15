@@ -5,7 +5,7 @@ import numpy as np
 from jax import vmap
 import jax.random as jr
 from dynamax.hidden_markov_model import LinearRegressionHMM
-from BaseFemaleFly import BaseFemaleFly
+from hmms.BaseFemaleFly import BaseFemaleFly
 
 from utils import fitting
 

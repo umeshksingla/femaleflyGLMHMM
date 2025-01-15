@@ -228,7 +228,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
 
     model_ckp = {
         'prefix': model.prefix,
-        'model': model.model,
+        # 'model': model.model,
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
@@ -260,6 +260,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
         },
         'output_indices': output_indices,
     }
+    # print(model_ckp)
     os.makedirs(output_dir, exist_ok=False)
     joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
@@ -280,8 +281,11 @@ def load_latest(model_name):
 
 def load_specific_path(model_path):
     print('Loading:', model_path)
-    model_pkl = joblib.load(os.path.join(model_path, 'model.pkl'))
+    # print(os.listdir(model_path))
+    # print(glob.glob(f'{model_path}/*.pkl'))
     data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
+    # print(data_config_pkl)
+    model_pkl = joblib.load(os.path.join(model_path, 'model.pkl'))
     with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
     with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
     if fit_success != 'True':

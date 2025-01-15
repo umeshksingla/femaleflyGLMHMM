@@ -1,21 +1,20 @@
 import joblib
 
-from BaseFemaleFly import BaseFemaleFly
-from LRHMMFemaleFly import LRHMMFemaleFly
-from LRFemaleFly import LRFemaleFly
-from GHMMFemaleFly import GHMMFemaleFly
-from ChanceFemaleFly import ChanceFemaleFly
+from hmms.BaseFemaleFly import BaseFemaleFly
+from hmms.LRHMMFemaleFly import LRHMMFemaleFly
+from hmms.LRFemaleFly import LRFemaleFly
+from hmms.GHMMFemaleFly import GHMMFemaleFly
+from hmms.ChanceFemaleFly import ChanceFemaleFly
 
-import utils
-
+from utils import utils
 
 if __name__ == '__main__':
 
-    MODEL = LRHMMFemaleFly
+    MODEL = ChanceFemaleFly
 
     data = joblib.load(f'data/fly_data_cos=8_ortho_o=15.pkl')
     model_config = {
-        'num_states': 10,
+        'num_states': 15,
         'transition_matrix_stickiness': 10,
     }
 

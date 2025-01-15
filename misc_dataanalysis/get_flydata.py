@@ -6,7 +6,8 @@ from collections import OrderedDict
 from scipy.signal import savgol_filter
 
 from utils.utils import create_x_and_y_windows
-from cosine_transform import BasisProjection, identity, raised_cosine, multifeature_basis
+from glm_utils.preprocessing import BasisProjection
+from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
 
@@ -229,7 +230,7 @@ if __name__ == '__main__':
 
     data_config['input_raw_each_dim'] = 3*150
     data_config['num_timesteps'] = 100000
-    data_config["predict_window_size"] = 15
+    data_config["predict_window_size"] = 5
     data_config['input_labels'] = OrderedDict({
         'mFV': 'z-mFV',
         'mLS': 'z-mLS',
@@ -250,7 +251,7 @@ if __name__ == '__main__':
         'fLV': 'z-fLV',
         'dfTheta': 'z-fRV',
     })
-    data_config['ncos'] = 8
+    data_config['ncos'] = 4
 
     # describe_sessions()
     # sys.exit()
@@ -258,5 +259,5 @@ if __name__ == '__main__':
     data = get_x_and_y_data(data_config, display=True)
     filename = f'fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}.pkl'
     print("Saving at:", filename)
-    joblib.dump(data, f'data/{filename}')
+    joblib.dump(data, f'../data/{filename}')
     print("Saved at:", filename)

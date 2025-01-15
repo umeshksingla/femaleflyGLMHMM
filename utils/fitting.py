@@ -15,7 +15,7 @@ def fitEM(key, hmm, train_emissions, train_inputs):
                                         em_props,
                                         train_emissions,
                                         train_inputs,
-                                        num_iters=100, verbose=True)
+                                        num_iters=200, verbose=True)
     em_lps = -em_losses / train_emissions.size
     e = time.time()
     print("=== END em ==========")

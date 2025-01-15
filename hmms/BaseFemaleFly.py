@@ -38,14 +38,15 @@ class BaseFemaleFly:
         y_preds = y_preds.reshape(-1, y_preds.shape[-1])
         emissions = emissions.reshape(-1, emissions.shape[-1])
         z_seqs = z_seqs.reshape(-1)
-        return {z: r2_score(emissions[z_seqs == z], y_preds[z_seqs == z]) for z in range(self.num_states)}
+        print("z_seqs", np.unique(z_seqs, return_counts=True))
+        return {z: (r2_score(emissions[z_seqs == z], y_preds[z_seqs == z]) if np.any(z_seqs == z) else 0.0) for z in range(self.num_states)}
 
     def score_by_z_and_o(self, emissions, inputs):
         y_preds, z_seqs = self.predict(emissions, inputs)
         y_preds = y_preds.reshape(-1, y_preds.shape[-1])
         emissions = emissions.reshape(-1, emissions.shape[-1])
         z_seqs = z_seqs.reshape(-1)
-        return {z: {o: r2_score(emissions[z_seqs == z][:, o], y_preds[z_seqs == z][:, o]) for o in range(self.data_config["emission_dim"])}
+        return {z: {o: (r2_score(emissions[z_seqs == z][:, o], y_preds[z_seqs == z][:, o]) if np.any(z_seqs == z) else 0.0) for o in range(self.data_config["emission_dim"])}
                 for z in range(self.num_states)}
 
     def correlation_by_o(self, emissions, inputs):

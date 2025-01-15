@@ -1,5 +1,4 @@
 from functools import partial
-
 import joblib
 
 import jax
@@ -9,9 +8,9 @@ import jax.random as jr
 from dynamax.hidden_markov_model import GaussianHMM
 
 from utils import utils, fitting
-from BaseFemaleFly import BaseFemaleFly
+from hmms.BaseFemaleFly import BaseFemaleFly
 
-# print("jax.config", jax.config.values)
+
 jax.config.update("jax_enable_x64", True)
 
 
@@ -64,36 +63,6 @@ class GHMMFemaleFly(BaseFemaleFly):
         lp += self.model.log_prior(self.learned_params)
         lp = lp / emissions.size
         return lp
-
-
-if __name__ == '__main__':
-
-    data = joblib.load(f'data/fly_data_cos=4_ortho_o=15_directional.pkl')
-    model_config = {
-        'num_states': 3,
-        'transition_matrix_stickiness': 10,
-    }
-
-    data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
-    num_batches = data_config['num_sessions']
-    num_train_batches = int(num_batches * 0.8)
-    train_emissions, train_inputs = emissions[:num_train_batches], inputs[:num_train_batches]
-    test_emissions, test_inputs = emissions[num_train_batches:], inputs[num_train_batches:]
-
-    model = GHMMFemaleFly(data_config, model_config)
-    model.fit(train_emissions, None)
-    # test_emission_predictions, test_z_predictions = model.predict(test_emissions, test_inputs)
-
-    dump_filepath = utils.getafilepath(f'{model.prefix}_{model.model_config["num_states"]}')
-    print(">> Saving at:", dump_filepath)
-    utils.save(model, train_emissions, train_inputs, test_emissions, test_inputs, dump_filepath)
-
-    print(model.score(train_emissions, train_inputs))
-
-    print(model.score(test_emissions, test_inputs))
-    print(model.score_by_z_and_o(test_emissions, test_inputs))
-    print(model.correlation_by_o(test_emissions, test_inputs))
-
 
 # 20241213_142835_bowtie with LR 3
 # 20241213_151732_webmail noLR 3

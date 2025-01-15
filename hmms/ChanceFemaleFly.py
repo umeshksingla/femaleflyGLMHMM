@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from sklearn.metrics import r2_score
 
 from utils import utils
-from BaseFemaleFly import BaseFemaleFly
+from hmms.BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
 jax.config.update("jax_enable_x64", True)
@@ -18,9 +18,15 @@ class ChanceFemaleFly(BaseFemaleFly):
     prefix = 'chance'
 
     def __init__(self, data_config, model_config):
+        """
+        model_config in Chance Model is unused.
+        :param data_config:
+        :param model_config:
+        """
         self.data_config = data_config
-        self.model_config = model_config
+        self.model_config = {}
         self.num_states = 1
+        self.model_config['num_states'] = self.num_states
         # self.model = tfd.MultivariateNormalFullCovariance(loc=np.zeros(data_config['emission_dim']), covariance_matrix=np.identity(data_config['emission_dim']))
         self.learned_params = None
         self.learned_lps = None
@@ -73,32 +79,6 @@ class ChanceFemaleFly(BaseFemaleFly):
         y_preds = y_preds.reshape(-1, self.data_config['emission_dim'])
         y_tr = emissions.reshape(-1, self.data_config['emission_dim'])
         return round(r2_score(y_tr, y_preds), 4)
-
-
-if __name__ == '__main__':
-
-    data = joblib.load(f'../data/fly_data_cos=4_ortho_o=15.pkl')
-    model_config = {}
-
-    data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
-    num_batches = data_config['num_sessions']
-    num_train_batches = int(num_batches * 0.8)
-    train_emissions, train_inputs = emissions[:num_train_batches], inputs[:num_train_batches]
-    test_emissions, test_inputs = emissions[num_train_batches:], inputs[num_train_batches:]
-
-    model = ChanceFemaleFly(data_config, model_config)
-    model.fit(train_emissions, None)
-    test_emission_predictions, test_z_predictions = model.predict(None, test_inputs)
-
-    dump_filepath = utils.getafilepath(model.prefix)
-    print(">> Saving at:", dump_filepath)
-    utils.save(model, train_emissions, train_inputs, test_emissions, test_inputs, dump_filepath)
-
-    print(model.score(train_emissions, train_inputs))
-
-    print(model.score(test_emissions, test_inputs))
-    print(model.score_by_z_and_o(test_emissions, test_inputs))
-    print(model.correlation_by_o(test_emissions, test_inputs))
 
 # 20241211_233249_designation fly_data_cos=4_ortho_o=15.pkl
 

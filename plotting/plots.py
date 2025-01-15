@@ -9,8 +9,7 @@ import jax.numpy as jnp
 import jax.random as jr
 from dynamax.utils.plotting import CMAP, COLORS
 from scipy.ndimage import uniform_filter1d
-
-from cosine_transform import BasisProjection
+from glm_utils.preprocessing import BasisProjection
 
 
 # -- Axes --
@@ -225,7 +224,7 @@ def plot_filters(weights, data_config, savefig=False, fig_dir=None, display=True
         weights = BasisProjection(basis).inverse_transform(weights.reshape(-1, filter_len)).reshape(num_states, emission_dim, -1)
     weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
 
-    fig, axs = plt.subplots(emission_dim, n_inputs, sharex=True, sharey='row')
+    fig, axs = plt.subplots(emission_dim, n_inputs, figsize=(20, 10), sharex=True, sharey='row')
     # weights = weights / np.sum(weights)
     d = 0
     for _ in emission_labels:
@@ -419,7 +418,7 @@ def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None
 
 
 def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, display=True):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(20, 20))
     m = transition_matrix.shape[0]
     sns.heatmap(transition_matrix, annot=True, cmap='bone', cbar=True, square=True, fmt=".3f",
                 xticklabels=[f'State {i}' for i in range(m)],
@@ -427,6 +426,7 @@ def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, displ
     plt.title('Transition Matrix')
     plt.xlabel('To State')
     plt.ylabel('From State')
+    plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, 'transition_matrix.pdf'), bbox_inches='tight', dpi=300)
     if display: plt.show()
     plt.close()
@@ -503,11 +503,11 @@ def plot_var_explained_by_z_o(r2_z_o, o_labels, title=None, savefig=False, fig_d
     Plot r2 scores in each state for each emission dimension separately
     """
     print("o_labels", o_labels)
-    fig, ax = plt.subplots(1, len(r2_z_o), sharey=True)
+    fig, ax = plt.subplots(1, len(r2_z_o), figsize=(10, 10), sharey=True, layout='constrained')
     for z in r2_z_o:
         for o in r2_z_o[z]:
             ax[z].bar(o, r2_z_o[z][o] * 100, color=COLORS[z])
-        ax[z].set_xticks(list(r2_z_o[z].keys()), list(o_labels.values()))
+        ax[z].set_xticks(list(r2_z_o[z].keys()), list(o_labels.values()), rotation=90)
         ax[z].set_title(f'State {z}', color=COLORS[z])
         ax[z].axhline(0, c='k', ls=':', lw=2)
         ax[z].margins(0.1)
