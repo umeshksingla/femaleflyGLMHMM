@@ -3,15 +3,15 @@ import sys
 
 import numpy as np
 
-from plotting import plots
-import utils
+import femaleflystates.utilities.utils as utils
+from femaleflystates.plotting import plots
 
 # Display plots
-display = True
+display = False
 savefig = True
 
 # Load model
-m1 = 'lrhmm_15/20250114_155847_version'
+m1 = 'cv/ghmm_2_cv/20250115_184405_tearful'
 model_ckp, data_config, model_config = utils.load_specific_path(f'models/{m1}')
 
 # Create directory to output figures

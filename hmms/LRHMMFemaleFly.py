@@ -7,7 +7,7 @@ import jax.random as jr
 from dynamax.hidden_markov_model import LinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
 
-from utils import fitting
+from utilities import fitting
 
 # print("jax.config", jax.config.values)
 jax.config.update("jax_enable_x64", True)

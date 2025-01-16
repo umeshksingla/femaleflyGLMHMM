@@ -44,6 +44,6 @@ if __name__ == '__main__':
         f"array_args.txt",
     ]
     print(">>> SLURM COMMAND ran:", " ".join(command))
-    # subprocess.run(command)
+    subprocess.run(command)
 
 

@@ -4,7 +4,7 @@ import json
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
-from utils import utils
+from utilities import utils
 
 
 def create_cli_parser():

@@ -7,7 +7,7 @@ from jax import vmap
 import jax.random as jr
 from dynamax.hidden_markov_model import GaussianHMM
 
-from utils import utils, fitting
+from utilities import utils, fitting
 from hmms.BaseFemaleFly import BaseFemaleFly
 
 
