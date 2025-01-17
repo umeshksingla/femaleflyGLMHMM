@@ -6,7 +6,7 @@ import numpy as np
 import jax.numpy as jnp
 from sklearn.metrics import r2_score
 
-from utils import utils
+from utilities import utils
 from hmms.BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)

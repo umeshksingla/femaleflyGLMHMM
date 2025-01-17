@@ -521,12 +521,12 @@ def plot_var_explained_by_z_o(r2_z_o, o_labels, title=None, savefig=False, fig_d
 
 
 def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
-    fig = plt.figure()
-    plt.plot(em_losses)
+    fig = plt.figure(figsize=(10, 10), constrained_layout=True)
+    plt.plot(em_losses, '.-')
     plt.title('EM training iters')
     plt.xlabel('#iters')
     plt.ylabel('Neg Log prob (per frame)')
-    plt.tight_layout()
+    plt.margins(0.2)
     if savefig: fig.savefig(os.path.join(fig_dir, 'loss.pdf'), bbox_inches='tight', dpi=300)
     if display: plt.show()
     return fig
@@ -606,7 +606,7 @@ def print_ghmm_params(params, true_params=False):
 #     return
 
 
-def plot_trajectories(model_ckp, data_config, batch, prefix_data='', xlim=None, savefig=False, fig_path=None, display=True):
+def plot_trajectories(model_ckp, model_config, data_config, batch, prefix_data='', xlim=None, savefig=False, fig_path=None, display=True):
     """
 
     :param prefix_data: 'train' or 'test'
@@ -619,7 +619,7 @@ def plot_trajectories(model_ckp, data_config, batch, prefix_data='', xlim=None, 
     predictions_key = f'{prefix_data}_predictions'
     stateseq_key = f'{prefix_data}_stateseq'
 
-    num_states = model_ckp['model'].num_states
+    num_states = model_config['num_states']
     model_label = model_ckp['prefix'].upper() + '_' + str(num_states)
     emission_labels = data_config['emission_labels']
 

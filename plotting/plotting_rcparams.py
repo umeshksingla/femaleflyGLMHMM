@@ -31,8 +31,8 @@ rcParams['ytick.major.size'] = 4
 
 # -- Fonts --
 rcParams['font.size'] = 16  # Panel label
-rcParams['font.family'] = 'Arial'
-rcParams['font.sans-serif'] = 'Arial'
+# rcParams['font.family'] = 'Arial'
+# rcParams['font.sans-serif'] = 'Arial'
 rcParams['text.color'] = 'black'
 rcParams['axes.labelcolor'] = 'black'
 

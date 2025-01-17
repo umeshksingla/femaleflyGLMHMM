@@ -6,16 +6,16 @@ from hmms.LRFemaleFly import LRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 
-from utils import utils
+from utilities import utils
 
 if __name__ == '__main__':
 
-    MODEL = ChanceFemaleFly
+    MODEL = LRFemaleFly
 
-    data = joblib.load(f'data/fly_data_cos=8_ortho_o=15.pkl')
+    data = joblib.load(f'../data/fly_data_cos=4_ortho_o=15.pkl')
     model_config = {
-        'num_states': 15,
-        'transition_matrix_stickiness': 10,
+        # 'num_states': 15,
+        # 'transition_matrix_stickiness': 10,
     }
 
     data_config, emissions, inputs, output_indices = data['data_config'], data['emissions'], data['inputs'], data['output_indices']
