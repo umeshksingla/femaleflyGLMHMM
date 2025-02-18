@@ -66,15 +66,3 @@ class LRHMMFemaleFly(BaseFemaleFly):
         lp += self.model.log_prior(self.learned_params)
         lp = lp / emissions.size
         return lp
-
-
-# 20241213_142846_lane with LR 3
-# 20241213_151646_diction noLR 3
-# 20241217_164917_toad with LR 5
-# 20241217_164829_toothpaste noLR 5
-# 20241217_170304_tasty with LR 3 directional only
-# 20241217_175018_watch with LR 3 smoothed
-# 20241217_175455_lecture with LR 3 heavily smoothed
-# 20241219_190821_administration with LR cos=8
-
-

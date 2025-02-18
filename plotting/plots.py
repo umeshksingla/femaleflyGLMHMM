@@ -42,8 +42,8 @@ mpl.rcParams['ytick.major.size'] = 4
 
 # -- Fonts --
 mpl.rcParams['font.size'] = 16  # Panel label
-mpl.rcParams['font.family'] = 'Arial'
-mpl.rcParams['font.sans-serif'] = 'Arial'
+# mpl.rcParams['font.family'] = 'Arial'
+# mpl.rcParams['font.sans-serif'] = 'Arial'
 mpl.rcParams['text.color'] = 'black'
 mpl.rcParams['axes.labelcolor'] = 'black'
 
@@ -523,6 +523,7 @@ def plot_var_explained_by_z_o(r2_z_o, o_labels, title=None, savefig=False, fig_d
 def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     fig = plt.figure(figsize=(10, 10), constrained_layout=True)
     plt.plot(em_losses, '.-')
+    print("em_losses:", em_losses)
     plt.title('EM training iters')
     plt.xlabel('#iters')
     plt.ylabel('Neg Log prob (per frame)')

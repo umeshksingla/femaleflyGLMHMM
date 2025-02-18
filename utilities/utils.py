@@ -16,6 +16,8 @@ import jax.numpy as jnp
 import jax.random as jnr
 import jax
 
+from plotting import plots
+
 
 def get_data_logprob(hmm, params, emissions, inputs=None):
     """Evaluate the log probability of the data under the given model and model parameters"""
@@ -266,6 +268,51 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
     with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
+    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
+    return
+
+
+def generate_figures(model_dir, savefig=True, display=False):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    os.makedirs(fig_dir, exist_ok=True)
+
+    train_stateseq = model_ckp['train_data']['train_stateseq']
+    test_stateseq = model_ckp['test_data']['test_stateseq']
+    learned_params = model_ckp['learned_params']
+    learned_lps = model_ckp['learned_lps']
+    emission_labels = data_config['emission_labels']
+
+    plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_prob_states(train_stateseq, model_config, title='train', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_prob_states(test_stateseq, model_config, title='held-out', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_transition_matrix(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_steady_state(calculate_steady_state_p(learned_params.transitions.transition_matrix), savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(learned_params.emissions.weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_z(model_ckp['train_data']['train_score_by_z'], title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_z_o(model_ckp['train_data']['train_score_by_z_and_o'], emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_correlation_by_o(model_ckp['train_data']['train_correlation_by_o'], emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_z(model_ckp['test_data']['test_score_by_z'], title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_z_o(model_ckp['test_data']['test_score_by_z_and_o'], emission_labels, title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_correlation_by_o(model_ckp['test_data']['test_correlation_by_o'], emission_labels, title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+
+    os.makedirs(f'{fig_dir}/trajs', exist_ok=True)
+    for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),]:
+        for batch in np.random.choice(range(len(train_stateseq)), size=5, replace=False):
+            plots.plot_trajectories(model_ckp, model_config, data_config, batch,
+                                    prefix_data='train', xlim=xlim, savefig=True,
+                                    fig_path=f'{fig_dir}/trajs/train{batch}_xlim={xlim}.pdf',
+                                    display=display)
+
+    for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),]:
+        for batch in np.random.choice(range(len(test_stateseq)), size=5, replace=False):
+            plots.plot_trajectories(model_ckp, model_config, data_config, batch,
+                                    prefix_data='test', xlim=xlim, savefig=True,
+                                    fig_path=f'{fig_dir}/trajs/test{batch}_xlim={xlim}.pdf',
+                                    display=display)
+    print("Done with trajectories.")
     return
 
 
