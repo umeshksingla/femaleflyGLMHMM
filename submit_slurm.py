@@ -1,3 +1,9 @@
+####################################
+
+# Usage: python submit_slurm.py
+
+####################################
+
 import json
 
 import random
@@ -23,11 +29,11 @@ def create_array_file(model_configs):
 
 if __name__ == '__main__':
     model_configs = {
-        'names': ['lrhmm', 'ghmm'],
-        'seeds': [random.randint(1, 10000) for _ in range(4)],
+        'names': ['lrhmm'],
+        'seeds': [random.randint(1, 10000) for _ in range(5)],
         'num_states': [
-            # 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50
-            11, 12, 13, 16, 18, 23, 28, 30, 33, 40,
+            # 2, 
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
         ],
         'transition_matrix_stickiness': [10],
     }
