@@ -36,12 +36,15 @@ class LRFemaleFly(BaseFemaleFly):
         X_tr = inputs.reshape(-1, inputs.shape[-1])
         Y_tr = emissions.reshape(-1, emissions.shape[-1])
         self.model.fit(X_tr, Y_tr)
-        self.learned_params = np.expand_dims(self.model.coef_, 0)
+        self.learned_params = {
+            'w': np.expand_dims(self.model.coef_, 0),
+            'b': np.expand_dims(self.model.intercept_, 0)
+        }
         self.update_status()
         return
 
     def check_nan_in_fit_params(self):
-        return ~np.any(np.isnan(self.learned_params))
+        return ~np.any(np.isnan(self.learned_params['w']))
 
     def predict(self, emissions, inputs):
         """
