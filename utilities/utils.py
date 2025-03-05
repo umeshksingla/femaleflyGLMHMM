@@ -222,6 +222,12 @@ def get_train_test_split(data, num_fitsessions=None, seed=0, train_frac=0.7):
 
 def save(model, train_emissions, train_inputs, train_session_keys, test_emissions, test_inputs, test_session_keys, output_indices, output_dir):
 
+    os.makedirs(output_dir, exist_ok=False)
+    joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
+    with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
+    with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
+    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
+
     train_emission_predictions, train_z_predictions = model.predict(train_emissions, train_inputs)
     test_emission_predictions, test_z_predictions = model.predict(test_emissions, test_inputs)
 
@@ -263,12 +269,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
         'output_indices': output_indices,
     }
     # print(model_ckp)
-    os.makedirs(output_dir, exist_ok=False)
     joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
-    joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
-    with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
-    with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
-    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
     return
 
 
