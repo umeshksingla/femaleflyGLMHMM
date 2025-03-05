@@ -41,8 +41,9 @@ def plotCV_same_model(path, model_prefix, num_states_configs):
         plt.plot(x, (hmm_train_lps - baseline)*effective_fps, 'b.', label='Train' if i == 0 else '')
         plt.plot(x, (hmm_test_lps - baseline)*effective_fps, 'r.', label='Train' if i == 0 else '')
 
-        plt.plot(s, (hmm_train_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'b*', markersize=15)
-        plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'r*', markersize=15)
+        if len(hmm_train_lps):
+            plt.plot(s, (hmm_train_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'b*', markersize=15)
+            plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'r*', markersize=15)
         # break
 
     plt.ylabel('Normalized LL (bits/s)')
@@ -123,7 +124,7 @@ if __name__ == '__main__':
 
     CHANCE_MODEL_PATH = 'models/chance_1/20250117_135807_octave'
     LR_MODEL_PATH = 'models/lr_1/20250117_135840_lane'
-    path = 'cv4'
-    plotCV_same_model(path, 'lrhmmci', num_states_configs)
+    path = 'cv5'
+    plotCV_same_model(path, 'lrhmm', num_states_configs)
     # plotCV_same_model('ghmm', num_states_configs)
     # for ns in num_states_configs: plotCV_different_models(num_states=ns)
