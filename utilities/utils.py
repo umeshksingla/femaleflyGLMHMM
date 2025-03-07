@@ -4,27 +4,23 @@ import joblib
 import json
 import numpy as np
 from functools import partial
-from sklearn.metrics import r2_score, mean_squared_error
 from wonderwords import RandomWord
 from datetime import datetime
 from collections import defaultdict
 
 from jax import vmap
-from jax.scipy.stats import multivariate_normal
 import tensorflow_probability.substrates.jax.distributions as tfd
 import jax.numpy as jnp
-import jax.random as jnr
-import jax
 
 from plotting import plots
 
 
-def get_data_logprob(hmm, params, emissions, inputs=None):
-    """Evaluate the log probability of the data under the given model and model parameters"""
-    lp = vmap(partial(hmm.marginal_log_prob, params))(emissions, inputs).sum()
-    lp += hmm.log_prior(params)
-    lp = lp / emissions.size
-    return lp
+# def get_data_logprob(hmm, params, emissions, inputs=None):
+#     """Evaluate the log probability of the data under the given model and model parameters"""
+#     lp = vmap(partial(hmm.marginal_log_prob, params))(emissions, inputs).sum()
+#     lp += hmm.log_prior(params)
+#     lp = lp / emissions.size
+#     return lp
 
 
 # def get_data_logprob_weightszero(hmm, params, emissions, inputs):
@@ -40,44 +36,21 @@ def get_data_logprob(hmm, params, emissions, inputs=None):
 #     lp = lp / emissions.size
 #     return lp
 
+# def get_data_logprob_mvn(emissions):
+#     def fit_mvn(y):
+#         """
+#         Multivariate gaussian model
+#         """
+#         mu = jnp.mean(y, axis=0)
+#         cov = jnp.cov(y.T)
+#         # p = multivariate_normal.pdf(y, mean=mu, cov=cov)
+#         p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov).prob(y)
+#         p = jnp.maximum(p, 1e-15)
+#         log_Y_given_mvn = jnp.sum(jnp.log(p))
+#         return log_Y_given_mvn
 
-def get_data_logprob_lr(lr, emissions, inputs):
-    """
-    Linear regression
-    P(Y|X, w)
-    """
-    def fit_normal_residuals(fit_y, true_y):
-        residuals = fit_y - true_y
-        # print(residuals.shape)
-        sigma = jnp.cov(residuals.T)
-        mu = jnp.zeros(residuals.shape[-1])
-        # print("sigma_tr", sigma)
-        # p = multivariate_normal.pdf(residuals, mean=mu, cov=sigma)
-        p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).prob(residuals)
-        # print(p, p.shape)
-        p = jnp.maximum(p, 1e-15)
-        log_Y_given_wx = jnp.sum(jnp.log(p))
-        return log_Y_given_wx
-
-    emissions_pred = jnp.array([lr.predict(_) for _ in inputs])     # session wise
-    return vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
-
-
-def get_data_logprob_mvn(emissions):
-    def fit_mvn(y):
-        """
-        Multivariate gaussian model
-        """
-        mu = jnp.mean(y, axis=0)
-        cov = jnp.cov(y.T)
-        # p = multivariate_normal.pdf(y, mean=mu, cov=cov)
-        p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov).prob(y)
-        p = jnp.maximum(p, 1e-15)
-        log_Y_given_mvn = jnp.sum(jnp.log(p))
-        return log_Y_given_mvn
-
-    lp = vmap(fit_mvn)(emissions).sum() / emissions.size
-    return lp
+#     lp = vmap(fit_mvn)(emissions).sum() / emissions.size
+#     return lp
 
 
 def calculate_steady_state_p(P):
@@ -358,7 +331,8 @@ def load_specific_path(model_path):
     with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
     with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
     if fit_success != 'True':
-        raise Warning(f'Unsuccessful model loaded. {model_path}')
+        print(Warning(f'Unsuccessful model loaded. {model_path}'))
+        return None, None, None
     return model_pkl, data_config_pkl, model_config
 
 
