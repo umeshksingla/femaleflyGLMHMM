@@ -85,14 +85,17 @@ def run(mc):
 if __name__ == '__main__':
 
     ## If from command line
-    parser = create_cli_parser()
-    args = parser.parse_args()
-    print("Args:", vars(args))
-    model_config_str = args.mc
-    path = args.path
-    model_config = json.loads(model_config_str)
+    # parser = create_cli_parser()
+    # args = parser.parse_args()
+    # print("Args:", vars(args))
+    # model_config_str = args.mc
+    # path = args.path
+    # model_config = json.loads(model_config_str)
 
-    ## If model_config specified here
+    ## OR specify a model_config here
     # model_config = {}
 
-    run(model_config)
+    # run(model_config)
+
+    ## OR Given a path, generate all the figures
+    utils.generate_figures("./models/general/lrhmmci_27_cv/20250306_193653_defense", savefig=True, display=False)

@@ -1,5 +1,7 @@
 models
 data
+debug_logs
+scratch
 
 **/*.pdf
 **/*.svg
