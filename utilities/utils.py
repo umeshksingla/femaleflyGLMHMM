@@ -226,17 +226,14 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
     with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
-    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
-
     partial_model_ckp = {
         'prefix': model.prefix,
-        # 'model': model.model,
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
     }
-
-    joblib.dump(partial_model_ckp, os.path.join(output_dir, 'partial_model_ckp.pkl'))   # helps with debugging params
+    joblib.dump(partial_model_ckp, os.path.join(output_dir, 'model.pkl'))   # helps with debugging params
+    print("Partial checkpoint dumped.")
 
     #### calculate evaluation stats etc on train and test data
     train_emission_predictions, train_z_predictions = model.predict(train_emissions, train_inputs)
@@ -281,6 +278,8 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
     }
     # print(model_ckp)
     joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
+    print("Full checkpoint dumped.")
+    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
     return
 
 
