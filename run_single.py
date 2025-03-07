@@ -1,6 +1,8 @@
 ####################################
 
 # Example usage: python run_single.py  --mc '{"names": "lrhmmci", "seeds": 6205, "num_states": 2, "transition_matrix_stickiness": 10}' --path "general"
+# OR
+# python run_single.py --mc '{"names": "chance"}' --path "general"
 
 ####################################
 
@@ -57,6 +59,8 @@ def run(mc):
         model = GHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
+    elif model_prefix == 'chance':
+        model = ChanceFemaleFly(data_config, mc)
     else:
         raise Exception('Unsupported model for cross validation.')
 

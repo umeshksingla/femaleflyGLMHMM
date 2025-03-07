@@ -29,11 +29,12 @@ def create_array_file(model_configs):
 
 if __name__ == '__main__':
     model_configs = {
-        'names': ['lrhmm'],
+        'names': ['lrhmmci'],
         'seeds': [random.randint(1, 10000) for _ in range(5)],
         'num_states': [
-            # 2, 
-            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
+            # 2, 5, 15, 
+            2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
+            # 20, 25, 27, 30
         ],
         'transition_matrix_stickiness': [10],
     }
