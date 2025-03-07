@@ -269,6 +269,10 @@ def generate_figures(model_dir, savefig=True, display=False):
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
 
+    plots.plot_ethogram(learned_params.transitions.transition_matrix,
+                                 savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_ethogram_community(learned_params.transitions.transition_matrix,
+                                  savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_prob_states(train_stateseq, model_config,
                            title='train', savefig=savefig, fig_dir=fig_dir, display=display)

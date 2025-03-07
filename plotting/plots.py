@@ -3,6 +3,7 @@ import matplotlib as mpl
 from matplotlib import colors
 import seaborn as sns
 import os
+import networkx as nx
 
 import numpy as np
 import jax.numpy as jnp
@@ -431,6 +432,88 @@ def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, displ
     if display: plt.show()
     plt.close()
     return fig
+
+
+def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
+    fig = plt.figure(figsize=(10, 10))
+
+    G = nx.DiGraph()
+    num_states = transition_matrix.shape[0]
+
+    # Add edges with weights
+    for i in range(num_states):
+        for j in range(num_states):
+            if transition_matrix[i, j] > 0.005:  # Only add edges with nonzero probability
+                G.add_edge(i, j, weight=transition_matrix[i, j])
+
+    pos = nx.spring_layout(G)
+
+    edges = G.edges(data=True)
+    edge_widths = [d['weight'] * 5 for (u, v, d) in edges]  # Scale edge width
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=2000,
+            font_size=14, font_weight='bold', edge_color='gray', width=edge_widths,
+            arrows=True,
+            connectionstyle='arc3,rad=0.1')
+
+    # Draw edge labels
+    edge_labels = {(u, v): f"{d['weight']:.3f}" for (u, v, d) in edges}
+    # print(edge_labels, len(edge_labels))
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, label_pos=0.4, connectionstyle='arc3,rad=0.1')
+
+    plt.title("Transition Probability Graph")
+    if savefig: fig.savefig(os.path.join(fig_dir, 'ethogram.pdf'), bbox_inches='tight', dpi=300)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_ethogram_community(transition_matrix, savefig=False, fig_dir=None, display=True):
+
+    fig = plt.figure(figsize=(10, 10))
+
+    # Define positions using a circular layout
+    G = nx.DiGraph()
+    num_states = transition_matrix.shape[0]
+
+    # Add edges with weights
+    for i in range(num_states):
+        for j in range(num_states):
+            if transition_matrix[i, j] > 0.005:  # Only add edges with nonzero probability
+                G.add_edge(i, j, weight=transition_matrix[i, j])
+
+    communities = nx.community.greedy_modularity_communities(G)
+    print("communities", communities)
+
+    # Compute positions for the node clusters as if they were themselves nodes in a
+    # supergraph using a larger scale factor
+    supergraph = nx.cycle_graph(len(communities))
+    superpos = nx.spring_layout(G, scale=50)
+
+    # Use the "supernode" positions as the center of each node cluster
+    centers = list(superpos.values())
+    pos = {}
+    for center, comm in zip(centers, communities):
+        pos.update(nx.spring_layout(nx.subgraph(G, comm), center=center))
+
+    edges = G.edges(data=True)
+    edge_widths = [d['weight'] * 5 for (u, v, d) in edges]  # Differentiate in/out degrees
+
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=2000,
+            font_size=14, font_weight='bold', edge_color='gray', width=edge_widths,
+            arrows=True,
+            connectionstyle='arc3,rad=0.1')
+    nx.draw_networkx_edges(G, pos=pos)
+
+    # Draw edge labels
+    edge_labels = {(u, v): f"{d['weight']:.3f}" for (u, v, d) in edges}
+    # print(edge_labels, len(edge_labels))
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, label_pos=0.4, connectionstyle='arc3,rad=0.1')
+
+    plt.title("Transition Probability Graph")
+    if savefig: fig.savefig(os.path.join(fig_dir, 'ethogram_community.pdf'), bbox_inches='tight', dpi=300)
+    if display: plt.show()
+    plt.close()
+    return
 
 
 def plot_steady_state(steady_state_p, savefig=False, fig_dir=None, display=True):
