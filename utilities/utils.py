@@ -211,6 +211,8 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
     #### calculate evaluation stats etc on train and test data
     train_emission_predictions, train_z_predictions = model.predict(train_emissions, train_inputs)
     test_emission_predictions, test_z_predictions = model.predict(test_emissions, test_inputs)
+    train_z_probs = model.get_state_probs(train_emissions, train_inputs)
+    test_z_probs = model.get_state_probs(test_emissions, test_inputs)
 
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
     test_lp = model.get_data_logprob(test_emissions, test_inputs)
@@ -226,6 +228,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
             'train_inputs': train_inputs,
             'train_predictions': train_emission_predictions,
             'train_stateseq': train_z_predictions,
+            'train_state_probs': train_z_probs,
             'train_lp': train_lp,
             'train_score': model.score(train_emissions, train_inputs),
             'train_score_by_o': model.score_by_o(train_emissions, train_inputs),
@@ -239,6 +242,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
             'test_inputs': test_inputs,
             'test_predictions': test_emission_predictions,
             'test_stateseq': test_z_predictions,
+            'test_state_probs': test_z_probs,
             'test_lp': test_lp,
             'test_score': model.score(test_emissions, test_inputs),
             'test_score_by_o': model.score_by_o(test_emissions, test_inputs),
@@ -309,16 +313,26 @@ def generate_figures(model_dir, savefig=True, display=False):
     for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),]:
         for batch in np.random.choice(range(len(train_stateseq)), size=min(5, len(train_stateseq)), replace=False):
             plots.plot_trajectories(model_ckp, model_config, data_config, batch,
-                                    prefix_data='train', xlim=xlim, savefig=True,
+                                    prefix_data='train', xlim=xlim, savefig=savefig,
                                     fig_path=f'{fig_dir}/trajs/train{batch}_xlim={xlim}.pdf',
                                     display=display)
+            if xlim is None:
+                plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], batch,
+                                          savefig=savefig, fig_dir=fig_dir, display=display)
+            break
+        break
 
     for xlim in [None, (0, 1000), (1500, 2000), (10000, 15000), (0, 5000), (16000, 17000),]:
         for batch in np.random.choice(range(len(test_stateseq)), size=min(5, len(test_stateseq)), replace=False):
             plots.plot_trajectories(model_ckp, model_config, data_config, batch,
-                                    prefix_data='test', xlim=xlim, savefig=True,
+                                    prefix_data='test', xlim=xlim, savefig=savefig,
                                     fig_path=f'{fig_dir}/trajs/test{batch}_xlim={xlim}.pdf',
                                     display=display)
+            if xlim is None:
+                plots.plot_smoothed_probs(model_ckp['test_data']['test_state_probs'], batch,
+                                          savefig=savefig, fig_dir=fig_dir, display=display)
+            break
+        break
     print("Done with trajectories.")
     return
 

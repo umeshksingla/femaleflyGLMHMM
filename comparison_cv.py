@@ -175,7 +175,7 @@ def plotCV_different_models(path, num_states):
 
 if __name__ == '__main__':
 
-    data_config = joblib.load(f'data/fly_data_cos=4_ortho_o=15.pkl')['data_config']
+    data_config = joblib.load(f'data/wt_fred_fly_data_cos=4_ortho_o=2.pkl')['data_config']
 
     savefig = True
     display = False
@@ -190,7 +190,8 @@ if __name__ == '__main__':
 
     path = 'general_fred'
     # plotCV_same_model_LL(path, 'lrhmmci', num_states_configs)
-    # for ns in num_states_configs: plotCV_different_models(path, num_states=ns)
+    generate_figures_same_model(path, 'lrhmmci', num_states_configs[:2])
+    # plotCV_same_model_R2(path, 'lrhmmci', num_states_configs[:2])
+    # plotCV_same_model_LL(path, 'lrhmmci', num_states_configs[:2])
 
-    # generate_figures_same_model(path, 'lrhmmci', num_states_configs)
-    plotCV_same_model_R2(path, 'lrhmmci', num_states_configs[:2])
+    # for ns in num_states_configs: plotCV_different_models(path, num_states=ns)

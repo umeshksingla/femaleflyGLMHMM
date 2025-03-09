@@ -66,3 +66,12 @@ class LRHMMFemaleFly(BaseFemaleFly):
         lp += self.model.log_prior(self.learned_params)
         lp = lp / emissions.size
         return lp
+
+    def get_state_probs(self, emissions, inputs=None):
+        z_probs = []
+        for btch in range(len(emissions)):
+            z_prob = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
+            print(z_prob.smoothed_probs.shape)
+            z_probs.append(z_prob.smoothed_probs)
+        z_probs = np.array(z_probs)
+        return z_probs
