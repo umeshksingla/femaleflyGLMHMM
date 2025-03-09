@@ -5,5 +5,5 @@ matplotlib
 seaborn
 glm_utils
 wonderwords
-
+networkx
 

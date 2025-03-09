@@ -14,10 +14,10 @@ from utilities import utils
 
 
 def loadCV(path, model_prefix, num_states):
-    model_pkls = sorted(glob.glob(f'models/{path}/{model_prefix}_{num_states}_cv/**/'))
+    model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_prefix}_{num_states}_cv/**/'))
     train_lps = []
     test_lps = []
-    for _ in model_pkls:
+    for _ in model_pkl_paths:
         pkl, _, _ = utils.load_specific_path(_)
         if pkl is None:
             continue
@@ -65,6 +65,15 @@ def plotCV_same_model(path, model_prefix, num_states_configs):
         plt.savefig(f'models/{path}/{model_prefix}_cv.pdf', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
+    return
+
+
+def generate_figures_same_model(path, model_prefix, num_states_configs):
+
+    for s in num_states_configs:
+        model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_prefix}_{s}_cv/**/'))
+        for model_pkl_path in model_pkl_paths:
+            utils.generate_figures(model_pkl_path, savefig=True, display=False)
     return
 
 
@@ -134,6 +143,7 @@ if __name__ == '__main__':
     LR_MODEL_PATH = 'models/lr_1/20250117_135840_lane'
 
     path = 'cv6'
-    plotCV_same_model(path, 'lrhmmci', num_states_configs)
-    # plotCV_same_model('ghmm', num_states_configs)
+    # plotCV_same_model(path, 'lrhmmci', num_states_configs)
     # for ns in num_states_configs: plotCV_different_models(num_states=ns)
+
+    generate_figures_same_model(path, 'lrhmmci', num_states_configs)

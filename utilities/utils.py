@@ -8,9 +8,9 @@ from wonderwords import RandomWord
 from datetime import datetime
 from collections import defaultdict
 
-from jax import vmap
-import tensorflow_probability.substrates.jax.distributions as tfd
-import jax.numpy as jnp
+# from jax import vmap
+# import tensorflow_probability.substrates.jax.distributions as tfd
+# import jax.numpy as jnp
 
 from plotting import plots
 
@@ -259,6 +259,8 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
 def generate_figures(model_dir, savefig=True, display=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if model_ckp is None:
+        return
 
     fig_dir = os.path.join(model_dir, 'figures')
     os.makedirs(fig_dir, exist_ok=True)
@@ -271,7 +273,9 @@ def generate_figures(model_dir, savefig=True, display=False):
 
     plots.plot_ethogram(learned_params.transitions.transition_matrix,
                                  savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_ethogram_community(learned_params.transitions.transition_matrix,
+    plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.005,
+                                  savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,
                                   savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_prob_states(train_stateseq, model_config,

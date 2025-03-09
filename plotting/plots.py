@@ -6,8 +6,8 @@ import os
 import networkx as nx
 
 import numpy as np
-import jax.numpy as jnp
-import jax.random as jr
+# import jax.numpy as jnp
+# import jax.random as jr
 from dynamax.utils.plotting import CMAP, COLORS
 from scipy.ndimage import uniform_filter1d
 from glm_utils.preprocessing import BasisProjection
@@ -467,7 +467,7 @@ def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
     return
 
 
-def plot_ethogram_community(transition_matrix, savefig=False, fig_dir=None, display=True):
+def plot_ethogram_community(transition_matrix, threshold, savefig=False, fig_dir=None, display=True):
 
     fig = plt.figure(figsize=(10, 10))
 
@@ -478,7 +478,7 @@ def plot_ethogram_community(transition_matrix, savefig=False, fig_dir=None, disp
     # Add edges with weights
     for i in range(num_states):
         for j in range(num_states):
-            if transition_matrix[i, j] > 0.005:  # Only add edges with nonzero probability
+            if transition_matrix[i, j] > threshold:  # Only add edges with nonzero probability
                 G.add_edge(i, j, weight=transition_matrix[i, j])
 
     communities = nx.community.greedy_modularity_communities(G)
@@ -510,7 +510,7 @@ def plot_ethogram_community(transition_matrix, savefig=False, fig_dir=None, disp
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, label_pos=0.4, connectionstyle='arc3,rad=0.1')
 
     plt.title("Transition Probability Graph")
-    if savefig: fig.savefig(os.path.join(fig_dir, 'ethogram_community.pdf'), bbox_inches='tight', dpi=300)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'ethogram_community_{threshold}.pdf'), bbox_inches='tight', dpi=300)
     if display: plt.show()
     plt.close()
     return
@@ -616,36 +616,36 @@ def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     return fig
 
 
-def print_params(params, true_params=False):
-    jnp.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    if true_params:
-        prefix = 'True'
-    else:
-        prefix = 'Fitted'
-    print(f"{prefix} initial probs:")
-    print(params.initial.probs)
-    print(f"{prefix} transition matrix:")
-    print(params.transitions.transition_matrix)
-    print(f"{prefix} emission input weights:")
-    print(params.emissions.weights)
-    print(f"{prefix} emission input biases:")
-    print(params.emissions.biases)
-    print(f"{prefix} emission input covs:")
-    print(params.emissions.covs)
+# def print_params(params, true_params=False):
+#     jnp.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+#     if true_params:
+#         prefix = 'True'
+#     else:
+#         prefix = 'Fitted'
+#     print(f"{prefix} initial probs:")
+#     print(params.initial.probs)
+#     print(f"{prefix} transition matrix:")
+#     print(params.transitions.transition_matrix)
+#     print(f"{prefix} emission input weights:")
+#     print(params.emissions.weights)
+#     print(f"{prefix} emission input biases:")
+#     print(params.emissions.biases)
+#     print(f"{prefix} emission input covs:")
+#     print(params.emissions.covs)
 
 
-def print_ghmm_params(params, true_params=False):
-    jnp.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-    if true_params:
-        prefix = 'True'
-    else:
-        prefix = 'Fitted'
-    print(f"{prefix} initial probs:")
-    print(params.initial.probs)
-    print(f"{prefix} transition matrix:")
-    print(params.transitions.transition_matrix)
-    print(f"{prefix} emissions:")
-    print(params.emissions)
+# def print_ghmm_params(params, true_params=False):
+#     jnp.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+#     if true_params:
+#         prefix = 'True'
+#     else:
+#         prefix = 'Fitted'
+#     print(f"{prefix} initial probs:")
+#     print(params.initial.probs)
+#     print(f"{prefix} transition matrix:")
+#     print(params.transitions.transition_matrix)
+#     print(f"{prefix} emissions:")
+#     print(params.emissions)
 
 
 # def plot_trajectories(model_ckp, data_config, prefix_data='', xlim=None, savefig=False, fig_dir=None, display=True):
