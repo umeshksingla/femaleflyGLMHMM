@@ -538,6 +538,26 @@ def plot_steady_state(steady_state_p, savefig=False, fig_dir=None, display=True)
     return fig
 
 
+def plot_var_explained(r2, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot overall r2 scores.
+    :return:
+    """
+    fig = plt.figure()
+    plt.bar(1, r2 * 100)
+    plt.ylabel('Var explained (%)')
+    plt.margins(0.1)
+    plt.xticks()
+    plt.xlabel('')
+    plt.axhline(0, c='k', ls=':', lw=2)
+    plt.title(title)
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_score.pdf'), bbox_inches='tight', dpi=300)
+    if display:
+        plt.show()
+    return fig
+
+
 def plot_var_explained_by_z(r2_z, title=None, savefig=False, fig_dir=None, display=True):
     """
     Plot overall r2 scores in each state.
