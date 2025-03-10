@@ -345,37 +345,25 @@ def plot_state_mean_outputs_by_o(model_config, outputs_z, data_config):
     return fig
 
 
-def plot_state_mean_outputs_by_o_dists(model_config, outputs_z, data_config):
+def plot_state_mean_outputs_by_o_dists(emissions, stateseq, num_states, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
-    emission_labels = data_config['emission_labels']
-    num_states = model_config['num_states']
+    fig, ax = plt.subplots(1, len(o_labels), figsize=(16, 6))
 
-    fig, ax = plt.subplots(2, len(emission_labels))
-
-    o = 0
-    for __ in emission_labels:
+    emissions_z = {}
+    for btch in range(len(stateseq)):
         for z in range(num_states):
-            rand_idxs = np.random.randint(len(outputs_z[z][:, o]), size=1000)
-            ax[0, o].scatter(
-                np.random.uniform(z-0.1, z+0.1, len(rand_idxs)),
-                outputs_z[z][rand_idxs, o],
-                c=COLORS[z],
-                s=2,
-            )
-        ax[0, o].set_ylabel(f'z-scored {emission_labels[__]} (a.u.)', color='magenta')
-        ax[0, o].set_xticks(range(num_states))
-        ax[0, o].set_xlabel('State')
-        ax[0, o].margins(0.1)
-        ax[0, o].axhline(0, ls=":", lw=2, c='k')
-        o += 1
+            if z not in emissions_z: emissions_z[z] = []
+            emissions_z[z].append(emissions[btch][stateseq[btch] == z])
 
-    o = 0
-    for __ in emission_labels:
+    for z in emissions_z:
+        emissions_z[z] = np.vstack(emissions_z[z])
+
+    for o, ol in enumerate(o_labels):
         for z in range(num_states):
-            data = np.round(outputs_z[z][:, o], decimals=10)
+            data = np.round(emissions_z[z][:, o], decimals=10)
             # rand_idxs = np.random.randint(len(outputs_z[z][:, o]), size=100)
-            print(o, z, np.std(data))
-            sns.histplot(data, color=COLORS[z], ax=ax[1, o],
+            # print(o, z, np.std(data))
+            sns.histplot(data, color=COLORS[z], ax=ax[o],
                         common_norm=False,
                         log_scale=True,
                          kde=True,
@@ -385,15 +373,16 @@ def plot_state_mean_outputs_by_o_dists(model_config, outputs_z, data_config):
                          alpha=1,
                          bins=100,
                         )
-        ax[1, o].set_xlabel(f'z-scored {emission_labels[__]} (a.u.)', color='magenta')
-        ax[1, o].margins(y=0.2)
-        ax[1, o].axhline(0, ls=":", lw=2, c='k')
-        if o == 0:
-            ax[1, 0].legend(loc='upper left')
-        o += 1
-    plt.suptitle('Distribution of female outputs by state')
-    plt.tight_layout()
-    return fig
+        ax[o].set_xlabel(f'{o_labels[ol]} (a.u.)', color='magenta')
+        ax[o].margins(y=0.2)
+        ax[o].axhline(0, ls=":", lw=2, c='k')
+        ax[o].legend(loc='upper left')
+    plt.suptitle(f'Emission distribution by state [{title}]')
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_outputs_by_o_dists.pdf'),
+                            bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
 
 
 def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None, display=True):

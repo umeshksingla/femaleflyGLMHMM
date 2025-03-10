@@ -274,6 +274,7 @@ def generate_figures(model_dir, savefig=True, display=False):
     learned_params = model_ckp['learned_params']
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
+    num_states = model_ckp['num_states']
 
     plots.plot_ethogram(learned_params.transitions.transition_matrix,
                                  savefig=savefig, fig_dir=fig_dir, display=display)
@@ -292,6 +293,9 @@ def generate_figures(model_dir, savefig=True, display=False):
                             savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_filters(learned_params.emissions.weights, data_config,
                        savefig=savefig, fig_dir=fig_dir, display=display)
+
+    plots.plot_state_mean_outputs_by_o_dists(model_ckp['train_data']['train_emissions'], train_stateseq, num_states, emission_labels,
+                                             title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained(model_ckp['train_data']['train_score'],
                              title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z(model_ckp['train_data']['train_score_by_z'],
@@ -300,6 +304,9 @@ def generate_figures(model_dir, savefig=True, display=False):
                                     title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_correlation_by_o(model_ckp['train_data']['train_correlation_by_o'], emission_labels,
                                 title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+
+    plots.plot_state_mean_outputs_by_o_dists(model_ckp['test_data']['test_emissions'], test_stateseq, num_states, emission_labels,
+                                             title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained(model_ckp['test_data']['test_score'],
                              title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z(model_ckp['test_data']['test_score_by_z'],
