@@ -18,15 +18,11 @@ class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
         
         lr = LRFemaleFly(self.data_config, self.model_config)
         lr.fit(emissions, inputs)
-        print("LR initial params computed (done):", lr.learned_params)
-        
         W = np.repeat(lr.learned_params['w'], repeats=self.num_states, axis=0)
         b = np.repeat(lr.learned_params['b'], repeats=self.num_states, axis=0)
         W = W + np.random.random(W.shape) * 0.01
         b = b + np.random.random(b.shape) * 0.01
-        print("W", W.shape, "b", b.shape)
-        print(b)
-        em_params, em_lps = fitting.fitEMCustomInit(key, self.model, emissions, train_inputs=inputs, 
+        em_params, em_lps = fitting.fitEMCustomInit(key, self.model, emissions, train_inputs=inputs,
                                                     emission_weights=W, emission_biases=b)
         self.learned_params = em_params
         self.learned_lps = em_lps

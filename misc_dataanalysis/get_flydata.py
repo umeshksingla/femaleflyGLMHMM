@@ -5,15 +5,19 @@ import scipy
 from collections import OrderedDict
 from scipy.signal import savgol_filter
 
-from utils.utils import create_x_and_y_windows
+from utilities.utils import create_x_and_y_windows
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
 
-DATA = 'wt'
-# BASE_FOLDER = f' notebooks/eda/{DATA}/'
-sessions_features = joblib.load('../data/sessions_features_82_isong.pkl')
+# source = 'wt'
+# sessions_features = joblib.load('../data/sessions_features_82_isong.pkl')
+# fps = 150
+
+source = 'wt_fred'
+sessions_features = joblib.load('../data/sessions_features_11.pkl')
+fps = 60
 
 
 def smooth_moving_average(x, smooth_window):
@@ -226,11 +230,13 @@ def describe_sessions():
 
 if __name__ == '__main__':
 
-    from standard_data_config import data_config
-
-    data_config['input_raw_each_dim'] = 3*150
+    data_config = {}
+    data_config['fps'] = fps
+    data_config['input_raw_each_dim'] = 3*fps
     data_config['num_timesteps'] = 100000
-    data_config["predict_window_size"] = 5
+    data_config['predict_gap_size'] = fps//10   # 100ms
+    data_config['input_raw_overlap'] = 3*fps-fps//30
+    data_config["predict_window_size"] = fps//30  # averaging emission over this window size (30ms)
     data_config['input_labels'] = OrderedDict({
         'mFV': 'z-mFV',
         'mLS': 'z-mLS',
@@ -251,13 +257,14 @@ if __name__ == '__main__':
         'fLV': 'z-fLV',
         'dfTheta': 'z-fRV',
     })
+    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
 
     # describe_sessions()
     # sys.exit()
 
     data = get_x_and_y_data(data_config, display=True)
-    filename = f'fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}.pkl'
+    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}.pkl'
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')
     print("Saved at:", filename)
