@@ -256,7 +256,8 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
     # print(model_ckp)
     joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
     print("Full checkpoint dumped.")
-    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
+    if 'hmm' in model_ckp['prefix']:
+        plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
     return
 
 
@@ -324,7 +325,7 @@ def generate_figures(model_dir, savefig=True, display=False):
                                     fig_path=f'{fig_dir}/trajs/train{batch}_xlim={xlim}.pdf',
                                     display=display)
             if xlim is None:
-                plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], batch,
+                plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], model_config, batch,
                                           savefig=savefig, fig_dir=fig_dir, display=display)
             break
         break
@@ -336,7 +337,7 @@ def generate_figures(model_dir, savefig=True, display=False):
                                     fig_path=f'{fig_dir}/trajs/test{batch}_xlim={xlim}.pdf',
                                     display=display)
             if xlim is None:
-                plots.plot_smoothed_probs(model_ckp['test_data']['test_state_probs'], batch,
+                plots.plot_smoothed_probs(model_ckp['test_data']['test_state_probs'], model_config, batch,
                                           savefig=savefig, fig_dir=fig_dir, display=display)
             break
         break

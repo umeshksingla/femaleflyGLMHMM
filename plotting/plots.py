@@ -699,9 +699,14 @@ def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
 #     return
 
 
-def plot_smoothed_probs(state_probs, batch, savefig=False, fig_dir=None, display=True):
+def plot_smoothed_probs(state_probs, config, batch, savefig=False, fig_dir=None, display=True):
     fig = plt.figure(figsize=(20, 5))
-    plt.plot(uniform_filter1d(state_probs[batch], size=500, axis=0))
+
+    for z in range(config['num_states']):
+        # Probability of z at each time step
+        plt.plot(uniform_filter1d(state_probs[batch][z], size=100), c=COLORS[z], linewidth=1.5, label=f'State {z}')
+
+    # plt.plot(uniform_filter1d(state_probs[batch], size=500, axis=0))
     plt.ylim([0, 1])
     if savefig: fig.savefig(os.path.join(fig_dir, f"smoothed_probs_{batch}.pdf"), dpi=300, bbox_inches='tight', transparent=True)
     if display: plt.show()
