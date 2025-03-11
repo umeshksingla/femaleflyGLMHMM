@@ -79,6 +79,6 @@ class LRFemaleFly(BaseFemaleFly):
         lp = vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
         return lp
 
-# 20241213_143304_uncle with LR
-# 20241213_151742_meter _noLR
-# 20241217_170339_porch with LR directional only
+    def get_state_probs(self, emissions, inputs=None):
+        z_probs = np.ones((emissions.shape[0], emissions.shape[1]))
+        return z_probs

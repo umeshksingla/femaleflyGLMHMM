@@ -80,6 +80,7 @@ class ChanceFemaleFly(BaseFemaleFly):
         y_tr = emissions.reshape(-1, self.data_config['emission_dim'])
         return round(r2_score(y_tr, y_preds), 4)
 
-# 20241211_233249_designation fly_data_cos=4_ortho_o=15.pkl
-
+    def get_state_probs(self, emissions, inputs=None):
+        z_probs = np.ones((emissions.shape[0], emissions.shape[1]))
+        return z_probs
 
