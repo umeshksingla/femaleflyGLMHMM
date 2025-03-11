@@ -67,8 +67,10 @@ def run(mc):
         model = LRHMMCustomInitFemaleFly(data_config, mc)
     elif model_prefix == 'chance':
         model = ChanceFemaleFly(data_config, mc)
+    elif model_prefix == 'lr':
+        model = LRFemaleFly(data_config, mc)
     else:
-        raise Exception('Unsupported model for cross validation.')
+        raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
     model.fit(train_emissions, train_inputs)
     dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
