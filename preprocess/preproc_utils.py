@@ -2,6 +2,7 @@ import numpy as np
 import miniball
 from scipy.signal import savgol_filter
 import h5py
+from scipy.interpolate import interp1d
 
 
 def h5read(filename, dataset):
@@ -82,6 +83,45 @@ def signed_angle(a, b):
 
 def smooth(x, smooth_window):
     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
+
+
+def fill_missing_tracks_SR(Y, kind="linear"):
+    initial_shape = Y.shape
+
+    # Flatten after first dim.
+    Y = Y.reshape((initial_shape[0], -1))
+    # print(f"\tY_initial.shape = {initial_shape}, Y.shape={Y.shape}")
+    # Interpolate along each slice.
+    for i in range(Y.shape[-1]):
+        y = Y[:, i]
+
+        non_missing_mask = ~np.isnan(y)
+        num_non_missing = np.sum(non_missing_mask)
+
+        # If we don't have enough points, don't interpolate, if we only have 2-3,
+        # use linear interpolation, otherwise, use the interpolation requested.
+        if num_non_missing <= 1:
+            continue
+        elif num_non_missing <= 4:
+            kind_i = "linear"
+        else:
+            kind_i = kind
+
+        # Build interpolant.
+        x = np.flatnonzero(non_missing_mask)
+        f = interp1d(x, y[x], kind=kind_i, fill_value=np.nan, bounds_error=False)
+
+        # Fill missing
+        xq = np.flatnonzero(np.isnan(y))
+        Y[xq, i] = f(xq)
+
+        # Fill leading or trailing NaNs with the nearest non-NaN values
+        mask = np.isnan(Y[:, i])
+        Y[:, i][mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), Y[:, i][~mask])
+
+    # Restore to initial shape.
+    Y = Y.reshape(initial_shape)
+    return Y
 
 
 def circle_estimator_helper(trxM, trxF):

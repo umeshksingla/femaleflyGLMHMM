@@ -1,45 +1,5 @@
 import numpy as np
 from preprocess.preproc_utils import signed_angle
-from scipy.interpolate import interp1d
-
-
-def fill_missing_tracks_SR(Y, kind="linear"):
-    initial_shape = Y.shape
-
-    # Flatten after first dim.
-    Y = Y.reshape((initial_shape[0], -1))
-    # print(f"\tY_initial.shape = {initial_shape}, Y.shape={Y.shape}")
-    # Interpolate along each slice.
-    for i in range(Y.shape[-1]):
-        y = Y[:, i]
-
-        non_missing_mask = ~np.isnan(y)
-        num_non_missing = np.sum(non_missing_mask)
-
-        # If we don't have enough points, don't interpolate, if we only have 2-3,
-        # use linear interpolation, otherwise, use the interpolation requested.
-        if num_non_missing <= 1:
-            continue
-        elif num_non_missing <= 4:
-            kind_i = "linear"
-        else:
-            kind_i = kind
-
-        # Build interpolant.
-        x = np.flatnonzero(non_missing_mask)
-        f = interp1d(x, y[x], kind=kind_i, fill_value=np.nan, bounds_error=False)
-
-        # Fill missing
-        xq = np.flatnonzero(np.isnan(y))
-        Y[xq, i] = f(xq)
-
-        # Fill leading or trailing NaNs with the nearest non-NaN values
-        mask = np.isnan(Y[:, i])
-        Y[:, i][mask] = np.interp(np.flatnonzero(mask), np.flatnonzero(~mask), Y[:, i][~mask])
-
-    # Restore to initial shape.
-    Y = Y.reshape(initial_shape)
-    return Y
 
 
 def compute_visual_features(fThx, mThx, fHd, mHd, mLwing, mRwing):
@@ -87,16 +47,6 @@ def compute_visual_features(fThx, mThx, fHd, mHd, mLwing, mRwing):
         mHd = mHd.reshape(-1, 2)
         mLwing = mLwing.reshape(-1, 2)
         mRwing = mRwing.reshape(-1, 2)
-
-    # Fill missing values.
-    # print('Filling missing values.')
-    fThx = fill_missing_tracks_SR(fThx, kind="cubic")   # PROBABLY DO IT BEFORE SMOOTHING
-    mThx = fill_missing_tracks_SR(mThx, kind="cubic")
-    fHd = fill_missing_tracks_SR(fHd, kind="cubic")
-    mHd = fill_missing_tracks_SR(mHd, kind="cubic")
-    mLwing = fill_missing_tracks_SR(mLwing, kind="cubic")
-    mRwing = fill_missing_tracks_SR(mRwing, kind="cubic")
-    # print('Filled missing values!')
 
     # Euclidean distance between the male and female thorax.
     mfDist = np.sqrt(np.sum((fThx - mThx) ** 2, axis=1))
