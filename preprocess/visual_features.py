@@ -2,15 +2,14 @@ import numpy as np
 from preprocess.preproc_utils import signed_angle
 
 
-def compute_visual_features(fThx, mThx, fHd, mHd, mLwing, mRwing):
+def compute_visual_features(fTrx, mTrx, FLY_SKELETON):
     """Extract behavioral features given head and thorax coordinates.
 
     Args:
-        fThx: Female thorax coordinates in array of shape (timesteps, 2).
-        mThx: Male thorax coordinates in array of shape (timesteps, 2).
-        fHd: Female head coordinates in array of shape (timesteps, 2).
-        mHd: Female head coordinates in array of shape (timesteps, 2).
+        fTrx: Female track coordinates in array of shape (timesteps, b, 2).
+        mTrx: Male track coordinates in array of shape (timesteps, b, 2).
 
+    where b is len(FLY_SKELETON).
     Returns:
         A dictionary of classical features with keys:
 
@@ -37,6 +36,15 @@ def compute_visual_features(fThx, mThx, fHd, mHd, mLwing, mRwing):
     Notes:
         Based off of Junyu Li's implementation (/tigress/MMURTHY/junyu/code/alignFeature/compute_features.py).
     """
+
+    # Get relevant indices
+    fHd = fTrx[..., FLY_SKELETON.index('head'), :]
+    fThx = fTrx[..., FLY_SKELETON.index('thorax'), :]
+    mHd = mTrx[..., FLY_SKELETON.index('head'), :]
+    mThx = mTrx[..., FLY_SKELETON.index('thorax'), :]
+    mLwing = mTrx[..., FLY_SKELETON.index('wingL'), :]
+    mRwing = mTrx[..., FLY_SKELETON.index('wingR'), :]
+
     orig_dim = fThx.ndim
     # print("orig_dim", orig_dim)
     if orig_dim == 3:

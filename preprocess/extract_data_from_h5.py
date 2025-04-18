@@ -19,23 +19,12 @@ def get_features(DATA, expt_path, cop_start_frame):
     fTrx = smooth(fTrx, DATA.smooth_window)
     mTrx = smooth(mTrx, DATA.smooth_window)
 
-    fHd = fTrx[..., fly_nodes.index('head'), :]
-    fThx = fTrx[..., fly_nodes.index('thorax'), :]
-    mHd = mTrx[..., fly_nodes.index('head'), :]
-    mThx = mTrx[..., fly_nodes.index('thorax'), :]
-    mLwing = mTrx[..., fly_nodes.index('wingL'), :]
-    mRwing = mTrx[..., fly_nodes.index('wingR'), :]
-
     # Fill missing values
-    fThx = fill_missing_tracks_SR(fThx, kind="cubic")  # TODO: PROBABLY DO IT BEFORE SMOOTHING?
-    mThx = fill_missing_tracks_SR(mThx, kind="cubic")
-    fHd = fill_missing_tracks_SR(fHd, kind="cubic")
-    mHd = fill_missing_tracks_SR(mHd, kind="cubic")
-    mLwing = fill_missing_tracks_SR(mLwing, kind="cubic")
-    mRwing = fill_missing_tracks_SR(mRwing, kind="cubic")
+    fTrx = fill_missing_tracks_SR(fTrx, kind="cubic")
+    mTrx = fill_missing_tracks_SR(mTrx, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
 
     # Compute visual features using various body points
-    visual_ftr_dict = visual_features.compute_visual_features(fThx, mThx, fHd, mHd, mLwing, mRwing)
+    visual_ftr_dict = visual_features.compute_visual_features(fTrx, mTrx, DATA.get_fly_nodes())
 
     # Compute tactile features using various body points
     tap_ftr_dict = DATA.get_tap_feature(expt_path, cop_start_frame, mTrx, fTrx)
@@ -62,6 +51,7 @@ def get_features(DATA, expt_path, cop_start_frame):
 
     # Compute environmental features, i.e. how far the wall is from female's head
     centerW, _ = DATA.get_circle_estimator_helper(trxF=fTrx, trxM=mTrx)
+    fHd = fTrx[..., fly_nodes.index('head'), :]
     all_session_features['fDistWall'] = DATA.RADIUS - np.linalg.norm(fHd - np.array(centerW), axis=1)
 
     return all_session_features
@@ -106,9 +96,9 @@ if __name__ == '__main__':
         #     print("Could not open file.")
         #     continue
 
-        if _ % 10 == 0:
-            joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
-        # if _ == 2:
-        #     break
+        # if _ % 10 == 0:
+        #     joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
+
+        break
     joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
     print(f"Finished computing/loading all features in: {round(time.time() - st1, 2)} secs. #sessions: {len(sessions_features)}")
