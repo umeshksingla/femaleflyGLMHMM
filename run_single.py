@@ -52,12 +52,16 @@ def run(mc):
     print(f"Fitting {model_prefix} with model_config: {mc}")
     data = joblib.load(data_path)
     data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
+    print('Inputs:', data_config['input_labels'])
+    print('Emissions:', data_config['emission_labels'])
     session_keys = data_config['session_keys']
     output_indices = data['output_indices']
     num_batches = data_config['num_sessions']
     num_train_batches = int(num_batches * 0.8)
     train_emissions, train_inputs, train_session_keys = emissions[:num_train_batches], inputs[:num_train_batches], session_keys[ :num_train_batches]
     test_emissions, test_inputs, test_session_keys = emissions[num_train_batches:], inputs[num_train_batches:], session_keys[num_train_batches:]
+    print("# Train sessions:", len(train_session_keys))
+    print("# Test sessions:", len(test_session_keys))
 
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
@@ -72,20 +76,33 @@ def run(mc):
     else:
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
+    print(">> Fitting")
     model.fit(train_emissions, train_inputs)
+    print(">> Fit done.")
+
     dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
-    print(">> Saving at:", dump_filepath)
+
+    print(">> Saving basic checkpoint at:", dump_filepath)
     utils.save(model, train_emissions, train_inputs, train_session_keys, test_emissions, test_inputs, test_session_keys,
-               output_indices, dump_filepath)
-    print("Saved.\n")
+               output_indices, dump_filepath)   # save model parameters and data used for train and test
+    print(">> Saved.\n")
+
+    print(">> Calculating r2 scores for this fit:")
+    print("train r2", model.score(train_emissions, train_inputs))
+    print("test r2", model.score(test_emissions, test_inputs))
+    print("test r2 by z", model.score_by_z(test_emissions, test_inputs))
+    print("test r2 by o", model.score_by_o(test_emissions, test_inputs))
+    print("test r2 by z and o", model.score_by_z_and_o(test_emissions, test_inputs))
+    print("test corr", model.correlation_by_o(test_emissions, test_inputs))
+
+    print(">> Saving enhanced checkpoint:")
+    utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
+    print(">> Saved.\n")
+
     print(">> Making figures:")
     utils.generate_figures(dump_filepath, savefig=True, display=False)
-    print("Done.\n")
+    print(">> Done with figures.\n")
 
-    print(model.score(train_emissions, train_inputs))
-    print(model.score(test_emissions, test_inputs))
-    print(model.score_by_z_and_o(test_emissions, test_inputs))
-    print(model.correlation_by_o(test_emissions, test_inputs))
     print("Finished.\n")
     return
 
