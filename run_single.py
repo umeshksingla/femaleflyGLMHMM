@@ -8,10 +8,8 @@
 
 import argparse
 import joblib
-import os
 import json
 
-from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
@@ -30,25 +28,16 @@ def create_cli_parser():
         required=True,
         help="model config",
     )
-    parser.add_argument(
-        "--path",
-        type=str,
-        required=True,
-        help="models/{path} argument",
-    )
-    parser.add_argument(
-        "--data_path",
-        type=str,
-        required=True,
-        help="path to wt or wt_fred data pkl file",
-    )
     return parser
 
 
 def run(mc):
     if not len(mc): return  # if empty dict is passed
 
+    path = mc['path']
+    data_path = mc['data_path']
     model_prefix = mc['names']
+
     print(f"Fitting {model_prefix} with model_config: {mc}")
     data = joblib.load(data_path)
     data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
@@ -87,17 +76,15 @@ def run(mc):
                output_indices, dump_filepath)   # save model parameters and data used for train and test
     print(">> Saved.\n")
 
-    print(">> Calculating r2 scores for this fit:")
-    print("train r2", model.score(train_emissions, train_inputs))
-    print("test r2", model.score(test_emissions, test_inputs))
-    print("test r2 by z", model.score_by_z(test_emissions, test_inputs))
-    print("test r2 by o", model.score_by_o(test_emissions, test_inputs))
-    print("test r2 by z and o", model.score_by_z_and_o(test_emissions, test_inputs))
-    print("test corr", model.correlation_by_o(test_emissions, test_inputs))
+    print(">> Calculating overall r2 scores for this fit:")
+    print("train r2: ", model.score(train_emissions, train_inputs))
+    print("test r2: ", model.score(test_emissions, test_inputs))
 
     print(">> Saving enhanced checkpoint:")
     utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
     print(">> Saved.\n")
+
+    if model.prefix == 'chance': return
 
     print(">> Making figures:")
     utils.generate_figures(dump_filepath, savefig=True, display=False)
@@ -113,12 +100,5 @@ if __name__ == '__main__':
     parser = create_cli_parser()
     args = parser.parse_args()
     print("Args:", vars(args))
-    model_config_str = args.mc
-    path = args.path
-    data_path = args.data_path
-    model_config = json.loads(model_config_str)
-
-    ## OR specify a model_config here
-    # model_config = {}
-
+    model_config = json.loads(args.mc)
     run(model_config)

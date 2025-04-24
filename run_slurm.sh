@@ -17,9 +17,6 @@ linenum=$SLURM_ARRAY_TASK_ID
 echo "SLURM_ARRAY_TASK_ID: $linenum"
 model_config=$(sed -n "$linenum p" $array_args_file)
 
-data_path="/scratch/gpfs/MMURTHY/usingla/data/fly_data_cos=4_ortho_o=15.pkl"
-echo "DATA path: $data_path"
-
 source activate /scratch/gpfs/MMURTHY/usingla/femaleflyenv
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-python "$PY_SCRIPT" --mc "$model_config" --path "cv6" --data_path "$data_path"
+python "$PY_SCRIPT" --mc "$model_config"
