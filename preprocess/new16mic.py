@@ -24,8 +24,12 @@ class FREDCLEANED_DATA:
         return fTrx, mTrx
 
     @staticmethod
+    def get_session_name(session_path):
+        return session_path.split("/")[-3]
+
+    @staticmethod
     def get_copulation_frame(session_path):
-        session = session_path.split("/")[-3]
+        session = FREDCLEANED_DATA.get_session_name(session_path)
         copulation_frame_idxs = {
             '20190927_161548_right': 12750,
             '20191001_114431_left': 25540,
@@ -82,6 +86,7 @@ class FREDCLEANED_DATA:
     def get_tap_feature(expt_path, cop_start_frame, mTrx=None, fTrx=None, fTheta=None):
         d = dict()
         d['tap'] = (np.load(os.path.join(os.path.dirname(expt_path), 'cropped_predictions.npy')) > 0.9)[:cop_start_frame]
+        d['tap2'] = d['tap']
         return d
 
     @staticmethod

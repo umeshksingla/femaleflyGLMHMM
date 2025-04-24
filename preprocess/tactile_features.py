@@ -142,8 +142,8 @@ def compute_mechanical_features_v2(mTrx, fTrx, FLY_SKELETON):
     fmpAng = signed_angle(fDir, fmpDir)
 
     ftrs = dict()
-    ftrs["touchDistanceNew"] = min_distance
-    ftrs["touchAngleNew"] = fmpAng
+    ftrs["tapClosestDist"] = min_distance
+    ftrs["tapClosestAng"] = fmpAng
     if orig_dim == 4:
         for f in ftrs:
             ftrs[f] = ftrs[f].reshape(-1, time_dim)

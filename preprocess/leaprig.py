@@ -17,6 +17,10 @@ class WT_DATA:
     dataset = 'wt'
 
     @staticmethod
+    def get_session_name(session_path):
+        return session_path.split("/")[-1]
+
+    @staticmethod
     def get_copulation_frame(session_path):
         tracking_h5_path = session_path.replace('/h5/', '/trackingh5/').replace('.h5', '.tracking.h5')
         track_occupancy = h5read(tracking_h5_path, 'track_occupancy')
@@ -89,10 +93,8 @@ class WT_DATA:
         d = dict()
         d['tap'] = tactile_features.compute_mechanical_features_v1(mTrx, fTrx, WT_DATA.get_fly_nodes())['touch']
         tap_feat = tactile_features.compute_mechanical_features_v2(mTrx, fTrx, WT_DATA.get_fly_nodes())
-        d['closestAng'] = tap_feat['touchAngleNew']
-        d['closestDist'] = tap_feat['touchDistanceNew']
-        d['tap2'] = (d['closestDist'] <= 0.0) * np.sign(d['closestAng'])   # mm
-        d['tap2u'] = d['closestDist'] <= 0.0  # mm   # unsigned tap
+        d['tap2'] = tap_feat['tapClosestDist'] <= 0.0  # unsigned tap
+        # d['tap2_directed'] = (tap_feat['tapClosestDist'] <= 0.0) * np.sign(tap_feat['tapClosestAng'])  # signed tap
         return d
 
     @staticmethod
