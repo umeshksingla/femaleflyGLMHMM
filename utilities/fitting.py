@@ -24,9 +24,9 @@ def fitEMCustomInit(key, hmm, train_emissions, train_inputs,
                                         em_props,
                                         train_emissions,
                                         train_inputs,
-                                        num_iters=200, verbose=True)
+                                        num_iters=100, verbose=True)
     em_lps = -em_losses / train_emissions.size
-    print("em_lps:", em_lps)
+    # print("em_lps:", em_lps)
     e = time.time()
     print("=== END emCustomInit ==========")
     print(f"Time taken to fit EM: {round(e - s, 2)}s")
@@ -44,7 +44,6 @@ def fitEM(key, hmm, train_emissions, train_inputs):
                                         train_inputs,
                                         num_iters=200, verbose=True)
     em_lps = -em_losses / train_emissions.size
-    print("em_lps:", em_lps)
     e = time.time()
     print("=== END em ==========")
     print(f"Time taken to fit EM: {round(e - s, 2)}s")
