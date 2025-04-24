@@ -188,7 +188,7 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
 
     model_ckp = {
         'prefix': model.prefix,
-        'model': model,
+        'model': model if model.prefix != 'chance' else '', # chance model cannot unpickle tfd distribution
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
@@ -218,6 +218,10 @@ def enhance(output_dir):
     etc. computed."""
 
     model_ckp = joblib.load(os.path.join(output_dir, 'model_basic.pkl'))
+    if model_ckp['prefix'] == 'chance': # Skip predictions etc on the Chance model
+        joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
+        return
+
     model = model_ckp['model']
 
     train_emissions = model_ckp['train_data']['train_emissions']
@@ -276,12 +280,13 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     emission_labels = data_config['emission_labels']
     num_states = model_ckp['num_states']
 
+    plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'],
+                             savefig=savefig, fig_dir=fig_dir, display=display)
 
     plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
                             savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_empirical_occupancy(train_stateseq, model_config,
                             title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
-    return
 
     plots.plot_ethogram(learned_params.transitions.transition_matrix,
                         savefig=savefig, fig_dir=fig_dir, display=display)
@@ -305,8 +310,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     #                         fig_path=f'{fig_dir}/trajs/train{btch}.pdf',
     #                         display=display)
 
-    plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'],
-                             savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.005,
                                   savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,

@@ -84,5 +84,4 @@ class LRFemaleFly(BaseFemaleFly):
         return z_probs
 
     def get_forward_state_probs(self, emissions, inputs=None):
-        z_probs = np.ones((emissions.shape[0], emissions.shape[1]))
-        return z_probs
+        return self.get_state_probs(emissions, inputs)
