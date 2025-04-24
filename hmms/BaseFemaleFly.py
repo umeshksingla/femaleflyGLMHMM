@@ -38,7 +38,7 @@ class BaseFemaleFly:
         y_preds = y_preds.reshape(-1, y_preds.shape[-1])
         emissions = emissions.reshape(-1, emissions.shape[-1])
         z_seqs = z_seqs.reshape(-1)
-        print("z_seqs", np.unique(z_seqs, return_counts=True))
+        # print("z_seqs unique", np.unique(z_seqs, return_counts=True))
         return {z: (r2_score(emissions[z_seqs == z], y_preds[z_seqs == z]) if np.any(z_seqs == z) else 0.0) for z in range(self.num_states)}
 
     def score_by_z_and_o(self, emissions, inputs):
