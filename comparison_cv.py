@@ -90,21 +90,23 @@ def plotCV_same_model_LL(path, model_prefix, num_states_configs):
 
     baseline = chance_pkl['test_data']['test_lp']
 
-    plt.figure(figsize=(20, 12), constrained_layout=True)
+    plt.figure(figsize=(10, 6), constrained_layout=True)
 
     # Plot for num_states=1 i.e. linear regression
-    plt.plot(1, (lr_pkl['train_data']['train_lp'] - baseline)*effective_fps, 'b.', label='Train')
-    plt.plot(1, (lr_pkl['test_data']['test_lp'] - baseline)*effective_fps, 'r*', label='Test (corr to best train)', markersize=15)
+    plt.plot(1, (lr_pkl['train_data']['train_lp'] - baseline)*effective_fps, 'b.', label='Train', markersize=15)
+    plt.plot(1, (lr_pkl['test_data']['test_lp'] - baseline)*effective_fps, 'r.', label='Held-out', markersize=15)
+
+    # Plot for num_states > 1 now
     for i, s in enumerate(num_states_configs):
         hmm_train_lps, hmm_test_lps = loadCV_LLs(path, model_prefix, s)
         print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_lps)} Test:{len(hmm_test_lps)}")
         x = [s + np.random.uniform(-0.2, 0.2) for _ in hmm_train_lps]
-        plt.plot(x, (hmm_train_lps - baseline)*effective_fps, 'b.')
+        plt.plot(x, (hmm_train_lps - baseline)*effective_fps, 'b.', markersize=15)
         # plt.plot(x, (hmm_test_lps - baseline)*effective_fps, 'r.', label='Test' if i == 0 else '')
 
         if len(hmm_train_lps):
             # plt.plot(s, (hmm_train_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'b*', markersize=15)
-            plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'r*', markersize=15)
+            plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)] - baseline)*effective_fps, 'r.', markersize=15)
 
     plt.ylabel('Normalized LL (bits/s)')
     plt.xlabel('Number of states')
@@ -126,7 +128,7 @@ def plotCV_same_model_R2(path, model_prefix, num_states_configs):
     chance_pkl, _, _ = utils.load_specific_path(CHANCE_MODEL_PATH)
     lr_pkl, _, _ = utils.load_specific_path(LR_MODEL_PATH)
 
-    plt.figure(figsize=(20, 12), constrained_layout=True)
+    plt.figure(figsize=(10, 6), constrained_layout=True)
 
     # # Plot for chance model
     # plt.plot(0, chance_pkl['train_data']['train_score']*100, 'b.', label='Train', markersize=15)
@@ -134,7 +136,7 @@ def plotCV_same_model_R2(path, model_prefix, num_states_configs):
 
     # Plot for num_states=1 i.e. linear regression
     plt.plot(1, lr_pkl['train_data']['train_score']*100, 'b.', label='Train', markersize=15)
-    plt.plot(1, lr_pkl['test_data']['test_score']*100, 'r.', label='Test', markersize=15)
+    plt.plot(1, lr_pkl['test_data']['test_score']*100, 'r.', label='Held-out', markersize=15)
     print("LR:", "train", lr_pkl['train_data']['train_score'], "test", lr_pkl['test_data']['test_score'])
 
     for i, s in enumerate(num_states_configs):
@@ -143,16 +145,17 @@ def plotCV_same_model_R2(path, model_prefix, num_states_configs):
         print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_r2s)} Test:{len(hmm_test_r2s)}")
         x = [s + np.random.uniform(-0.1, 0.1) for _ in hmm_train_r2s]
         plt.plot(x, hmm_train_r2s*100, 'b.', markersize=15)
-        plt.plot(x, hmm_test_r2s*100, 'r.', markersize=15)
+        # plt.plot(x, hmm_test_r2s*100, 'r.', markersize=15)
 
         if len(hmm_train_r2s):
-            plt.plot(s, hmm_train_r2s[np.argmax(hmm_train_r2s)]*100, 'b*', markersize=15)
-            plt.plot(s, hmm_test_r2s[np.argmax(hmm_train_r2s)]*100, 'r*', markersize=15)
+            # plt.plot(s, hmm_train_r2s[np.argmax(hmm_train_r2s)]*100, 'b*', markersize=15)
+            plt.plot(s, hmm_test_r2s[np.argmax(hmm_train_r2s)]*100, 'r.', markersize=15)
 
     plt.ylabel('Var explained (%)')
     plt.xlabel('Number of states')
     plt.xticks([1] + num_states_configs)
     plt.title(model_prefix.upper())
+    plt.ylim(0, 45)
     plt.legend(loc='upper left')
     plt.margins(0.1)
     plt.grid()
@@ -305,20 +308,19 @@ if __name__ == '__main__':
     savefig = True
     display = False
     num_states_configs = [
-        # 2, 5, 15, 20, 25, 27, 30
         2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
-        #   16, 18, 23, 28, 33, 15, 20, 25, 30, 40, 50
-        ]
+        ][:8]
 
-    # CHANCE_MODEL_PATH = 'models/cv6_fred/chance_1_cv/20250310_195917_dysfunction'
-    # LR_MODEL_PATH = 'models/cv6_fred/lr_1_cv/20250310_195654_rediscovery'
-    # path = 'cv6_fred'
+    CHANCE_MODEL_PATH = 'models/apr23_wt/chance_1_cv/20250423_220857_dromedary'
+    LR_MODEL_PATH = 'models/apr23_wt/lr_1_cv/20250423_213816_pigeon'
+    path = 'apr23_wt'
 
-    # CHANCE_MODEL_PATH = 'models/chance_1/20250117_135807_octave'
-    # LR_MODEL_PATH = 'models/lr_1/20250117_135840_lane'
+    # CHANCE_MODEL_PATH = 'models/apr23_wt_fred/chance_1_cv/20250423_221313_handmaiden'
+    # LR_MODEL_PATH = 'models/apr23_wt_fred/lr_1_cv/20250423_221326_pharmacist'
+    # path = 'apr23_wt_fred'
 
-    # plotCV_same_model_LL(path, 'lrhmmci', num_states_configs)
-    # plotCV_same_model_R2(path, 'lrhmmci', num_states_configs)
+    plotCV_same_model_LL(path, 'lrhmmci', num_states_configs)
+    plotCV_same_model_R2(path, 'lrhmmci', num_states_configs)
     # plotCV_same_model_Corr(path, 'lrhmmci', num_states_configs)
     # plotCV_same_model_R2adj(path, 'lrhmmci', num_states_configs)
 
@@ -327,6 +329,6 @@ if __name__ == '__main__':
 
     # generate_figures_multiple_fits('general', 'lrhmmci', num_states_configs, savefig=True, display=False)
 
-    model_pkl_path = f'models/general/lrhmmci_4_cv//'
-    # model_pkl_path = f'models/general_fred/lrhmmci_4_cv//'
-    generate_figures_single_fit(model_pkl_path, savefig=True, display=False)
+    # model_pkl_path = f'models/general/lrhmmci_4_cv//'
+    # # model_pkl_path = f'models/general_fred/lrhmmci_4_cv//'
+    # generate_figures_single_fit(model_pkl_path, savefig=True, display=False)
