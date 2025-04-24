@@ -48,19 +48,28 @@ def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0
 
 
 def get_input_feat(s, f_name):
-    if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist']:
-        return zscore(sessions_features[s][f_name])     # todo: zscore?
-    elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap']:
-        return sessions_features[s][f_name]
+    sf = sessions_features[s]
+    if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall']:
+        feat = zscore(sf[f_name])     # todo: zscore?
+    elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap', 'tap2']:
+        feat = sf[f_name].astype(float)
     elif f_name in ['fmAng_cos']:
-        return np.cos(np.radians(sessions_features[s]['fmAng']))    # cos: front to back
+        feat = np.cos(np.radians(sf['fmAng']))    # cos: front to back
     elif f_name in ['fmAng_sin']:
-        return np.sin(np.radians(sessions_features[s]['fmAng']))    # sin: left or right of the fly
-    elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed']:
+        feat = np.sin(np.radians(sf['fmAng']))    # sin: left or right of the fly
+    elif f_name in ['wingAlign']:
+        feat = np.min([sf['wingLAristaLAlignAng'],
+                       sf['wingRAristaRAlignAng'],
+                       sf['wingLAristaRAlignAng'],
+                       sf['wingRAristaLAlignAng']], axis=0)
+        feat = zscore(feat)     # it is okay to zscore these alignment angles as they are treated linearly
+        print(feat.shape)
+    elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
         f_name_ = f_name.split('_directed')[0]
-        return sessions_features[s][f_name_] * np.sign(np.sin(np.radians(sessions_features[s]['fmAng'])))
+        feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
     else:
         raise Exception(f'unsupported {f_name} input feature.')
+    return feat
 
 
 def get_output_feat(s, f_name, output_windows):
@@ -88,12 +97,13 @@ def get_aux_feat(s, f_name, aux_windows):
     if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist']:
         ts = sessions_features[s][f_name]
         # ts = smooth_moving_average(ts, 20)
-        return np.mean(zscore(ts)[aux_windows], axis=1)    # todo: zscore?
-    elif f_name in ['pfast_i', 'sine_i', 'tap']:
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)    # todo: zscore?
+    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed']:
         ts = sessions_features[s][f_name]
-        return zscore(np.sum(ts[aux_windows], axis=1))  # todo: zscore?
+        feat = np.sum(ts[aux_windows], axis=1)  # todo: zscore?
     else:
-        raise Exception(f'unsupported {f_name} output feature.')
+        raise Exception(f'unsupported {f_name} aux feature.')
+    return feat
 
 
 def get_x_and_y_data(config, display=False):
@@ -127,10 +137,11 @@ def get_x_and_y_data(config, display=False):
     session_keys = []
     for s_i, s in enumerate(sessions_features):
         if s_i == 0:
-            print(sessions_features[s].keys())
+            print('Available features:', sessions_features[s].keys())
         session_len = len(sessions_features[s]['mFV'])
+        print(f"Session {s_i} length: {len(sessions_features[s]['mFV'])}.")
         if session_len < min_num_timesteps:    # skip short sessions for now
-            print(f"Session {s_i} length = {len(sessions_features[s]['mFV'])}. Too short. Skipped.")
+            print("Too short. Skipped.")
             continue
 
         input_windows, output_windows = create_x_and_y_windows(num_timesteps,
@@ -283,11 +294,11 @@ if __name__ == '__main__':
 
     source = 'wt'
     if source == 'wt':
-        sessions_features = joblib.load('../data/sessions_features_82_isong.pkl')
-        fps = 150
+        sessions_features = joblib.load('../data/wt/sessions_features_77.pkl')
+        fps = sessions_features.get('fps', 150)
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/sessions_features_11.pkl')
-        fps = 60
+        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11.pkl')
+        fps = sessions_features.get('fps', 60)
     else:
         raise Exception('Wrong data source.')
 
@@ -297,7 +308,7 @@ if __name__ == '__main__':
     data_config['input_raw_each_dim'] = 3*fps
     data_config['num_timesteps'] = 100000
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
-    data_config['input_raw_overlap'] = fps//30    # move input window by 33ms (TODO keep this same as predict window size?)
+    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
     data_config["predict_window_size"] = fps//10  # averaging emission over this window size (100ms)
     data_config['input_labels'] = OrderedDict({
         'mFV': 'z-mFV',
@@ -305,6 +316,7 @@ if __name__ == '__main__':
         'mfDist': 'z-mfDist',
 
         'fmAng_sin': 'maleLR',
+        'wingAlign': 'wingAlign',
 
         'pfast_i': 'pulse',
         'sine_i': 'sine',
@@ -312,7 +324,9 @@ if __name__ == '__main__':
 
         'pfast_i_directed': 'pulseLR',
         'sine_i_directed': 'sineLR',
-        'tap2u': 'tap2uLR',
+        'tap2_directed': 'tap2LR',
+
+        # 'fDistWall': 'distWall',
     })
 
     data_config['emission_labels'] = OrderedDict({
@@ -327,7 +341,7 @@ if __name__ == '__main__':
         'mfDist': 'z-mfDist',
         'pfast_i': 'pulse',
         'sine_i': 'sine',
-        'tap': 'tap',
+        'tap2': 'tap2',
     })
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4

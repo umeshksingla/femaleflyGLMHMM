@@ -12,16 +12,16 @@ from preprocess import visual_features
 def get_features(DATA, expt_path, cop_start_frame):
 
     # Get raw tracks in mm space up to copulation
-    fTrx, mTrx = DATA.get_tracks(expt_path, cop_start_frame)
+    fTrx_, mTrx_ = DATA.get_tracks(expt_path, cop_start_frame)
     fly_nodes = DATA.get_fly_nodes()
 
     # Smooth those raw tracks
-    fTrx = smooth(fTrx, DATA.smooth_window)
-    mTrx = smooth(mTrx, DATA.smooth_window)
+    fTrx_ = smooth(fTrx_, DATA.smooth_window)
+    mTrx_ = smooth(mTrx_, DATA.smooth_window)
 
     # Fill missing values
-    fTrx = fill_missing_tracks_SR(fTrx, kind="cubic")
-    mTrx = fill_missing_tracks_SR(mTrx, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
+    fTrx = fill_missing_tracks_SR(fTrx_, kind="cubic")
+    mTrx = fill_missing_tracks_SR(mTrx_, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
 
     # Compute visual features using various body points
     visual_ftr_dict = visual_features.compute_visual_features(fTrx, mTrx, DATA.get_fly_nodes())
@@ -50,17 +50,19 @@ def get_features(DATA, expt_path, cop_start_frame):
     all_session_features['silence_i'] = isong[:, 3]
 
     # Compute environmental features, i.e. how far the wall is from female's head
-    centerW, _ = DATA.get_circle_estimator_helper(trxF=fTrx, trxM=mTrx)
+    centerW, _ = DATA.get_circle_estimator_helper(trxM=mTrx_, trxF=fTrx_)
     fHd = fTrx[..., fly_nodes.index('head'), :]
     all_session_features['fDistWall'] = DATA.RADIUS - np.linalg.norm(fHd - np.array(centerW), axis=1)
+
+    all_session_features['fps'] = DATA.fps
 
     return all_session_features
 
 
 if __name__ == '__main__':
 
-    # DATA = WT_DATA
-    DATA = FREDCLEANED_DATA
+    DATA = WT_DATA
+    # DATA = FREDCLEANED_DATA
 
     BASE_FOLDER = f'../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
@@ -72,15 +74,14 @@ if __name__ == '__main__':
     for _, session_path in list(enumerate(session_paths)):
         print(f'Loading expt {_}:', session_path)
 
-        if DATA.dataset == 'wt':
-            session_name = session_path.split("/")[-1]
-        elif DATA.dataset in ['wt_fred', 'wt_fredcleaned']:
-            session_name = session_path.split("/")[-3]
-        else:
-            raise Exception(f'Wrong dataset "{DATA.dataset}".')
+        session_name = DATA.get_session_name(session_path)
 
         if session_name in ['190723_102650_wt_18159211_rig1.1.h5']:
             print("Skipped. usually file open error.")
+            continue
+
+        if session_name in ['20190927_151317_left']:
+            print("Corrupted tap file.")
             continue
 
         try:
@@ -89,16 +90,23 @@ if __name__ == '__main__':
             print("No track_occupancy. Skipping this session.")
             continue
 
-        sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
-        # try:
-        #     sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
-        # except RuntimeError:
-        #     print("Could not open file.")
-        #     continue
+        # sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
+        try:
+            sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
+        except RuntimeError as e:
+            print(e)
+            continue
+        except np.linalg.LinAlgError as e:
+            print(e)
+            continue
 
         # if _ % 10 == 0:
-        #     joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
+        #     joblib.dump(sessions_features,
+        #                 os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
 
         break
-    joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
-    print(f"Finished computing/loading all features in: {round(time.time() - st1, 2)} secs. #sessions: {len(sessions_features)}")
+
+    joblib.dump(sessions_features,
+                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
+    print(f"Finished computing all features in: {round(time.time() - st1, 2)} "
+          f"secs. #sessions: {len(sessions_features)}")
