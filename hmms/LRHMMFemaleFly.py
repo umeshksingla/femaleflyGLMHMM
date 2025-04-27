@@ -31,7 +31,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
         self.learned_lps = None
         super().__init__()
 
-    def reindex_params(self, em_params, emissions, inputs):
+    def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
 
         # print("Before:", em_params)
@@ -50,12 +50,12 @@ class LRHMMFemaleFly(BaseFemaleFly):
         # print("state_vel_means", state_vel_means)
         # print("new ordering:", new_index)
 
-        # OR Reindex by the total activity
-        _, z = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, z, self.num_states)
-        state_tot_activity_mean = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
-        new_index = np.argsort(state_tot_activity_mean)[::-1]
-        print("state_tot_activity_mean", state_tot_activity_mean)
+        # OR Reindex by the activity index
+        _, zseq = self.predict(emissions, inputs)
+        emissions_z = utils.get_emissions_by_state(emissions, zseq, output_mn_std, self.num_states)
+        state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
+        new_index = np.argsort(state_activity_index)[::-1]
+        print("state_tot_activity_mean", state_activity_index)
         print("new ordering:", new_index)
 
         params = em_params._replace(
@@ -74,11 +74,11 @@ class LRHMMFemaleFly(BaseFemaleFly):
         # print("After:", params)
         return params
 
-    def fit(self, emissions, inputs):
+    def fit(self, emissions, inputs, output_mn_std=None):
         key = jr.PRNGKey(self.seed)
         em_params, em_lps = fitting.fitEM(key, self.model, emissions, train_inputs=inputs)
         self.learned_params = em_params
-        self.learned_params = self.reindex_params(em_params, emissions, inputs)
+        self.learned_params = self.reindex_params(em_params, emissions, inputs, output_mn_std)
         self.learned_lps = em_lps
         self.update_status()
         return
@@ -87,8 +87,6 @@ class LRHMMFemaleFly(BaseFemaleFly):
         return ~np.any(np.isnan(self.learned_params.transitions.transition_matrix))
 
     def predict(self, emissions, inputs):
-        """use viterbi sequence to find the state sequence and then use corresponding state’s weights at each time 
-        to get the y predicted"""
         return self.predict_v3(emissions, inputs)
 
         def calc(params, z, i):
@@ -107,8 +105,6 @@ class LRHMMFemaleFly(BaseFemaleFly):
         return y_preds, z_seqs
 
     def predict_v2(self, emissions, inputs):
-        """use filtering distribution probabilities and take the argmax state at each step and use its filters,
-        i.e. weights of $argmax_{z_t} P(z_t | y_{1..t})$"""
 
         def calc(params, z, i):
             return params.emissions.weights[z] @ i + params.emissions.biases[z]
@@ -128,8 +124,6 @@ class LRHMMFemaleFly(BaseFemaleFly):
         return y_preds, z_seqs
 
     def predict_v3(self, emissions, inputs):
-        """use filtering distribution probabilities and use the combined distribution of all states at each step,
-        i.e. $\sum_{z_t}[P(z_t | y_{1..t}) * P(y_t|z_t, w_{z_t})]$. probably the most bayesian way"""
 
         def calc(params, pz, i):
             return np.sum(pz[z] * (params.emissions.weights[z] @ i + params.emissions.biases[z]) for z in np.arange(len(pz)))
@@ -138,12 +132,13 @@ class LRHMMFemaleFly(BaseFemaleFly):
         z_seqs = []
         for btch in range(len(emissions)):
             post = self.model.filter(self.learned_params, emissions[btch], inputs[btch])
-            y_pred = vmap(partial(calc, self.learned_params))(post.filtered_probs, inputs[btch])  # computed y given z
+            y_pred = vmap(partial(calc, self.learned_params))(post.predicted_probs, inputs[btch])  # computed y given z
             y_preds.append(y_pred)
 
-            z_seq = np.argmax(post.filtered_probs, axis=1)  # inferred states, just for the sake of it
+            post = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
+            z_seq = np.argmax(post.smoothed_probs, axis=1)
             z_seqs.append(z_seq)
-            # print(btch, y_pred.shape)
+
         y_preds = np.array(y_preds)
         z_seqs = np.array(z_seqs)
         return y_preds, z_seqs
