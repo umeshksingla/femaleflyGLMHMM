@@ -9,6 +9,7 @@
 import argparse
 import joblib
 import json
+import numpy as np
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
@@ -43,14 +44,24 @@ def run(mc):
     data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
     print('Inputs:', data_config['input_labels'])
     print('Emissions:', data_config['emission_labels'])
-    session_keys = data_config['session_keys']
+
+    session_keys = np.array(data_config['session_keys'])
+    output_mn_std = data['output_mn_std']
     output_indices = data['output_indices']
+
     num_batches = data_config['num_sessions']
     num_train_batches = int(num_batches * 0.8)
-    train_emissions, train_inputs, train_session_keys = emissions[:num_train_batches], inputs[:num_train_batches], session_keys[ :num_train_batches]
-    test_emissions, test_inputs, test_session_keys = emissions[num_train_batches:], inputs[num_train_batches:], session_keys[num_train_batches:]
-    print("# Train sessions:", len(train_session_keys))
-    print("# Test sessions:", len(test_session_keys))
+    train_session_indices = np.arange(num_train_batches).astype(int)
+    test_session_indices = np.arange(num_train_batches, num_batches).astype(int)
+
+    train_emissions = emissions[train_session_indices]
+    test_emissions = emissions[test_session_indices]
+    train_inputs = inputs[train_session_indices]
+    test_inputs = inputs[test_session_indices]
+    train_output_mn_std = output_mn_std[train_session_indices]
+
+    print("# Train sessions:", train_session_indices, len(train_session_indices))
+    print("# Test sessions:", test_session_indices, len(test_session_indices))
 
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
@@ -66,14 +77,14 @@ def run(mc):
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
     print(">> Fitting")
-    model.fit(train_emissions, train_inputs)
+    model.fit(train_emissions, train_inputs, train_output_mn_std)
     print(">> Fit done.")
 
     dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
 
     print(">> Saving basic checkpoint at:", dump_filepath)
-    utils.save(model, train_emissions, train_inputs, train_session_keys, test_emissions, test_inputs, test_session_keys,
-               output_indices, dump_filepath)   # save model parameters and data used for train and test
+    utils.save(model, emissions, inputs, train_session_indices, test_session_indices,
+               session_keys, output_mn_std, output_indices, dump_filepath)   # save model parameters and data used for train and test
     print(">> Saved.\n")
 
     print(">> Calculating overall r2 scores for this fit:")

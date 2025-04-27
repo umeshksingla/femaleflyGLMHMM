@@ -63,7 +63,6 @@ def get_input_feat(s, f_name):
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
         feat = zscore(feat)     # it is okay to zscore these alignment angles as they are treated linearly
-        print(feat.shape)
     elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
         f_name_ = f_name.split('_directed')[0]
         feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
@@ -73,24 +72,32 @@ def get_input_feat(s, f_name):
 
 
 def get_output_feat(s, f_name, output_windows):
+    sf = sessions_features[s]
     if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA']:
-        ts = sessions_features[s][f_name]
-        # ts = smooth_moving_average(ts, 20)
-        return np.mean(zscore(ts)[output_windows], axis=1)    # todo: zscore? zscore before mean or after?
+        ts = sf[f_name]
+        mn = ts.mean()
+        std = ts.std()
+        f = np.mean(zscore(ts)[output_windows], axis=1)    # todo: zscore? zscore before mean or after?
     elif f_name in ['dfTheta']:
-        fTheta = sessions_features[s]['fTheta'][output_windows]
+        fTheta = sf['fTheta'][output_windows]
         dfTheta = fTheta[:, -1] - fTheta[:, 0]
         dfTheta = np.where(np.abs(dfTheta) > 90, 0, dfTheta)
+        mn = dfTheta.mean()
+        std = dfTheta.std()
         dfTheta = zscore(dfTheta)
-        return dfTheta
+        f = dfTheta
     elif f_name in ['dfTheta_abs']:
-        fTheta = sessions_features[s]['fTheta'][output_windows]
+        fTheta = sf['fTheta'][output_windows]
         dfTheta_abs = np.abs(fTheta[:, -1] - fTheta[:, 0])
         dfTheta_abs = np.where(dfTheta_abs > 90, 0, dfTheta_abs)
+        mn = dfTheta_abs.mean()
+        std = dfTheta_abs.std()
         dfTheta_abs = zscore(dfTheta_abs)
-        return dfTheta_abs
+        f = dfTheta_abs
     else:
         raise Exception(f'unsupported {f_name} output feature.')
+    # print(f_name, mn, std)
+    return f, mn, std
 
 
 def get_aux_feat(s, f_name, aux_windows):
@@ -108,12 +115,11 @@ def get_aux_feat(s, f_name, aux_windows):
 
 def get_x_and_y_data(config, display=False):
 
-    until_copulation = config['until_copulation']
-    if until_copulation is True:
-        raise Exception('until_copulation=True not supported yet. 3/25/25')
-
-    num_timesteps = config['num_timesteps']
-    min_num_timesteps = num_timesteps
+    copulation_bool = config['copulation']
+    if copulation_bool is True:
+        print('Processing sessions with copulation.')
+    else:
+        print('Processing sessions with no copulation.')
 
     basis_transformed = config['basis_transformed']
     # num_sessions = config['num_sessions']
@@ -129,9 +135,23 @@ def get_x_and_y_data(config, display=False):
     input_raw_overlap = config['input_raw_overlap']
     predict_gap_size = config['predict_gap_size']
 
+    if copulation_bool:
+        num_timesteps = 45000
+        print("Copulation True")
+    else:
+        num_timesteps = 240000
+        print("Copulation False")
+
+    input_windows, output_windows = create_x_and_y_windows(num_timesteps,
+                                                           x_size=input_raw_each_dim,
+                                                           y_size=predict_window_size,
+                                                           x_overlap=input_raw_overlap,
+                                                           y_gap_size=predict_gap_size)
+
     inputs_raw = []
     emissions = []
     aux_data = []
+    output_mn_std = []
 
     num_sessions = 0
     session_keys = []
@@ -139,50 +159,61 @@ def get_x_and_y_data(config, display=False):
         if s_i == 0:
             print('Available features:', sessions_features[s].keys())
         session_len = len(sessions_features[s]['mFV'])
-        print(f"Session {s_i} length: {len(sessions_features[s]['mFV'])}.")
-        if session_len < min_num_timesteps:    # skip short sessions for now
-            print("Too short. Skipped.")
+        print(f"Session {s_i} length: {session_len}.")
+
+        session_copulation = session_len < 270000    # TODO: have to verify if sessions > 240k but <270k actually copulate or not
+        if copulation_bool != session_copulation:
             continue
 
-        input_windows, output_windows = create_x_and_y_windows(num_timesteps,
-                                                               x_size=input_raw_each_dim,
-                                                               y_size=predict_window_size,
-                                                               x_overlap=input_raw_overlap,
-                                                               y_gap_size=predict_gap_size)
-        # if session_len > 250000:  # do we want to remove the ones that have no copulation?
-        #     print(f"Session {s_i} length = {len(sessions_features[s]['mFV'])}. No copulation. Skipped.")
-        #     continue
+        if copulation_bool is True and session_len < num_timesteps:
+            print(f"Too short for copulation sessions. Skipped.")
+            continue
+
         session_keys.append(s)
+
+        print(input_windows, input_windows.shape)
+        print(output_windows, output_windows.shape)
+        s_input_windows = input_windows + (session_len-num_timesteps-1)
+        s_output_windows = output_windows + (session_len-num_timesteps-1)
+        print(s_input_windows, s_input_windows.shape)
+        print(s_output_windows, s_output_windows.shape)
 
         # INPUTS
         feats = []
         for _ in x_labels:
-            f = get_input_feat(s, _)[input_windows]
+            f = get_input_feat(s, _)[s_input_windows]
             feats.append(f)
         s_inputs = np.hstack(feats)
 
         # EMISSIONS
         o_feats = []
+        o_mn_std = []
         for _ in y_labels:
-            f = get_output_feat(s, _, output_windows)
+            f, mn, std = get_output_feat(s, _, s_output_windows)
             o_feats.append(f)
+            o_mn_std.append([mn, std])
         s_emissions = np.vstack(o_feats).T
+        s_o_mn_std = np.vstack(o_mn_std)
 
         # AUXILIARY DAta
         a_feats = []
         for _ in a_labels:
-            f = get_aux_feat(s, _, output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
+            f = get_aux_feat(s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
             a_feats.append(f)
         s_aux_data = np.vstack(a_feats).T
 
         inputs_raw.append(s_inputs)
         emissions.append(s_emissions)
         aux_data.append(s_aux_data)
+        output_mn_std.append(s_o_mn_std)
         num_sessions += 1
+        print("============")
 
     inputs_raw = np.array(inputs_raw)
     emissions = np.array(emissions)
     aux_data = np.array(aux_data)   # aux data doesn't need to be basis transformed
+    output_mn_std = np.array(output_mn_std)
+    # print("output_mn_std", output_mn_std, output_mn_std.shape)
 
     # Cosine basis transformation of inputs
     if basis_transformed == 'cos':
@@ -240,8 +271,9 @@ def get_x_and_y_data(config, display=False):
         'emissions': emissions,
         'inputs': inputs,
         'aux_data': aux_data,
+        'output_mn_std': output_mn_std,
         # 'inputs_raw': inputs_raw,
-        'output_indices': output_windows[:, 0],
+        'output_indices': output_windows[:, 0], # TODO!!!? need per session output windows now
         'aux_indices': output_windows[:, 0],
     }
 
@@ -303,7 +335,7 @@ if __name__ == '__main__':
         raise Exception('Wrong data source.')
 
     data_config['source'] = source
-    data_config['until_copulation'] = False
+    data_config['copulation'] = False
     data_config['fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['num_timesteps'] = 100000
@@ -316,7 +348,7 @@ if __name__ == '__main__':
         'mfDist': 'z-mfDist',
 
         'fmAng_sin': 'maleLR',
-        'wingAlign': 'wingAlign',
+        'wingAlign': 'z-wingAlign',
 
         'pfast_i': 'pulse',
         'sine_i': 'sine',
@@ -330,9 +362,9 @@ if __name__ == '__main__':
     })
 
     data_config['emission_labels'] = OrderedDict({
-        'fFV': 'z-fFV',
-        'fLV': 'z-fLV',
-        'dfTheta': 'z-fRV',
+        'fFV': 'forward velocity',
+        'fLV': 'lateral velocity',
+        'dfTheta': 'orientation change',
     })
 
     data_config['auxiliary_labels'] = OrderedDict({
@@ -350,7 +382,7 @@ if __name__ == '__main__':
     # sys.exit()
 
     data = get_x_and_y_data(data_config, display=True)
-    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}_aux_data.pkl'
+    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}_copulation={data_config["copulation"]}.pkl'
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')
     print("Saved at:", filename)

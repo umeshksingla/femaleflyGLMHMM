@@ -434,7 +434,7 @@ def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefi
 
     for o, ol in enumerate(o_labels):
         for z in list(emissions_z.keys()):
-            data = np.round(emissions_z[z][:, o], decimals=5)
+            data = np.random.choice(np.round(emissions_z[z][:, o], decimals=5), min(1000, len(emissions_z[z])), replace=False)
             sns.histplot(data, color=COLORS[z], ax=ax[o],
                          common_norm=False,
                          kde=True,
@@ -442,10 +442,12 @@ def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefi
                          label=f'State {z+1}',
                          edgecolor=None,
                          alpha=1,
+                         bins=50,
                          )
-        ax[o].set_xscale('symlog')  # symmetric log, can handle negative emission values with log_scale in sns.histplot can't.
-        ax[o].set_xlabel(f'{o_labels[ol]} (a.u.)', color='magenta')
-        ax[o].margins(y=0.2)
+        # ax[o].set_xscale('symlog')  # symmetric log, can handle negative emission values with log_scale in sns.histplot can't.
+        ax[o].set_xlabel(o_labels[ol], color='magenta')
+        ax[o].margins(y=0.1)
+        ax[o].set_ylim(0, 0.5)
         ax[o].axhline(0, ls=":", lw=2, c='k')
         if o == 0:
             ax[o].legend(loc='upper left')
@@ -677,14 +679,36 @@ def plot_var_explained_by_z(r2_z, title=None, savefig=False, fig_dir=None, displ
     return fig
 
 
+def plot_var_explained_by_o(r2_o, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot overall r2 scores for each emission dim.
+    :return:
+    """
+    fig = plt.figure()
+    for o in r2_o:
+        plt.bar(o, r2_o[o], color='magenta')
+    plt.xticks(list(r2_o.keys()), list(o_labels.values()), rotation=90)
+    plt.ylabel('Var explained (%)')
+    plt.margins(0.1)
+    plt.xticks(list(r2_o.keys()))
+    plt.axhline(0, c='k', ls=':', lw=2)
+    plt.title(title)
+    # plt.tight_layout()
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_score_by_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return fig
+
+
 def plot_correlation_by_o(corr_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
     """
     Plot correlation coefficients for each emission timeseries.
     :return:
     """
     fig = plt.figure()
-    for z in corr_z:
-        plt.bar(z, corr_z[z], color='magenta')
+    for o in corr_z:
+        plt.bar(o, corr_z[o], color='magenta')
     plt.xticks(list(corr_z.keys()), list(o_labels.values()), rotation=90)
     plt.ylabel('Correlation (lag=0)')
     plt.margins(0.1)
@@ -692,8 +716,10 @@ def plot_correlation_by_o(corr_z, o_labels, title=None, savefig=False, fig_dir=N
     plt.axhline(0, c='k', ls=':', lw=2)
     plt.title(title)
     # plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_correlation_by_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_correlation_by_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
     return fig
 
 

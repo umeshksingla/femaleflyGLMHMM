@@ -81,12 +81,14 @@ def calculate_steady_state_p(P):
     return steady_state_vector
 
 
-def get_emissions_by_state(emissions, stateseq, num_states):
+def get_emissions_by_state(emissions, stateseq, output_mn_std, num_states):
     emissions_z = {}
     for btch in range(len(stateseq)):
+        mn_std_btch = output_mn_std[btch]
         for z in range(num_states):
             if z not in emissions_z: emissions_z[z] = []
-            emissions_z[z].append(emissions[btch][stateseq[btch] == z])
+            eez = emissions[btch][stateseq[btch] == z] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+            emissions_z[z].append(eez)
     for z in emissions_z:
         emissions_z[z] = np.vstack(emissions_z[z])
     return emissions_z
@@ -176,12 +178,18 @@ def get_train_test_split(data, num_fitsessions=None, seed=0, train_frac=0.7):
     return [train_emissions, train_inputs], [test_emissions, test_inputs]
 
 
-def save(model, train_emissions, train_inputs, train_session_keys, test_emissions, test_inputs, test_session_keys, output_indices, output_dir):
+def save(model, emissions, inputs, train_session_indices, test_session_indices,
+         session_keys, output_mn_std, output_indices, output_dir):
 
     os.makedirs(output_dir, exist_ok=False)
     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
     with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
+
+    train_emissions = emissions[train_session_indices]
+    test_emissions = emissions[test_session_indices]
+    train_inputs = inputs[train_session_indices]
+    test_inputs = inputs[test_session_indices]
 
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
     test_lp = model.get_data_logprob(test_emissions, test_inputs)
@@ -196,13 +204,17 @@ def save(model, train_emissions, train_inputs, train_session_keys, test_emission
             'train_emissions': train_emissions,
             'train_inputs': train_inputs,
             'train_lp': train_lp,
-            'train_session_keys': train_session_keys,
+            'train_session_indices': train_session_indices,
+            'train_output_mn_std': output_mn_std[train_session_indices],
+            'train_session_keys': session_keys[train_session_indices],
         },
         'test_data': {
             'test_emissions': test_emissions,
             'test_inputs': test_inputs,
             'test_lp': test_lp,
-            'test_session_keys': test_session_keys,
+            'test_session_indices': test_session_indices,
+            'test_output_mn_std': output_mn_std[test_session_indices],
+            'test_session_keys': session_keys[test_session_indices],
         },
         'output_indices': output_indices,
     }
@@ -273,8 +285,8 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         shutil.rmtree(fig_dir)
     os.makedirs(fig_dir, exist_ok=True)
 
-    train_stateseq = model_ckp['train_data']['train_stateseq']
-    test_stateseq = model_ckp['test_data']['test_stateseq']
+    # train_stateseq = model_ckp['train_data']['train_stateseq']
+    # test_stateseq = model_ckp['test_data']['test_stateseq']
     learned_params = model_ckp['learned_params']
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
@@ -283,9 +295,14 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'],
                              savefig=savefig, fig_dir=fig_dir, display=display)
 
+    plots.plot_state_mean_outputs_by_o_dists(
+        get_emissions_by_state(model_ckp['train_data']['train_emissions'], model_ckp['train_data']['train_stateseq'],
+                               model_ckp['train_data']['train_output_mn_std'], num_states),
+        emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+
     plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
                             savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_empirical_occupancy(train_stateseq, model_config,
+    plots.plot_empirical_occupancy(model_ckp['train_data']['train_stateseq'], model_config,
                             title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
 
     plots.plot_ethogram(learned_params.transitions.transition_matrix,
@@ -298,7 +315,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                        savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_filter_amplitudes(learned_params.emissions.weights, data_config,
                        savefig=savefig, fig_dir=fig_dir, display=display)
-    # return
+
 
     # btch=32
     # plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], model_config, btch, effective_fps=data_config["predict_window_size"],
@@ -315,23 +332,27 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,
                                   savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_prob_states(train_stateseq, model_config,
+    plots.plot_prob_states(model_ckp['train_data']['train_stateseq'], model_config,
                            title='train', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_prob_states(test_stateseq, model_config,
+    plots.plot_prob_states(model_ckp['test_data']['test_stateseq'], model_config,
                            title='held-out', savefig=savefig, fig_dir=fig_dir, display=display)
 
-    plots.plot_state_mean_outputs_by_o_dists(get_emissions_by_state(model_ckp['train_data']['train_emissions'], train_stateseq, num_states), emission_labels,
-                                             title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z(model_ckp['train_data']['train_score_by_z'],
+                                  title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_o(model_ckp['train_data']['train_score_by_o'], emission_labels,
                                   title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z_o(model_ckp['train_data']['train_score_by_z_and_o'], emission_labels,
                                     title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_correlation_by_o(model_ckp['train_data']['train_correlation_by_o'], emission_labels,
                                 title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
 
-    plots.plot_state_mean_outputs_by_o_dists(get_emissions_by_state(model_ckp['test_data']['test_emissions'], test_stateseq, num_states), emission_labels,
-                                             title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_state_mean_outputs_by_o_dists(
+        get_emissions_by_state(model_ckp['test_data']['test_emissions'], model_ckp['test_data']['test_stateseq'],
+                               model_ckp['test_data']['test_output_mn_std'], num_states),
+        emission_labels, title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z(model_ckp['test_data']['test_score_by_z'],
+                                  title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_o(model_ckp['test_data']['test_score_by_o'], emission_labels,
                                   title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_z_o(model_ckp['test_data']['test_score_by_z_and_o'], emission_labels,
                                     title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
@@ -343,7 +364,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
 
     effective_fps = data_config["predict_window_size"]
     window_size = effective_fps * 1 * 60    # 1 minute windows  # TODO TODO FIX!!!!
-    num_timestamps = train_stateseq.shape[1]
+    num_timestamps = model_ckp['train_data']['train_stateseq'].shape[1]
 
     window_starts = np.linspace(0, num_timestamps-window_size-10, num=10)
     window_starts = np.round(window_starts).astype(int)
@@ -363,7 +384,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     all_window_starts = np.append(all_window_starts, 0)     # add full session window
     all_window_ends = np.append(all_window_ends, num_timestamps-1)
 
-    for batch in np.random.choice(range(len(train_stateseq)), size=min([5, len(train_stateseq)]), replace=False):
+    for batch in np.random.choice(range(len(model_ckp['train_data']['train_stateseq'])), size=min([5, len(model_ckp['train_data']['train_stateseq'])]), replace=False):
         for xlim in zip(all_window_starts, all_window_ends):  # on train
             plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], model_config, batch, effective_fps, xlim=xlim,
                                       prefix_data='train', savefig=savefig, fig_path=f'{fig_dir}/probs/train{batch}_xlim={xlim}.pdf', display=display)
@@ -379,7 +400,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         break
 
     # for batch in np.random.choice(range(len(test_stateseq)), size=min([5, len(test_stateseq)]), replace=False):
-    for batch in range(len(test_stateseq)):
+    for batch in range(len(model_ckp['test_data']['test_stateseq'])):
         for xlim in zip(all_window_starts, all_window_ends):  # on test
             plots.plot_smoothed_probs(model_ckp['test_data']['test_state_probs'], model_config, batch, effective_fps,
                                       xlim=xlim,
@@ -398,36 +419,36 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     return
 
 
-def generate_figures2(model_dir, data_pkl_path, savefig=True, display=False):
-    """Figures that need raw data to be loaded, such as male data to define contexts"""
-
-    model_ckp, _, model_config = load_specific_path(model_dir)
-    if model_ckp is None:
-        return
-
-    data = joblib.load(data_pkl_path)
-    data_config, emissions, inputs, aux_data = data['data_config'], data['emissions'], data['inputs'], data['aux_data']
-    # todo save aux data with model as well
-    num_batches = data_config['num_sessions']
-    num_train_batches = int(num_batches * 0.8)
-    train_emissions, train_inputs, train_auxs = emissions[:num_train_batches], inputs[:num_train_batches], aux_data[:num_train_batches]
-    # test_emissions, test_inputs, test_auxs = emissions[num_train_batches:], inputs[num_train_batches:], aux_data[num_train_batches:]
-    print("num_batches", num_batches, "num_train_batches", num_train_batches)
-    print(train_emissions.shape, train_inputs.shape, train_auxs.shape)
-
-    train_stateseq = model_ckp['train_data']['train_stateseq']
-    # test_stateseq = model_ckp['test_data']['test_stateseq']
-    learned_params = model_ckp['learned_params']
-    # learned_lps = model_ckp['learned_lps']
-    # emission_labels = data_config['emission_labels']
-    num_states = model_ckp['num_states']
-
-    fig_dir = os.path.join(model_dir, 'figures')
-    plots.plot_state_mean_aux(train_auxs, train_stateseq, num_states, data_config,
-                                 title='Train', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_state_mean_outs(train_emissions, train_stateseq, num_states, data_config,
-                                 title='Train', savefig=savefig, fig_dir=fig_dir, display=display)
-    return
+# def generate_figures2(model_dir, data_pkl_path, savefig=True, display=False):
+#     """Figures that need raw data to be loaded, such as male data to define contexts"""
+#
+#     model_ckp, _, model_config = load_specific_path(model_dir)
+#     if model_ckp is None:
+#         return
+#
+#     data = joblib.load(data_pkl_path)
+#     data_config, emissions, inputs, aux_data = data['data_config'], data['emissions'], data['inputs'], data['aux_data']
+#     # todo save aux data with model as well
+#     num_batches = data_config['num_sessions']
+#     num_train_batches = int(num_batches * 0.8)
+#     train_emissions, train_inputs, train_auxs = emissions[:num_train_batches], inputs[:num_train_batches], aux_data[:num_train_batches]
+#     # test_emissions, test_inputs, test_auxs = emissions[num_train_batches:], inputs[num_train_batches:], aux_data[num_train_batches:]
+#     print("num_batches", num_batches, "num_train_batches", num_train_batches)
+#     print(train_emissions.shape, train_inputs.shape, train_auxs.shape)
+#
+#     train_stateseq = model_ckp['train_data']['train_stateseq']
+#     # test_stateseq = model_ckp['test_data']['test_stateseq']
+#     learned_params = model_ckp['learned_params']
+#     # learned_lps = model_ckp['learned_lps']
+#     # emission_labels = data_config['emission_labels']
+#     num_states = model_ckp['num_states']
+#
+#     fig_dir = os.path.join(model_dir, 'figures')
+#     plots.plot_state_mean_aux(train_auxs, train_stateseq, num_states, data_config,
+#                                  title='Train', savefig=savefig, fig_dir=fig_dir, display=display)
+#     plots.plot_state_mean_outs(train_emissions, train_stateseq, num_states, data_config,
+#                                  title='Train', savefig=savefig, fig_dir=fig_dir, display=display)
+#     return
 
 
 def getafilepath(model_name):
