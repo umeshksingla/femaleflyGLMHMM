@@ -31,8 +31,8 @@ class LRFemaleFly(BaseFemaleFly):
         self.learned_lps = None
         super().__init__()
 
-    def fit(self, emissions, inputs):
-
+    def fit(self, emissions, inputs, output_mn_std=None):
+        print(f'Begin fitting {self.__class__.__name__}...')
         X_tr = inputs.reshape(-1, inputs.shape[-1])
         Y_tr = emissions.reshape(-1, emissions.shape[-1])
         self.model.fit(X_tr, Y_tr)
@@ -41,6 +41,7 @@ class LRFemaleFly(BaseFemaleFly):
             'b': np.expand_dims(self.model.intercept_, 0)
         }
         self.update_status()
+        print(f'End fitting {self.__class__.__name__}...')
         return
 
     def check_nan_in_fit_params(self):

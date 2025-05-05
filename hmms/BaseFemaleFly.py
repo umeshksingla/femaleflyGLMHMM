@@ -7,7 +7,7 @@ class BaseFemaleFly:
     def __init__(self):
         self.fit_success = None
 
-    def fit(self, emissions, inputs):
+    def fit(self, emissions, inputs, output_mn_std=None):
         raise NotImplementedError
 
     def update_status(self):

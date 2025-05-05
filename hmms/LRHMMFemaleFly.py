@@ -74,13 +74,15 @@ class LRHMMFemaleFly(BaseFemaleFly):
         # print("After:", params)
         return params
 
-    def fit(self, emissions, inputs, output_mn_std=None):
+    def fit(self, emissions, inputs, output_mn_std):
+        print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
         em_params, em_lps = fitting.fitEM(key, self.model, emissions, train_inputs=inputs)
         self.learned_params = em_params
         self.learned_params = self.reindex_params(em_params, emissions, inputs, output_mn_std)
         self.learned_lps = em_lps
         self.update_status()
+        print(f'End fitting {self.__class__.__name__}...')
         return
 
     def check_nan_in_fit_params(self):
