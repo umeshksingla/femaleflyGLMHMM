@@ -16,6 +16,7 @@ from hmms.LRFemaleFly import LRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
+from hmms.LRHMMCustomInit2FemaleFly import LRHMMCustomInit2FemaleFly
 from utilities import utils
 
 
@@ -69,6 +70,8 @@ def run(mc):
         model = GHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
+    elif model_prefix == 'lrhmmci2':
+        model = LRHMMCustomInit2FemaleFly(data_config, mc)
     elif model_prefix == 'chance':
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
