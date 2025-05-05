@@ -244,23 +244,6 @@ def plotCV_same_model_R2adj(path, model_prefix, num_states_configs):
     return
 
 
-def generate_figures_multiple_fits(path, model_prefix, num_states_configs, savefig=True, display=False):
-    """(Re)generate figures for all model fits corresponding to model `model_prefix` and states in `num_states_configs`
-    present in the folder `path`.
-    """
-    for s in num_states_configs:
-        model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_prefix}_{s}_cv/**/'))
-        for model_pkl_path in model_pkl_paths:
-            utils.generate_figures(model_pkl_path, savefig=savefig, display=display, override_fig_dir=False)
-    return
-
-
-def generate_figures_single_fit(model_pkl_path, savefig=True, display=False):
-    """(Re)generate figures for a model fit at model_pkl_path"""
-    utils.generate_figures(model_pkl_path, savefig=savefig, display=display, override_fig_dir=False)
-    return
-
-
 def plotCV_different_models(path, num_states):
 
     lrhmm_train_lps, lrhmm_test_lps = loadCV_LLs(path, 'lrhmm', num_states)
@@ -307,28 +290,23 @@ if __name__ == '__main__':
 
     savefig = True
     display = False
-    num_states_configs = [
-        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
-        ][:8]
 
-    CHANCE_MODEL_PATH = 'models/apr23_wt/chance_1_cv/20250423_220857_dromedary'
-    LR_MODEL_PATH = 'models/apr23_wt/lr_1_cv/20250423_213816_pigeon'
-    path = 'apr23_wt'
+    # num_states_configs = [
+    #     2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 20, 23, 25, 27, 30,
+    #     ][:8]
+
+    # CHANCE_MODEL_PATH = 'models/apr23_wt/chance_1_cv/20250423_220857_dromedary'
+    # LR_MODEL_PATH = 'models/apr23_wt/lr_1_cv/20250423_213816_pigeon'
+    # path = 'apr23_wt'
 
     # CHANCE_MODEL_PATH = 'models/apr23_wt_fred/chance_1_cv/20250423_221313_handmaiden'
     # LR_MODEL_PATH = 'models/apr23_wt_fred/lr_1_cv/20250423_221326_pharmacist'
     # path = 'apr23_wt_fred'
 
-    plotCV_same_model_LL(path, 'lrhmmci', num_states_configs)
-    plotCV_same_model_R2(path, 'lrhmmci', num_states_configs)
+    # plotCV_same_model_LL(path, 'lrhmmci', num_states_configs)
+    # plotCV_same_model_R2(path, 'lrhmmci', num_states_configs)
     # plotCV_same_model_Corr(path, 'lrhmmci', num_states_configs)
     # plotCV_same_model_R2adj(path, 'lrhmmci', num_states_configs)
 
     # for ns in num_states_configs:
     #     plotCV_different_models(path, num_states=ns)
-
-    # generate_figures_multiple_fits('general', 'lrhmmci', num_states_configs, savefig=True, display=False)
-
-    # model_pkl_path = f'models/general/lrhmmci_4_cv//'
-    # # model_pkl_path = f'models/general_fred/lrhmmci_4_cv//'
-    # generate_figures_single_fit(model_pkl_path, savefig=True, display=False)
