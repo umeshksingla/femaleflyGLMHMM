@@ -139,7 +139,7 @@ def get_x_and_y_data(config, display=False):
         num_timesteps = 45000
         print("Copulation True")
     else:
-        num_timesteps = 240000
+        num_timesteps = 270000
         print("Copulation False")
 
     input_windows, output_windows = create_x_and_y_windows(num_timesteps,
@@ -152,17 +152,22 @@ def get_x_and_y_data(config, display=False):
     emissions = []
     aux_data = []
     output_mn_std = []
-
-    num_sessions = 0
+    start_frames = []
+    end_frames = []
+    downsampled_indices = []
+    upsampled_indices = []
     session_keys = []
+    num_sessions = 0
+
     for s_i, s in enumerate(sessions_features):
         if s_i == 0:
             print('Available features:', sessions_features[s].keys())
         session_len = len(sessions_features[s]['mFV'])
-        print(f"Session {s_i} length: {session_len}.")
+        print(f"Session {s_i} ({s}) length: {session_len}.")
 
         session_copulation = session_len < 270000    # TODO: have to verify if sessions > 240k but <270k actually copulate or not
         if copulation_bool != session_copulation:
+            print(f'Copulation={session_copulation}. Skipped.')
             continue
 
         if copulation_bool is True and session_len < num_timesteps:
@@ -170,13 +175,14 @@ def get_x_and_y_data(config, display=False):
             continue
 
         session_keys.append(s)
-
-        print(input_windows, input_windows.shape)
-        print(output_windows, output_windows.shape)
-        s_input_windows = input_windows + (session_len-num_timesteps-1)
-        s_output_windows = output_windows + (session_len-num_timesteps-1)
-        print(s_input_windows, s_input_windows.shape)
-        print(s_output_windows, s_output_windows.shape)
+        s_start_frame = (session_len-num_timesteps)     # index of the first frame of this session used for modeling
+        s_input_windows = input_windows + s_start_frame
+        s_output_windows = output_windows + s_start_frame
+        s_end_frame = s_output_windows[-1, 0]           # index of the last frame of this session used for modeling
+        s_downsampled_indices = s_output_windows[:, 0]
+        s_upsampled_indices = np.repeat(np.arange(len(s_downsampled_indices)), predict_window_size)
+        print(f'Session {s_i}', s_start_frame, s_end_frame, "s_downsampled_indices", s_downsampled_indices)
+        print(f'Session {s_i}', s_start_frame, s_end_frame, "s_upsampled_indices", s_upsampled_indices)
 
         # INPUTS
         feats = []
@@ -206,6 +212,10 @@ def get_x_and_y_data(config, display=False):
         emissions.append(s_emissions)
         aux_data.append(s_aux_data)
         output_mn_std.append(s_o_mn_std)
+        start_frames.append(s_start_frame)
+        end_frames.append(s_end_frame)
+        downsampled_indices.append(s_downsampled_indices)
+        upsampled_indices.append(s_upsampled_indices)
         num_sessions += 1
         print("============")
 
@@ -213,7 +223,6 @@ def get_x_and_y_data(config, display=False):
     emissions = np.array(emissions)
     aux_data = np.array(aux_data)   # aux data doesn't need to be basis transformed
     output_mn_std = np.array(output_mn_std)
-    # print("output_mn_std", output_mn_std, output_mn_std.shape)
 
     # Cosine basis transformation of inputs
     if basis_transformed == 'cos':
@@ -265,6 +274,7 @@ def get_x_and_y_data(config, display=False):
     config['basis'] = basis
     config['num_sessions'] = num_sessions   # number of total sessions
     config['session_keys'] = session_keys   # sessions in this data in order
+    config['num_timesteps'] = num_timesteps
 
     data = {
         'data_config': config,
@@ -275,6 +285,10 @@ def get_x_and_y_data(config, display=False):
         # 'inputs_raw': inputs_raw,
         'output_indices': output_windows[:, 0], # TODO!!!? need per session output windows now
         'aux_indices': output_windows[:, 0],
+        'start_frames': np.array(start_frames),
+        'end_frames': np.array(end_frames),
+        'downsampled_indices': np.array(downsampled_indices),
+        'upsampled_indices': np.array(upsampled_indices),
     }
 
     # Plot few samples of inputs
@@ -325,6 +339,7 @@ if __name__ == '__main__':
     data_config = {}
 
     source = 'wt'
+    cop_ = True
     if source == 'wt':
         sessions_features = joblib.load('../data/wt/sessions_features_77.pkl')
         fps = sessions_features.get('fps', 150)
@@ -335,13 +350,13 @@ if __name__ == '__main__':
         raise Exception('Wrong data source.')
 
     data_config['source'] = source
-    data_config['copulation'] = False
+    data_config['copulation'] = cop_
     data_config['fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
-    data_config['num_timesteps'] = 100000
+    # data_config['num_timesteps'] = 100000
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
     data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
-    data_config["predict_window_size"] = fps//10  # averaging emission over this window size (100ms)
+    data_config["predict_window_size"] = fps//30  # averaging emission over this window size (100ms)
     data_config['input_labels'] = OrderedDict({
         'mFV': 'z-mFV',
         'mLS': 'z-mLS',

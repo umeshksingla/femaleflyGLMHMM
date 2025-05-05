@@ -1,5 +1,7 @@
 import os
 import glob
+import random
+
 import joblib
 import json
 import shutil
@@ -14,44 +16,7 @@ from collections import defaultdict
 # import jax.numpy as jnp
 
 from plotting import plots
-
-
-# def get_data_logprob(hmm, params, emissions, inputs=None):
-#     """Evaluate the log probability of the data under the given model and model parameters"""
-#     lp = vmap(partial(hmm.marginal_log_prob, params))(emissions, inputs).sum()
-#     lp += hmm.log_prior(params)
-#     lp = lp / emissions.size
-#     return lp
-
-
-# def get_data_logprob_weightszero(hmm, params, emissions, inputs):
-#     """Evaluate the log probability of the data under the given model and model parameters"""
-#     print(params.emissions.weights, params.emissions.weights.dtype)
-#     emission_params = params.emissions
-#     emission_params = params.emissions._replace(
-#         weights=jnp.zeros(emission_params.weights.shape),
-#         biases=jnp.zeros(emission_params.biases.shape))
-#     params = params._replace(emissions=emission_params)
-#     lp = vmap(partial(hmm.marginal_log_prob, params))(emissions, inputs).sum()
-#     lp += hmm.log_prior(params)
-#     lp = lp / emissions.size
-#     return lp
-
-# def get_data_logprob_mvn(emissions):
-#     def fit_mvn(y):
-#         """
-#         Multivariate gaussian model
-#         """
-#         mu = jnp.mean(y, axis=0)
-#         cov = jnp.cov(y.T)
-#         # p = multivariate_normal.pdf(y, mean=mu, cov=cov)
-#         p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov).prob(y)
-#         p = jnp.maximum(p, 1e-15)
-#         log_Y_given_mvn = jnp.sum(jnp.log(p))
-#         return log_Y_given_mvn
-
-#     lp = vmap(fit_mvn)(emissions).sum() / emissions.size
-#     return lp
+from utilities.video_utils import clip_session
 
 
 def calculate_steady_state_p(P):
@@ -94,40 +59,15 @@ def get_emissions_by_state(emissions, stateseq, output_mn_std, num_states):
     return emissions_z
 
 
-def get_stateseq_indices(state_seqs, emissions, min_length=10):
-    """
-
-    :param state_seq:
-    :param config:
-    :param min_length: return indices that are followed by at least min_length frames in the same state
-    :return:
-    """
-    if emissions.ndim <= 2:
-        emissions = np.expand_dims(emissions, 0)
-
-    num_timesteps = len(emissions[1])
-    num_batches = len(emissions)
-    intervals = {}
-    for b in range(num_batches):
-        intervals[b] = defaultdict(list)
-        change_points = np.where(np.diff(state_seqs[b]) != 0)[0]+1
-        subseq_starts = np.concatenate(([0], change_points))
-        subseq_ends = np.concatenate((change_points, [num_timesteps-1]))
-        for s, e in zip(subseq_starts, subseq_ends):
-            if (e-s) >= min_length:
-                intervals[b][state_seqs[b][s]].append((s, e))
-        for z in intervals[b]:
-            intervals[b][z] = np.array(intervals[b][z][:-1], dtype=int)
+def get_stateseq_indices(indices_seq, state_seq, min_length=10):
+    intervals = defaultdict(list)
+    transitions_at = np.where(np.diff(state_seq) != 0)[0]+1
+    transitions_at = np.insert(transitions_at, 0, 0)
+    transitions_at = np.append(transitions_at, len(indices_seq)-1)
+    for s, e in zip(transitions_at, transitions_at[1:]):
+        if (e-s) >= min_length:
+            intervals[state_seq[s]].append((indices_seq[s], indices_seq[e]-1))  # state doesn't end at e-1 frame but original_indexing-1
     return intervals
-
-
-def map_to_video_frame_indices(intervals_dict, output_indices):
-    intervals_video_frmindx_dict = {}
-    for b in intervals_dict:
-        intervals_video_frmindx_dict[b] = {}
-        for z in intervals_dict[b]:
-            intervals_video_frmindx_dict[b][z] = output_indices[intervals_dict[b][z]]
-    return intervals_video_frmindx_dict
 
 
 def analyze_state_mean(state_seq, config, emissions, inputs):
@@ -157,34 +97,21 @@ def analyze_state_mean(state_seq, config, emissions, inputs):
     return inputs_z, outputs_z
 
 
-def get_train_test_split(data, num_fitsessions=None, seed=0, train_frac=0.7):
-    print("In get_train_test_split:", num_fitsessions, seed, train_frac)
-
-    data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
-    num_tsessions = data_config['num_sessions']
-    if not num_fitsessions:
-        num_fitsessions = num_tsessions
-
-    sessions = np.arange(num_tsessions)
-    # sessions = jax.random.permutation(jnr.PRNGKey(seed), sessions)[:num_fitsessions]
-    print("Permuted sessions", sessions)
-    num_train_batches = int(num_fitsessions * train_frac)
-
-    train_session_idxs = sessions[:num_train_batches]
-    test_session_idxs = sessions[num_train_batches:]
-
-    train_emissions, train_inputs = emissions[train_session_idxs], inputs[train_session_idxs]
-    test_emissions, test_inputs = emissions[test_session_idxs], inputs[test_session_idxs]
-    return [train_emissions, train_inputs], [test_emissions, test_inputs]
 
 
-def save(model, emissions, inputs, train_session_indices, test_session_indices,
-         session_keys, output_mn_std, output_indices, output_dir):
+
+def save(model, data, train_session_indices, test_session_indices, output_dir):
 
     os.makedirs(output_dir, exist_ok=False)
     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
     with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
+
+    emissions = data['emissions']
+    inputs = data['inputs']
+    output_mn_std = data['output_mn_std']
+    output_indices = data['output_indices']
+    session_keys = np.array(model.data_config['session_keys'])
 
     train_emissions = emissions[train_session_indices]
     test_emissions = emissions[test_session_indices]
@@ -196,7 +123,7 @@ def save(model, emissions, inputs, train_session_indices, test_session_indices,
 
     model_ckp = {
         'prefix': model.prefix,
-        'model': model if model.prefix != 'chance' else '', # chance model cannot unpickle tfd distribution
+        'model': model if model.prefix != 'chance' else '',     # chance model cannot unpickle tfd distribution
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
@@ -207,6 +134,10 @@ def save(model, emissions, inputs, train_session_indices, test_session_indices,
             'train_session_indices': train_session_indices,
             'train_output_mn_std': output_mn_std[train_session_indices],
             'train_session_keys': session_keys[train_session_indices],
+            'train_start_frames': data['start_frames'][train_session_indices],
+            'train_end_frames': data['end_frames'][train_session_indices],
+            'train_downsampled_indices': data['downsampled_indices'][train_session_indices],
+            'train_upsampled_indices': data['upsampled_indices'][train_session_indices]
         },
         'test_data': {
             'test_emissions': test_emissions,
@@ -215,6 +146,10 @@ def save(model, emissions, inputs, train_session_indices, test_session_indices,
             'test_session_indices': test_session_indices,
             'test_output_mn_std': output_mn_std[test_session_indices],
             'test_session_keys': session_keys[test_session_indices],
+            'test_start_frames': data['start_frames'][test_session_indices],
+            'test_end_frames': data['end_frames'][test_session_indices],
+            'test_downsampled_indices': data['downsampled_indices'][test_session_indices],
+            'test_upsampled_indices': data['upsampled_indices'][test_session_indices]
         },
         'output_indices': output_indices,
     }
@@ -299,6 +234,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         get_emissions_by_state(model_ckp['train_data']['train_emissions'], model_ckp['train_data']['train_stateseq'],
                                model_ckp['train_data']['train_output_mn_std'], num_states),
         emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    # return
 
     plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
                             savefig=savefig, fig_dir=fig_dir, display=display)
@@ -449,6 +385,40 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
 #     plots.plot_state_mean_outs(train_emissions, train_stateseq, num_states, data_config,
 #                                  title='Train', savefig=savefig, fig_dir=fig_dir, display=display)
 #     return
+
+
+def generate_videos(model_dir, override_vid_dir=True):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if model_ckp is None:
+        return
+
+    vid_dir = os.path.join(model_dir, 'videos')
+    if os.path.exists(vid_dir) and override_vid_dir:
+        shutil.rmtree(vid_dir)
+    os.makedirs(vid_dir, exist_ok=True)
+
+    train_stateseq = model_ckp['train_data']['train_stateseq']
+    train_downsampled_indices = model_ckp['train_data']['train_downsampled_indices']
+    train_upsampled_indices = model_ckp['train_data']['train_upsampled_indices']
+    train_session_keys = model_ckp['train_data']['train_session_keys']
+
+    for batch in np.random.choice(range(len(train_stateseq)), size=min([10, len(train_stateseq)]), replace=False):
+        zseq_b = train_stateseq[batch]
+        downsampled_indices_b = train_downsampled_indices[batch]
+        upsampled_indices_b = train_upsampled_indices[batch]
+        orig_indices_b = downsampled_indices_b[upsampled_indices_b]
+        upsampled_zseq_b = zseq_b[upsampled_indices_b]
+
+        key_b = train_session_keys[batch]
+        intervals_dict_b = get_stateseq_indices(orig_indices_b, upsampled_zseq_b, min_length=150)
+
+        for z in intervals_dict_b:
+            clips_z = intervals_dict_b[z]
+            for interval in random.sample(clips_z, min(10, len(clips_z))):
+                clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")),
+                             interval, output_path=f'{vid_dir}/train{batch}/state{z+1}_origframes={interval}.mp4')
+    return
 
 
 def getafilepath(model_name):

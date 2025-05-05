@@ -41,14 +41,13 @@ def run(mc):
     model_prefix = mc['names']
 
     print(f"Fitting {model_prefix} with model_config: {mc}")
+
     data = joblib.load(data_path)
-    data_config, emissions, inputs = data['data_config'], data['emissions'], data['inputs']
+    emissions, inputs, output_mn_std = data['emissions'], data['inputs'], data['output_mn_std']
+
+    data_config = data['data_config']
     print('Inputs:', data_config['input_labels'])
     print('Emissions:', data_config['emission_labels'])
-
-    session_keys = np.array(data_config['session_keys'])
-    output_mn_std = data['output_mn_std']
-    output_indices = data['output_indices']
 
     num_batches = data_config['num_sessions']
     num_train_batches = int(num_batches * 0.8)
@@ -86,8 +85,7 @@ def run(mc):
     dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
 
     print(">> Saving basic checkpoint at:", dump_filepath)
-    utils.save(model, emissions, inputs, train_session_indices, test_session_indices,
-               session_keys, output_mn_std, output_indices, dump_filepath)   # save model parameters and data used for train and test
+    utils.save(model, data, train_session_indices, test_session_indices, dump_filepath)   # save model parameters and data used for train and test
     print(">> Saved.\n")
 
     print(">> Calculating overall r2 scores for this fit:")
@@ -103,6 +101,10 @@ def run(mc):
     print(">> Making figures:")
     utils.generate_figures(dump_filepath, savefig=True, display=False)
     print(">> Done with figures.\n")
+
+    print(">> Generating videos:")
+    utils.generate_videos(dump_filepath)
+    print(">> Done with videos.\n")
 
     print("Finished.\n")
     return
