@@ -33,8 +33,10 @@ class LRFemaleFly(BaseFemaleFly):
 
     def fit(self, emissions, inputs, output_mn_std=None):
         print(f'Begin fitting {self.__class__.__name__}...')
-        X_tr = inputs.reshape(-1, inputs.shape[-1])
-        Y_tr = emissions.reshape(-1, emissions.shape[-1])
+        X_tr = np.concatenate(inputs, axis=0)
+        print(X_tr.shape)
+        Y_tr = np.concatenate(emissions, axis=0)
+        print(Y_tr.shape)
         self.model.fit(X_tr, Y_tr)
         self.learned_params = {
             'w': np.expand_dims(self.model.coef_, 0),
@@ -54,13 +56,20 @@ class LRFemaleFly(BaseFemaleFly):
         :param inputs:
         :return:
         """
-        X_tr = inputs.reshape(-1, inputs.shape[-1])
-        y_preds = self.model.predict(X_tr)
-        z_seqs = np.zeros(y_preds.shape[0])
-
-        y_preds = y_preds.reshape(inputs.shape[0], -1, self.data_config['emission_dim'])
-        z_seqs = z_seqs.reshape(inputs.shape[0], -1)
-
+        # X_tr = inputs.reshape(-1, inputs.shape[-1])
+        # y_preds = self.model.predict(X_tr)
+        # z_seqs = np.zeros(y_preds.shape[0])
+        #
+        # y_preds = y_preds.reshape(inputs.shape[0], -1, self.data_config['emission_dim'])
+        # z_seqs = z_seqs.reshape(inputs.shape[0], -1)
+        #
+        y_preds = []
+        z_seqs = []
+        for _ in inputs:
+            y_preds_ = self.model.predict(_)
+            z_seqs_ = np.zeros(_.shape[0])
+            y_preds.append(y_preds_)
+            z_seqs.append(z_seqs_)
         return y_preds, z_seqs
 
     def get_data_logprob(self, emissions, inputs):
@@ -76,12 +85,14 @@ class LRFemaleFly(BaseFemaleFly):
             log_Y_given_wx = jnp.sum(jnp.log(p))
             return log_Y_given_wx
 
-        emissions_pred = jnp.array(self.predict(None, inputs)[0])
-        lp = vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
+        emissions_pred = self.predict(None, inputs)[0]
+        # lp = vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        lp = np.sum([fit_normal_residuals(yp, yt) for yp, yt in zip(emissions_pred, emissions)]) / total_emissions_size
         return lp
 
     def get_state_probs(self, emissions, inputs=None):
-        z_probs = np.ones((emissions.shape[0], emissions.shape[1]))
+        z_probs = [np.ones(_.shape[0]) for _ in emissions]
         return z_probs
 
     def get_forward_state_probs(self, emissions, inputs=None):

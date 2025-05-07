@@ -110,7 +110,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     emissions = data['emissions']
     inputs = data['inputs']
     output_mn_std = data['output_mn_std']
-    output_indices = data['output_indices']
+    # output_indices = data['output_indices']
     session_keys = np.array(model.data_config['session_keys'])
 
     train_emissions = emissions[train_session_indices]
@@ -151,7 +151,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
             'test_downsampled_indices': data['downsampled_indices'][test_session_indices],
             'test_upsampled_indices': data['upsampled_indices'][test_session_indices]
         },
-        'output_indices': output_indices,
+        # 'output_indices': output_indices,
     }
     joblib.dump(model_ckp, os.path.join(output_dir, 'model_basic.pkl'))
     print("Basic checkpoint dumped.")
