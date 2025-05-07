@@ -220,8 +220,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         shutil.rmtree(fig_dir)
     os.makedirs(fig_dir, exist_ok=True)
 
-    # train_stateseq = model_ckp['train_data']['train_stateseq']
-    # test_stateseq = model_ckp['test_data']['test_stateseq']
     learned_params = model_ckp['learned_params']
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
@@ -234,7 +232,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         get_emissions_by_state(model_ckp['train_data']['train_emissions'], model_ckp['train_data']['train_stateseq'],
                                model_ckp['train_data']['train_output_mn_std'], num_states),
         emission_labels, title='Train Data', savefig=savefig, fig_dir=fig_dir, display=display)
-    # return
 
     plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
                             savefig=savefig, fig_dir=fig_dir, display=display)
@@ -245,23 +242,11 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                         savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_transition_matrix(learned_params.transitions.transition_matrix,
                                  savefig=savefig, fig_dir=fig_dir, display=display)
-    # returns
 
     plots.plot_filters(learned_params.emissions.weights, data_config,
                        savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_filter_amplitudes(learned_params.emissions.weights, data_config,
                        savefig=savefig, fig_dir=fig_dir, display=display)
-
-
-    # btch=32
-    # plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], model_config, btch, effective_fps=data_config["predict_window_size"],
-    #                           xlim=(0, 19907),
-    #                           prefix_data='train', savefig=savefig,
-    #                           fig_path=f'{fig_dir}/probs/train{btch}.pdf', display=display)
-    # plots.plot_trajectories(model_ckp, model_config, data_config, btch,
-    #                         prefix_data='train', xlim=(0, 19907), savefig=savefig,
-    #                         fig_path=f'{fig_dir}/trajs/train{btch}.pdf',
-    #                         display=display)
 
     plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.005,
                                   savefig=savefig, fig_dir=fig_dir, display=display)
@@ -294,6 +279,19 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                                     title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_correlation_by_o(model_ckp['test_data']['test_correlation_by_o'], emission_labels,
                                 title='Held-out Data', savefig=savefig, fig_dir=fig_dir, display=display)
+    return
+
+
+def generate_trajs(model_dir, savefig=True, display=False, override_fig_dir=True):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if model_ckp is None:
+        return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    if os.path.exists(fig_dir) and override_fig_dir:
+        shutil.rmtree(fig_dir)
+    os.makedirs(fig_dir, exist_ok=True)
 
     os.makedirs(f'{fig_dir}/trajs', exist_ok=True)
     os.makedirs(f'{fig_dir}/probs', exist_ok=True)
@@ -320,24 +318,36 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     all_window_starts = np.append(all_window_starts, 0)     # add full session window
     all_window_ends = np.append(all_window_ends, num_timestamps-1)
 
-    for batch in np.random.choice(range(len(model_ckp['train_data']['train_stateseq'])), size=min([5, len(model_ckp['train_data']['train_stateseq'])]), replace=False):
+    train_stateseq              = model_ckp['train_data']['train_stateseq']
+    train_downsampled_indices   = model_ckp['train_data']['train_downsampled_indices']
+    test_downsampled_indices    = model_ckp['test_data' ]['test_downsampled_indices']
+    train_session_keys          = model_ckp['train_data']['train_session_keys']
+    test_session_keys           = model_ckp['test_data' ]['test_session_keys']
+
+    for batch in np.random.choice(range(len(train_stateseq)), size=min([5, len(train_stateseq)]), replace=False):
+        key_b = train_session_keys[batch]
+
         for xlim in zip(all_window_starts, all_window_ends):  # on train
+            xlim_orig = (train_downsampled_indices[batch][xlim[0]], train_downsampled_indices[batch][xlim[1]])
             plots.plot_smoothed_probs(model_ckp['train_data']['train_state_probs'], model_config, batch, effective_fps, xlim=xlim,
                                       prefix_data='train', savefig=savefig, fig_path=f'{fig_dir}/probs/train{batch}_xlim={xlim}.pdf', display=display)
             plots.plot_comparison_probs(model_ckp['train_data']['train_state_probs'], model_ckp['train_data']['train_fwd_state_probs'], model_config, batch, effective_fps,
                                       xlim=xlim,
                                       prefix_data='train', savefig=savefig,
-                                      fig_path=f'{fig_dir}/probs/train{batch}_xlim={xlim}.pdf', display=display)
+                                      fig_path=f'{fig_dir}/probs/train{batch}_xlim={xlim}_.pdf', display=display)
             plots.plot_trajectories(model_ckp, model_config, data_config, batch,
                                     prefix_data='train', xlim=xlim, savefig=savefig,
-                                    fig_path=f'{fig_dir}/trajs/train{batch}_xlim={xlim}_.pdf',
+                                    fig_path=f'{fig_dir}/trajs/train{batch}_xlim={xlim}.pdf',
                                     display=display)
-            break
+            clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")),
+                         xlim_orig, output_path=f'{fig_dir}/trajs/train{batch}_xlim_orig={xlim_orig}_xlim={xlim}.mp4')
         break
 
     # for batch in np.random.choice(range(len(test_stateseq)), size=min([5, len(test_stateseq)]), replace=False):
     for batch in range(len(model_ckp['test_data']['test_stateseq'])):
+        key_b = test_session_keys[batch]
         for xlim in zip(all_window_starts, all_window_ends):  # on test
+            xlim_orig = (test_downsampled_indices[batch][xlim[0]], test_downsampled_indices[batch][xlim[1]])
             plots.plot_smoothed_probs(model_ckp['test_data']['test_state_probs'], model_config, batch, effective_fps,
                                       xlim=xlim,
                                       prefix_data='test', savefig=savefig,
@@ -345,14 +355,14 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
             plots.plot_comparison_probs(model_ckp['test_data']['test_state_probs'], model_ckp['test_data']['test_fwd_state_probs'], model_config, batch, effective_fps,
                                       xlim=xlim,
                                       prefix_data='test', savefig=savefig,
-                                      fig_path=f'{fig_dir}/probs/test{batch}_xlim={xlim}.pdf', display=display)
+                                      fig_path=f'{fig_dir}/probs/test{batch}_xlim={xlim}_.pdf', display=display)
             plots.plot_trajectories(model_ckp, model_config, data_config, batch,
                                     prefix_data='test', xlim=xlim, savefig=savefig,
                                     fig_path=f'{fig_dir}/trajs/test{batch}_xlim={xlim}_.pdf',
                                     display=display)
-            break
+            clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")),
+                         xlim_orig, output_path=f'{fig_dir}/trajs/test{batch}_xlim_orig={xlim_orig}_xlim={xlim}.mp4')
         break
-    return
 
 
 # def generate_figures2(model_dir, data_pkl_path, savefig=True, display=False):

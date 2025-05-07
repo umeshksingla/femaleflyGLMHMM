@@ -102,6 +102,10 @@ def run(mc):
     utils.generate_figures(dump_filepath, savefig=True, display=False)
     print(">> Done with figures.\n")
 
+    print(">> Generating trajectories:")
+    utils.generate_trajs(dump_filepath, savefig=True, display=False)
+    print(">> Done with trajectories.\n")
+
     print(">> Generating videos:")
     utils.generate_videos(dump_filepath)
     print(">> Done with videos.\n")
