@@ -247,15 +247,12 @@ def plot_filters(weights, data_config, savefig=False, fig_dir=None, display=True
 
             ax.axhline(0, ls=':', c='k')
             ax.margins(0.05)
-            ax.set_ylim(-0.1, 0.1)
+            # ax.set_ylim(-0.1, 0.1)
             ax.set_xlabel('Time (s)')
             stim += 1
 
         d += 1
-    # if num_states > 1:
-    #     ax = axs[0, 0] if emission_dim > 1 else axs[0]
-    #     ax.legend([f'State {s}' for s in range(num_states)], loc='upper left', fontsize='x-small')
-    # fig.supylabel('Filter amplitude (a.u.)')
+
     axs[1, 0].legend(loc='upper left')
     fig.supxlabel("Time relative to prediction (s)")
     fig.align_ylabels(axs[:, 0])
@@ -434,20 +431,24 @@ def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefi
 
     for o, ol in enumerate(o_labels):
         for z in list(emissions_z.keys()):
-            data = np.random.choice(np.round(emissions_z[z][:, o], decimals=5), min(1000, len(emissions_z[z])), replace=False)
-            sns.histplot(data, color=COLORS[z], ax=ax[o],
-                         common_norm=False,
-                         kde=True,
-                         stat='probability',
+            data = np.round(emissions_z[z][:, o])
+            # print(data.shape)
+            data = np.random.choice(np.round(emissions_z[z][:, o], decimals=3), min(10000, len(emissions_z[z])), replace=False)
+            sns.kdeplot(data, color=COLORS[z], ax=ax[o],
+                        cumulative=True,
+                         common_norm=True,
+                         # kde=True,
+                         # stat='probability',
                          label=f'State {z+1}',
-                         edgecolor=None,
+                         # edgecolor=None,
                          alpha=1,
-                         bins=50,
-                         )
+                         # bins=100,
+                        )
         # ax[o].set_xscale('symlog')  # symmetric log, can handle negative emission values with log_scale in sns.histplot can't.
         ax[o].set_xlabel(o_labels[ol], color='magenta')
         ax[o].margins(y=0.1)
-        ax[o].set_ylim(0, 0.5)
+        # ax[o].set_yscale('log')
+        # ax[o].set_ylim(0, 0.5)
         ax[o].axhline(0, ls=":", lw=2, c='k')
         if o == 0:
             ax[o].legend(loc='upper left')
@@ -466,11 +467,11 @@ def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None
     for z in range(config['num_states']):
         prob_z = np.mean(state_seqs == z, axis=0)  # Probability of z at each time step
         plt.plot(uniform_filter1d(prob_z, size=100), c=COLORS[z], linewidth=1.5, label=f'State {z+1}')
-    plt.xlabel('Time (min)', fontsize='large')
+    plt.xlabel('Time', fontsize='large')
     plt.legend(loc='upper right')
     plt.margins(0.05)
     plt.ylabel('P(state)', fontsize='large')
-    plt.xticks([0, len(prob_z)], [0, 15], fontsize='medium')
+    # plt.xticks([0, len(prob_z)], [0, 15], fontsize='medium')
     plt.yticks(fontsize='medium')
     plt.title(f'State occupancy over all {title} sessions')
     plt.ylim(0, 1)
