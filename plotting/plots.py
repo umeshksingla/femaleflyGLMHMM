@@ -473,7 +473,7 @@ def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None
     plt.ylabel('P(state)', fontsize='large')
     # plt.xticks([0, len(prob_z)], [0, 15], fontsize='medium')
     plt.yticks(fontsize='medium')
-    plt.title(f'State occupancy over all {title} sessions')
+    plt.title(f'State occupancy')
     plt.ylim(0, 1)
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_prob_states_over_time.pdf'), bbox_inches='tight', dpi=300,
                             transparent=True)

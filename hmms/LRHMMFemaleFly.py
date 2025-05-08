@@ -21,7 +21,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
         self.data_config = data_config
         self.model_config = model_config
         self.num_states = model_config['num_states']
-        print("self.model_config", self.model_config)
+        # print("self.model_config", self.model_config)
         self.seed = model_config.get('seed', 0)
         self.model = LinearRegressionHMM(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
