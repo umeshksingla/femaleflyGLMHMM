@@ -97,7 +97,32 @@ def analyze_state_mean(state_seq, config, emissions, inputs):
     return inputs_z, outputs_z
 
 
+def save_single(model, emissions, inputs, output_dir):
+    """Save single session fit."""
 
+    os.makedirs(output_dir, exist_ok=True)
+
+    emission_predictions, z_seq = model.predict(emissions, inputs)
+    model_ckp = {
+        'prefix': model.prefix,
+        'num_states': model.num_states,
+        'learned_params': model.learned_params,
+        'learned_lps': model.learned_lps,
+        'emissions': emissions,
+        'inputs': inputs,
+        'state_probs': model.get_state_probs(emissions, inputs),
+        'fwd_state_probs': model.get_forward_state_probs(emissions, inputs),
+        'emission_predictions': emission_predictions,
+        'z_seq': z_seq,
+        'score': model.score(emissions, inputs),
+        'score_by_o': model.score_by_o(emissions, inputs),
+    }
+
+    joblib.dump(model_ckp, os.path.join(output_dir, 'model_ind.pkl'))
+    joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
+    with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
+    plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
+    return
 
 
 def save(model, data, train_session_indices, test_session_indices, output_dir):
@@ -206,6 +231,29 @@ def enhance(output_dir):
 
     joblib.dump(model_ckp, os.path.join(output_dir, 'model.pkl'))
     print("Full checkpoint dumped.")
+    return
+
+
+def generate_figures_single(model_dir, savefig=True, display=False, override_fig_dir=True):
+
+    ind_model_ckp, data_config, model_config = load_specific_path_single(model_dir)
+    if ind_model_ckp is None: return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    if os.path.exists(fig_dir) and override_fig_dir:
+        shutil.rmtree(fig_dir)
+    os.makedirs(fig_dir, exist_ok=True)
+
+    learned_params = ind_model_ckp['learned_params']
+
+    plots.plot_var_explained(ind_model_ckp['score'], ind_model_ckp['score'], savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_var_explained_by_o(ind_model_ckp['score_by_o'], data_config['emission_labels'],
+                                  title='Session', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_prob_states(ind_model_ckp['z_seq'], model_config, title='Session', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(learned_params.emissions.weights, data_config,
+                       savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(learned_params.emissions.weights, data_config,
+                                 savefig=savefig, fig_dir=fig_dir, display=display)
     return
 
 
@@ -453,5 +501,12 @@ def load_specific_path(model_path):
     if fit_success != 'True':
         print(Warning(f'Unsuccessful model loaded. {model_path}'))
         return None, None, None
+    return model_pkl, data_config_pkl, model_config
+
+
+def load_specific_path_single(model_path):
+    data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
+    model_pkl = joblib.load(os.path.join(model_path, 'model_ind.pkl'))
+    with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
     return model_pkl, data_config_pkl, model_config
 
