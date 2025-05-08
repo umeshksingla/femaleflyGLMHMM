@@ -238,9 +238,6 @@ def get_x_and_y_data(config, display=False):
         num_sessions += 1
         print("============")
 
-        if num_sessions == 20:
-            break
-
     inputs_raw = np.array(inputs_raw, dtype=object)
     emissions = np.array(emissions, dtype=object)
     aux_data = np.array(aux_data, dtype=object)
