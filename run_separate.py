@@ -7,16 +7,13 @@
 ####################################
 
 import argparse
+import os.path
+
 import joblib
 import json
 import numpy as np
 
-from hmms.LRHMMFemaleFly import LRHMMFemaleFly
-from hmms.LRFemaleFly import LRFemaleFly
-from hmms.GHMMFemaleFly import GHMMFemaleFly
-from hmms.ChanceFemaleFly import ChanceFemaleFly
-from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
-from hmms.LRHMMCustomInit2FemaleFly import LRHMMCustomInit2FemaleFly
+from hmms.LRHMMIndFemaleFly import LRHMMIndFemaleFly
 from utilities import utils
 
 
@@ -38,80 +35,97 @@ def run(mc):
 
     path = mc['path']
     data_path = mc['data_path']
-    model_prefix = mc['names']
-
-    print(f"Fitting {model_prefix} with model_config: {mc}")
+    # model_prefix = mc['names']
+    # print(f"Fitting {model_prefix} with model_config: {mc}")
 
     data = joblib.load(data_path)
     emissions, inputs, output_mn_std = data['emissions'], data['inputs'], data['output_mn_std']
 
     data_config = data['data_config']
-    print('Inputs:', data_config['input_labels'])
-    print('Emissions:', data_config['emission_labels'])
+    # print('Inputs:', data_config['input_labels'])
+    # print('Emissions:', data_config['emission_labels'])
 
     num_batches = data_config['num_sessions']
     num_train_batches = int(num_batches * 0.8)
     train_session_indices = np.arange(num_train_batches).astype(int)
-    test_session_indices = np.arange(num_train_batches, num_batches).astype(int)
+    # test_session_indices = np.arange(num_train_batches, num_batches).astype(int)
 
     train_emissions = emissions[train_session_indices]
-    test_emissions = emissions[test_session_indices]
+    # test_emissions = emissions[test_session_indices]
     train_inputs = inputs[train_session_indices]
-    test_inputs = inputs[test_session_indices]
+    # test_inputs = inputs[test_session_indices]
     train_output_mn_std = output_mn_std[train_session_indices]
 
-    print("# Train sessions:", train_session_indices, len(train_session_indices))
-    print("# Test sessions:", test_session_indices, len(test_session_indices))
+    # print("# Train sessions:", train_session_indices, len(train_session_indices))
+    # print("# Test sessions:", test_session_indices, len(test_session_indices))
 
-    if model_prefix == 'lrhmm':
-        model = LRHMMFemaleFly(data_config, mc)
-    elif model_prefix == 'ghmm':
-        model = GHMMFemaleFly(data_config, mc)
-    elif model_prefix == 'lrhmmci':
-        model = LRHMMCustomInitFemaleFly(data_config, mc)
-    elif model_prefix == 'lrhmmci2':
-        model = LRHMMCustomInit2FemaleFly(data_config, mc)
-    elif model_prefix == 'chance':
-        model = ChanceFemaleFly(data_config, mc)
-    elif model_prefix == 'lr':
-        model = LRFemaleFly(data_config, mc)
-    else:
-        raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
+    # print(">> Fitting global fit")
+    # global_model = LRHMMCustomInitFemaleFly(data_config, mc)
+    # global_model.fit(train_emissions, train_inputs, train_output_mn_std)
+    # print("LRHMM global W and b computed.")
+    # print(">> Global fit done.")
+    # global_params = global_model.learned_params
+    # print("global_params", global_params)
+    # print("global_lps", global_model.learned_lps)
+    # joblib.dump(global_params, 'global_params.pkl')
 
-    print(">> Fitting")
-    model.fit(train_emissions, train_inputs, train_output_mn_std)
-    print(">> Fit done.")
+    global_params = joblib.load('global_params.pkl')
 
-    dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
+    dump_filepath = utils.getafilepath(f'{path}/lrhmmci2_4')
 
-    print(">> Saving basic checkpoint at:", dump_filepath)
-    utils.save(model, data, train_session_indices, test_session_indices, dump_filepath)   # save model parameters and data used for train and test
-    print(">> Saved.\n")
+    print(">> Fitting each session separately:")
+    for s_i in range(num_batches):
 
-    print(">> Calculating overall r2 scores for this fit:")
-    print("train r2: ", model.score(train_emissions, train_inputs))
-    print("test r2: ", model.score(test_emissions, test_inputs))
+        e = emissions[s_i][None]
+        i = inputs[s_i][None]
 
-    print(">> Saving enhanced checkpoint:")
-    utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
-    print(">> Saved.\n")
+        imodel = LRHMMIndFemaleFly(data_config, mc)
+        imodel.fit(global_params, e, i)
+        print(f"Session {s_i}: Fit done.", len(imodel.learned_lps))
+        try:
+            print(f"Session {s_i} r2: ", imodel.score(e, i))
+            dump_filepath_single = os.path.join(dump_filepath, f'session{s_i}')
+            utils.save_single(imodel, e, i, dump_filepath_single)
+            utils.generate_figures_single(dump_filepath_single)
+            print(f"Session {s_i}: Figures generated.")
+        except ValueError:
+            print(f"Session {s_i}: NaNed.")
+            continue
+        print("=====")
+        if s_i == 2:
+            break
+    print(">> Individual fits done.")
 
-    if model.prefix == 'chance': return
-
-    print(">> Making figures:")
-    utils.generate_figures(dump_filepath, savefig=True, display=False)
-    print(">> Done with figures.\n")
-
-    print(">> Generating trajectories:")
-    utils.generate_trajs(dump_filepath, savefig=True, display=False)
-    print(">> Done with trajectories.\n")
-
-    print(">> Generating videos:")
-    utils.generate_videos(dump_filepath)
-    print(">> Done with videos.\n")
-
-    print("Finished.\n")
-    return
+    # dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
+    #
+    # print(">> Saving basic checkpoint at:", dump_filepath)
+    # utils.save(model, data, train_session_indices, test_session_indices, dump_filepath)   # save model parameters and data used for train and test
+    # print(">> Saved.\n")
+    #
+    # print(">> Calculating overall r2 scores for this fit:")
+    # print("train r2: ", model.score(train_emissions, train_inputs))
+    # print("test r2: ", model.score(test_emissions, test_inputs))
+    #
+    # print(">> Saving enhanced checkpoint:")
+    # utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
+    # print(">> Saved.\n")
+    #
+    # if model.prefix == 'chance': return
+    #
+    # print(">> Making figures:")
+    # utils.generate_figures(dump_filepath, savefig=True, display=False)
+    # print(">> Done with figures.\n")
+    #
+    # print(">> Generating trajectories:")
+    # utils.generate_trajs(dump_filepath, savefig=True, display=False)
+    # print(">> Done with trajectories.\n")
+    #
+    # print(">> Generating videos:")
+    # utils.generate_videos(dump_filepath)
+    # print(">> Done with videos.\n")
+    #
+    # print("Finished.\n")
+    # return
 
 
 if __name__ == '__main__':
