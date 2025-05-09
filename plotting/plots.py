@@ -482,6 +482,40 @@ def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None
     return fig
 
 
+def plot_prob_states_aligned(resampled_state_seq, n_le=None, uniform_filter_size=1, config=None, title=None, xticks=None, xlabel=None, savefig=False, fig_dir=None, display=True):
+
+    fig = plt.figure(figsize=(13, 5))
+
+    GRID = resampled_state_seq.shape[1]     # reshaped timesteps
+    percent = np.linspace(0, GRID-1, GRID)
+
+    for z in range(config['num_states']):
+        if n_le is None:
+            mean = resampled_state_seq[:, :, z].mean(0)
+            sem = resampled_state_seq[:, :, z].std(0, ddof=1) / np.sqrt(len(resampled_state_seq))
+        else:
+            mean = np.sum(resampled_state_seq[:, :, z], axis=0)/n_le
+            # sem = np.sqrt(((resampled_state_seq[:, :, z].sum(0) - mean)**2) / n_le) / np.sqrt(n_le)
+
+        # plt.plot(percent, mean, '-', c=COLORS[z], lw=2, label=f'State {z+1}')
+        plt.plot(percent, uniform_filter1d(mean, size=uniform_filter_size), '-', c=COLORS[z], lw=2, label=f'State {z+1}')
+        # plt.fill_between(percent, mean - sem, mean + sem, alpha=.3)
+
+    plt.grid(alpha=.3)
+    plt.ylim(0, 1)
+    if xlabel: plt.xlabel(xlabel, fontsize='large')
+    plt.ylabel('p(state)', fontsize='large')
+    plt.legend(loc='upper left')
+    if title: plt.title(f'{title} sessions')
+    if xticks: plt.xticks([0, GRID-1], xticks, fontsize='medium')
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_prob_states_over_time.pdf'), bbox_inches='tight', dpi=300,
+                            transparent=True)
+    if display: plt.show()
+    plt.close()
+    return fig
+
+
 def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, display=True):
     fig = plt.figure(figsize=(20, 20))
     m = transition_matrix.shape[0]
@@ -653,6 +687,32 @@ def plot_var_explained(train_r2, test_r2, title=None, savefig=False, fig_dir=Non
     plt.legend(loc='lower left')
     if savefig:
         fig.savefig(os.path.join(fig_dir, f'overall_r2_scores.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return fig
+
+
+def plot_var_explained_ind(r2_scores, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot overall r2 scores.
+    :return:
+    """
+    fig = plt.figure(figsize=(3, 4))
+    r2_scores = np.where(np.abs(r2_scores) > 1e2, 0, r2_scores)
+    print(r2_scores)
+    plt.plot(np.ones(r2_scores.size) + np.random.uniform(-0.1, 0.1, size=r2_scores.size), r2_scores, 'b.', markersize=7)
+    plt.boxplot(r2_scores, positions=[1.2], widths=0.1)
+    # plt.scatter([1] * len(r2_scores), r2_scores, 'b.')
+    # plt.plot(r2_scores)
+    plt.ylabel('Var explained (%)')
+    plt.margins(0.3)
+    plt.xticks([0, 1, 2], labels=[])
+    plt.axhline(0, c='k', ls=':', lw=2)
+    plt.title(title)
+    # plt.legend(loc='lower left')
+    plt.tight_layout()
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'overall_ind_r2_scores.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display:
         plt.show()
     return fig

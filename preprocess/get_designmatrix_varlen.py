@@ -176,6 +176,7 @@ def get_x_and_y_data(config, display=False):
     downsampled_indices = []
     upsampled_indices = []
     session_keys = []
+    copulation_bools = []
     num_sessions = 0
 
     for s_i, s in enumerate(sessions_features):
@@ -235,8 +236,12 @@ def get_x_and_y_data(config, display=False):
         end_frames.append(s_end_frame)
         downsampled_indices.append(s_downsampled_indices)
         upsampled_indices.append(s_upsampled_indices)
+        copulation_bools.append(session_copulation)
         num_sessions += 1
         print("============")
+
+        # if num_sessions == 5:
+        #     break
 
     inputs_raw = np.array(inputs_raw, dtype=object)
     emissions = np.array(emissions, dtype=object)
@@ -284,6 +289,7 @@ def get_x_and_y_data(config, display=False):
         'end_frames': np.array(end_frames),
         'downsampled_indices': downsampled_indices,
         'upsampled_indices': upsampled_indices,
+        'copulation_bools': copulation_bools,
     }
 
     # Plot few samples of inputs

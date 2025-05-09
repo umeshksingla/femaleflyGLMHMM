@@ -97,7 +97,7 @@ def analyze_state_mean(state_seq, config, emissions, inputs):
     return inputs_z, outputs_z
 
 
-def save_single(model, emissions, inputs, output_dir):
+def save_single(model, emissions, inputs, copulation_bool, trained_bool, output_dir):
     """Save single session fit."""
 
     os.makedirs(output_dir, exist_ok=True)
@@ -105,6 +105,8 @@ def save_single(model, emissions, inputs, output_dir):
     emission_predictions, z_seq = model.predict(emissions, inputs)
     model_ckp = {
         'prefix': model.prefix,
+        'copulation_bool': copulation_bool,
+        'trained_bool': trained_bool,
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
@@ -254,6 +256,81 @@ def generate_figures_single(model_dir, savefig=True, display=False, override_fig
                        savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_filter_amplitudes(learned_params.emissions.weights, data_config,
                                  savefig=savefig, fig_dir=fig_dir, display=display)
+    return
+
+
+def normalize_to_equal_length(arr_list, GRID=101):
+    resampled = []
+    for a in arr_list:
+        print(a.shape)
+        T, S = a.shape
+        print("T, S", T, S)
+        u_src = np.linspace(0, 1, T)
+        u_dst = np.linspace(0, 1, GRID)
+        a_rs = np.vstack([np.interp(u_dst, u_src, a[:, s]) for s in range(S)]).T  # (GRID,S)
+        resampled.append(a_rs)
+    resampled = np.stack(resampled)  # (N, GRID, S)
+    print("resampled", resampled.shape)
+    return resampled
+
+
+def pad_to_equal_length(arr_list):
+
+    lengths = np.array([len(a) for a in arr_list])
+    max_length = np.max(lengths)
+    # sorted_lengths = np.sort(lengths)
+    n_le = np.array([np.sum(L <= lengths) for L in np.arange(0, max_length)])
+    print("n_le", n_le)
+    padded_arr_list = np.array([np.pad(a, ((0, max_length-a.shape[0]), (0, 0)), constant_values=0) for a in arr_list])
+    # return
+
+    print(padded_arr_list.shape)
+    # resampled = []
+    # for a in padded_arr_list:
+    #     print(a.shape)
+    #     T, S = a.shape
+    #     print("T, S", T, S)
+    #     u_src = np.linspace(0, 1, T)
+    #     u_dst = np.linspace(0, 1, GRID)
+    #     a_rs = np.vstack([np.interp(u_dst, u_src, a[:, s]) for s in range(S)]).T  # (GRID,S)
+    #     resampled.append(a_rs)
+    # resampled = np.stack(resampled)[:, :-1]
+    # print("resampled", resampled.shape)
+    return padded_arr_list, n_le
+
+
+def generate_figures_all_singles_merged(model_dir, savefig=True, display=False, override_fig_dir=True):
+    model_pkls, data_config_pkl, model_config = load_all_singles(model_dir)
+
+    if not model_pkls: return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    if os.path.exists(fig_dir) and override_fig_dir:
+        shutil.rmtree(fig_dir)
+    os.makedirs(fig_dir, exist_ok=True)
+
+    fwd_state_probs = [mckp['state_probs'][0][:-1] for mckp in model_pkls if mckp['copulation_bool'] is True]
+    plots.plot_prob_states_aligned(normalize_to_equal_length(fwd_state_probs, GRID=50000), None, 200, config=model_config, title='All Copulation',
+                                   xticks=['Start', 'Copulation'],
+                                   xlabel='Time (in courtship)',
+                                   savefig=savefig, fig_dir=fig_dir, display=display)
+
+    fwd_state_probs = [mckp['state_probs'][0] for mckp in model_pkls if mckp['copulation_bool'] is False]
+    plots.plot_prob_states_aligned(normalize_to_equal_length(fwd_state_probs, GRID=50000), None, 200, config=model_config, title='All No Copulation',
+                                   xticks=['0', '30'],
+                                   xlabel='Time (min)',
+                                   savefig=savefig, fig_dir=fig_dir, display=display)
+
+    fwd_state_probs = [mckp['state_probs'][0] for mckp in model_pkls]
+    padded_arrays, n_le = pad_to_equal_length(fwd_state_probs)
+    plots.plot_prob_states_aligned(padded_arrays, n_le, 200, model_config, title='All',
+                                   xticks=['0', '30'],
+                                   xlabel='Time (min)',
+                                   savefig=savefig, fig_dir=fig_dir, display=display)
+
+    # scores = np.array([mckp['score'] for mckp in model_pkls]) * 200
+    # plots.plot_var_explained_ind(scores, title='All sessions', savefig=savefig, fig_dir=fig_dir, display=display)
+
     return
 
 
@@ -510,3 +587,10 @@ def load_specific_path_single(model_path):
     with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
     return model_pkl, data_config_pkl, model_config
 
+
+def load_all_singles(model_dir):
+    model_pkls = []
+    for model_path in glob.glob(model_dir + '/session*'):
+        pkl, data_config_pkl, model_config = load_specific_path_single(model_path)
+        model_pkls.append(pkl)
+    return model_pkls, data_config_pkl, model_config
