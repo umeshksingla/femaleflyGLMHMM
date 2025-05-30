@@ -1,12 +1,14 @@
+import sys
+
 import joblib
 import numpy as np
 import os
 import time
 
-from preprocess.leaprig import WT_DATA
+from preprocess.leaprig import WT_DATA, AC_BOTH, AC_LEFT, AC_RIGHT, BLIND_BOTH
 from preprocess.new16mic import FREDCLEANED_DATA
 from preprocess.preproc_utils import smooth, fill_missing_tracks_SR
-from preprocess import visual_features
+from preprocess import visual_features, female_features
 
 
 def get_features(DATA, expt_path, cop_start_frame):
@@ -23,8 +25,13 @@ def get_features(DATA, expt_path, cop_start_frame):
     fTrx = fill_missing_tracks_SR(fTrx_, kind="cubic")
     mTrx = fill_missing_tracks_SR(mTrx_, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
 
+    # Compute wing flick features using various body points
+    female_wing_flick_ftr_dict = female_features.compute_wing_flick_features(fTrx, fly_nodes)
+    female_fending_ftr_dict = female_features.compute_fending_features(fTrx, fly_nodes)
+    # return
+
     # Compute visual features using various body points
-    visual_ftr_dict = visual_features.compute_visual_features(fTrx, mTrx, DATA.get_fly_nodes())
+    visual_ftr_dict = visual_features.compute_visual_features(fTrx, mTrx, fly_nodes)
 
     # Compute tactile features using various body points
     tap_ftr_dict = DATA.get_tap_feature(expt_path, cop_start_frame, mTrx, fTrx)
@@ -32,6 +39,8 @@ def get_features(DATA, expt_path, cop_start_frame):
     all_session_features = dict()
     all_session_features.update(visual_ftr_dict)
     all_session_features.update(tap_ftr_dict)
+    all_session_features.update(female_wing_flick_ftr_dict)
+    all_session_features.update(female_fending_ftr_dict)
 
     # Get auditory bout features
     song = DATA.get_all_song(expt_path)[:cop_start_frame]
@@ -62,9 +71,10 @@ def get_features(DATA, expt_path, cop_start_frame):
 if __name__ == '__main__':
 
     DATA = WT_DATA
+    # DATA = AC_BOTH
     # DATA = FREDCLEANED_DATA
 
-    BASE_FOLDER = f'../data/{DATA.dataset}/'
+    BASE_FOLDER = f'data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
 
     st1 = time.time()
@@ -90,7 +100,6 @@ if __name__ == '__main__':
             print("No track_occupancy. Skipping this session.")
             continue
 
-        # sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
         try:
             sessions_features[session_name] = get_features(DATA, session_path, cop_frame)
         except RuntimeError as e:
@@ -100,13 +109,10 @@ if __name__ == '__main__':
             print(e)
             continue
 
-        # if _ % 10 == 0:
-        #     joblib.dump(sessions_features,
-        #                 os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
-
-        break
+        if len(sessions_features) == 10:
+            joblib.dump(sessions_features,
+                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_may30.pkl'))
 
     joblib.dump(sessions_features,
-                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}.pkl'))
-    print(f"Finished computing all features in: {round(time.time() - st1, 2)} "
-          f"secs. #sessions: {len(sessions_features)}")
+                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_may30.pkl'))
+    print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(sessions_features)}")

@@ -115,3 +115,35 @@ class WT_DATA:
             "eyeR",
         ]
         return fly_nodes
+
+
+class AC_BOTH(WT_DATA):
+    dataset = 'ac_both'
+
+    @staticmethod
+    def get_session_paths():
+        return list(glob.glob('/Volumes/murthy/usingla/gold_dataset/ac_both/h5/*.h5'))
+
+
+class AC_LEFT(WT_DATA):
+    dataset = 'ac_left'
+
+    @staticmethod
+    def get_session_paths():
+        return list(glob.glob('/Volumes/murthy/usingla/gold_dataset/ac_left/h5/*.h5'))
+
+
+class AC_RIGHT(WT_DATA):
+    dataset = 'ac_right'
+
+    @staticmethod
+    def get_session_paths():
+        return list(glob.glob('/Volumes/murthy/usingla/gold_dataset/ac_right/h5/*.h5'))
+
+
+class BLIND_BOTH(WT_DATA):
+    dataset = 'blind_both'
+
+    @staticmethod
+    def get_session_paths():
+        return list(glob.glob('/Volumes/murthy/usingla/gold_dataset/both_eye_blind/h5/*.h5'))
