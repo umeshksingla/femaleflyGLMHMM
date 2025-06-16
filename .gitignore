@@ -9,3 +9,4 @@ scratch
 .DS_Store
 .idea
 __pycache__/
+paper figs/
