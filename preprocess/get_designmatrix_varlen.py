@@ -4,6 +4,8 @@ from scipy.stats import zscore
 import scipy
 from collections import OrderedDict
 from scipy.signal import savgol_filter
+from scipy.ndimage import uniform_filter1d, gaussian_filter1d
+import pywt
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
@@ -16,6 +18,10 @@ def smooth_moving_average(x, smooth_window):
 
 def smooth_savgol(x, smooth_window):
     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
+
+
+def smooth_gaussian(x, sigma):
+    return gaussian_filter1d(x, sigma=sigma)
 
 
 def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0):
@@ -47,22 +53,29 @@ def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0
     return x_idx_windows, y_idx_windows
 
 
-def get_input_feat(s, f_name):
+def get_input_feat(sessions_features, s, f_name):
     sf = sessions_features[s]
     if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall']:
-        feat = zscore(sf[f_name])     # todo: zscore?
+        ts = sf[f_name]
+        ts = smooth_gaussian(ts, sigma=3)
+        feat = zscore(ts)
     elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap', 'tap2']:
         feat = sf[f_name].astype(float)
     elif f_name in ['fmAng_cos']:
-        feat = np.cos(np.radians(sf['fmAng']))    # cos: front to back
+        ts = np.radians(sf['fmAng'])
+        ts = smooth_gaussian(ts, sigma=3)
+        feat = np.cos(ts)    # cos: front to back
     elif f_name in ['fmAng_sin']:
-        feat = np.sin(np.radians(sf['fmAng']))    # sin: left or right of the fly
+        ts = np.radians(sf['fmAng'])
+        ts = smooth_gaussian(ts, sigma=3)
+        feat = np.sin(ts)    # sin: left or right of the fly
     elif f_name in ['wingAlign']:
-        feat = np.min([sf['wingLAristaLAlignAng'],
+        ts = np.min([sf['wingLAristaLAlignAng'],
                        sf['wingRAristaRAlignAng'],
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
-        feat = zscore(feat)     # it is okay to zscore these alignment angles as they are treated linearly
+        ts = smooth_gaussian(ts, sigma=3)
+        feat = zscore(ts)     # it is okay to zscore these alignment angles as they are treated linearly
     elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
         f_name_ = f_name.split('_directed')[0]
         feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
@@ -71,15 +84,41 @@ def get_input_feat(s, f_name):
     return feat
 
 
-def get_output_feat(s, f_name, output_windows):
+def get_aux_feat(sessions_features, s, f_name, aux_windows):
+    sf = sessions_features[s]
+    if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist']:
+        ts = sf[f_name]
+        ts = smooth_gaussian(ts, sigma=3)
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
+    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed']:
+        ts = sf[f_name]
+        feat = (np.sum(ts[aux_windows], axis=1) >= 1).astype(float)
+    else:
+        raise Exception(f'unsupported {f_name} aux feature.')
+    return feat
+
+
+def wavelet_denoise(signal):
+    coeffs = pywt.wavedec(signal, 'db4', level=4)
+    print(len(coeffs), [len(_) for _ in coeffs])
+    threshold = 0.25 * np.max(coeffs[-1])  # Set small wavelet coefficients to zero
+    coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+    denoised_signal = pywt.waverec(coeffs, 'db4')
+    return denoised_signal
+
+
+def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
     if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA']:
         ts = sf[f_name]
+        ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
         std = ts.std()
-        f = np.mean(zscore(ts)[output_windows], axis=1)    # todo: zscore? zscore before mean or after?
+        f = np.mean(zscore(ts)[output_windows], axis=1)
     elif f_name in ['dfTheta']:
-        fTheta = sf['fTheta'][output_windows]
+        ts = sf['fTheta']
+        ts = smooth_gaussian(ts, sigma=3)
+        fTheta = ts[output_windows]
         dfTheta = fTheta[:, -1] - fTheta[:, 0]
         dfTheta = np.where(np.abs(dfTheta) > 90, 0, dfTheta)
         mn = dfTheta.mean()
@@ -87,30 +126,65 @@ def get_output_feat(s, f_name, output_windows):
         dfTheta = zscore(dfTheta)
         f = dfTheta
     elif f_name in ['dfTheta_abs']:
-        fTheta = sf['fTheta'][output_windows]
+        ts = sf['fTheta']
+        ts = smooth_gaussian(ts, sigma=3)
+        fTheta = ts[output_windows]
         dfTheta_abs = np.abs(fTheta[:, -1] - fTheta[:, 0])
         dfTheta_abs = np.where(dfTheta_abs > 90, 0, dfTheta_abs)
         mn = dfTheta_abs.mean()
         std = dfTheta_abs.std()
         dfTheta_abs = zscore(dfTheta_abs)
         f = dfTheta_abs
+    elif f_name in ['wingFlickTheta']:
+        ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
+        ts = smooth_gaussian(ts, sigma=3)
+        wingFlickTheta = ts * sf['wingFlick']
+        wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
+        mn = 0  # no zscoring for wing flick angles, as most of them are zeros
+        std = 1
+        f = wingFlickTheta
+    elif f_name in ['dfmAng']:
+
+        # r = np.r_[:100000]
+        #
+        # fig, ax = plt.subplots(3, 1, figsize=(18, 8), sharex=True)
+        #
+        # ax[0].plot(np.diff(np.abs(sf['fmAng'][r])), label='dfmAng_abs')
+        # ax[0].plot(np.diff(np.abs(sf['fTheta'][r])), label='dfTheta_abs')
+        #
+        # ax[1].plot(uniform_filter1d(np.diff(np.abs(sf['fmAng'][r])), size=10), label='dfmAng_abs_smoothed')
+        # ax[1].plot(uniform_filter1d(np.diff(np.abs(sf['fTheta'][r])), size=10), label='dfTheta_abs_smoothed')
+        #
+        # ax[2].plot(np.diff(np.abs(sf['fmAng'][r])), label='dfmAng_abs_wavedec')
+        # ax[2].plot(np.diff(np.abs(sf['fTheta'][r])), label='dfTheta_abs_wavedec')
+        #
+        # plt.suptitle('fmAng_abs vs dfTheta_abs')
+        # ax[0].legend(loc='upper left')
+        # ax[1].legend(loc='upper left')
+        # ax[2].legend(loc='upper left')
+        # plt.tight_layout()
+        # plt.show()
+        ts = sf['fmAng']
+        ts = smooth_gaussian(ts, sigma=3)
+        fmAng = np.abs(ts)     # abs to make left and right male positions symmetric
+        dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
+        dfmAng = np.mean(dfmAng, axis=1)             # signed changes in orientation
+        mn = dfmAng.mean()
+        std = dfmAng.std()
+        f = zscore(dfmAng)
+    elif f_name in ['dfmAng_abs']:
+        ts = sf['fmAng']
+        ts = smooth_gaussian(ts, sigma=3)
+        fmAng = np.abs(ts)     # abs to make left and right symmetric
+        dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
+        dfmAng_abs = np.abs(np.mean(dfmAng, axis=1))     # unsigned changes in orientation
+        mn = dfmAng_abs.mean()
+        std = dfmAng_abs.std()
+        f = zscore(dfmAng_abs)
     else:
         raise Exception(f'unsupported {f_name} output feature.')
     # print(f_name, mn, std)
     return f, mn, std
-
-
-def get_aux_feat(s, f_name, aux_windows):
-    if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist']:
-        ts = sessions_features[s][f_name]
-        # ts = smooth_moving_average(ts, 20)
-        feat = np.mean(zscore(ts)[aux_windows], axis=1)    # todo: zscore?
-    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed']:
-        ts = sessions_features[s][f_name]
-        feat = np.sum(ts[aux_windows], axis=1)  # todo: zscore?
-    else:
-        raise Exception(f'unsupported {f_name} aux feature.')
-    return feat
 
 
 def some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, input_each_dim, basis, basis_transformed, x_labels):
@@ -152,7 +226,7 @@ def some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, inp
     return
 
 
-def get_x_and_y_data(config, display=False):
+def get_x_and_y_data(sessions_features, config, display=False):
 
     basis_transformed = config['basis_transformed']
 
@@ -166,6 +240,14 @@ def get_x_and_y_data(config, display=False):
     predict_window_size = config['predict_window_size']
     input_raw_overlap = config['input_raw_overlap']
     predict_gap_size = config['predict_gap_size']
+
+    # Cosine basis transformation of inputs
+    input_each_dim = config['ncos']
+    b = raised_cosine(0, input_each_dim, [0, 2*input_raw_each_dim/3], 10, input_raw_each_dim)
+    b_multi = multifeature_basis(b, n_inputs)
+    basis_ortho = scipy.linalg.orth(b_multi)
+    basis = basis_ortho
+    print("Basis created.")
 
     inputs_raw = []
     emissions = []
@@ -185,11 +267,15 @@ def get_x_and_y_data(config, display=False):
         session_len = len(sessions_features[s]['mFV'])
         print(f"Session {s_i} ({s}) length: {session_len}.")
 
-        session_copulation = (session_len < 270000)    # TODO: have to verify if sessions > 240k but <270k actually copulate or not
-        print(f'Session Copulation={session_copulation}.')
-
-        session_keys.append(s)
         num_timesteps = session_len
+        if session_len < num_timesteps:
+            print(f"Too short. Skipped.\n============")
+            continue
+
+        print(f"Proceeding with the session {s_i}.")
+        session_keys.append(s)
+        session_copulation = (session_len < 270000)
+        print(f'Session {s_i} copulation={session_copulation}.')
 
         input_windows, output_windows = create_x_and_y_windows(num_timesteps, x_size=input_raw_each_dim,
                                                                y_size=predict_window_size, x_overlap=input_raw_overlap,
@@ -201,13 +287,11 @@ def get_x_and_y_data(config, display=False):
         s_end_frame = s_output_windows[-1, 0]           # index of the last frame of this session used for modeling
         s_downsampled_indices = s_output_windows[:, 0]
         s_upsampled_indices = np.repeat(np.arange(len(s_downsampled_indices)), predict_window_size)
-        print(f'Session {s_i}', s_start_frame, s_end_frame, "s_downsampled_indices", s_downsampled_indices)
-        print(f'Session {s_i}', s_start_frame, s_end_frame, "s_upsampled_indices", s_upsampled_indices)
 
         # INPUTS
         feats = []
         for _ in x_labels:
-            f = get_input_feat(s, _)[s_input_windows]
+            f = get_input_feat(sessions_features, s, _)[s_input_windows]
             feats.append(f)
         s_inputs = np.hstack(feats)
 
@@ -215,7 +299,8 @@ def get_x_and_y_data(config, display=False):
         o_feats = []
         o_mn_std = []
         for _ in y_labels:
-            f, mn, std = get_output_feat(s, _, s_output_windows)
+            f, mn, std = get_output_feat(sessions_features, s, _, s_output_windows)
+            # print(_, f.shape)
             o_feats.append(f)
             o_mn_std.append([mn, std])
         s_emissions = np.vstack(o_feats).T
@@ -224,7 +309,7 @@ def get_x_and_y_data(config, display=False):
         # AUXILIARY DAta
         a_feats = []
         for _ in a_labels:
-            f = get_aux_feat(s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
+            f = get_aux_feat(sessions_features, s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
             a_feats.append(f)
         s_aux_data = np.vstack(a_feats).T
 
@@ -238,8 +323,8 @@ def get_x_and_y_data(config, display=False):
         upsampled_indices.append(s_upsampled_indices)
         copulation_bools.append(session_copulation)
         num_sessions += 1
+        print("num_sessions", num_sessions)
         print("============")
-
         # if num_sessions == 5:
         #     break
 
@@ -250,21 +335,26 @@ def get_x_and_y_data(config, display=False):
     upsampled_indices = np.array(upsampled_indices, dtype=object)
     output_mn_std = np.array(output_mn_std)
 
-    # Cosine basis transformation of inputs
-    if basis_transformed == 'cos':
-        input_each_dim = config['ncos']
-        b = raised_cosine(0, input_each_dim, [0, 2*input_raw_each_dim/3], 10, input_raw_each_dim)
-        b_multi = multifeature_basis(b, n_inputs)
-        basis_ortho = scipy.linalg.orth(b_multi)
-        basis = basis_ortho
-        inputs = np.array([BasisProjection(basis).transform(_) for _ in inputs_raw], dtype=object)
-        input_dim = inputs[0].shape[-1]
-        print("basis", basis.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim, "input_dim", input_dim, "input_each_dim", input_each_dim)
-    else:
-        raise Exception('Invalid inputs transformation.')
+    print("Basis transforming now..")
+    print(len(inputs_raw))
+    inputs_transformed = [BasisProjection(basis).transform(_) for _ in inputs_raw]
 
-    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data", len(inputs), len(inputs_raw), len(emissions), len(aux_data))
-    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data", inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape)
+    print("Basis transformed.")
+    inputs = np.array(inputs_transformed, dtype=object)
+    input_dim = inputs[0].shape[-1]
+
+    print("basis", basis.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim,
+          "input_dim", input_dim, "input_each_dim", input_each_dim)
+    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape",
+          inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape)
+    print("inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape",
+          inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape)
+
+    # emissions = np.array(emissions)
+    # aux_data = np.array(aux_data)
+    # downsampled_indices = np.array(downsampled_indices)
+    # upsampled_indices = np.array(upsampled_indices)
+    # output_mn_std = np.array(output_mn_std)
 
     # enhance the config
     config['input_dim'] = input_dim
@@ -274,22 +364,18 @@ def get_x_and_y_data(config, display=False):
     config['basis'] = basis
     config['num_sessions'] = num_sessions   # number of total sessions
     config['session_keys'] = session_keys   # sessions in this data in order
-    # config['num_timesteps'] = num_timesteps
 
     data = {
-        'data_config': config,
         'emissions': emissions,
         'inputs': inputs,
         'aux_data': aux_data,
-        'output_mn_std': output_mn_std,
-        # 'inputs_raw': inputs_raw,
-        # 'output_indices': output_windows[:, 0], # TODO!!!? need per session output windows now
-        # 'aux_indices': output_windows[:, 0],
+        'output_mn_std': np.array(output_mn_std),
         'start_frames': np.array(start_frames),
         'end_frames': np.array(end_frames),
         'downsampled_indices': downsampled_indices,
         'upsampled_indices': upsampled_indices,
-        'copulation_bools': copulation_bools,
+        'data_config': config,
+        'copulation_bools': np.array(copulation_bools),
     }
 
     # Plot few samples of inputs
@@ -299,24 +385,16 @@ def get_x_and_y_data(config, display=False):
     return data
 
 
-def describe_sessions():
-    ns = 0
-    for s_i, s in enumerate(sessions_features):
-        if len(sessions_features[s]['mFV']) < data_config['num_timesteps']:    # skip short sessions for now
-            print(f"Session {s_i} length = {len(sessions_features[s]['mFV'])}. Skipped.")
-            continue
-        print(s_i, s, "number in data", ns, "Verify no:", len(sessions_features[s]['mFV']))
-        ns += 1
-    return
-
-
-if __name__ == '__main__':
+def extract():
 
     data_config = {}
 
     source = 'wt'
     if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_77.pkl')
+        sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
+        fps = sessions_features.get('fps', 150)
+    elif source == 'ac_both':
+        sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
         fps = sessions_features.get('fps', 150)
     elif source == 'wt_fred':
         sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11.pkl')
@@ -325,18 +403,21 @@ if __name__ == '__main__':
         raise Exception('Wrong data source.')
 
     data_config['source'] = source
-    data_config['fps'] = fps
+    data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
     data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
-    data_config["predict_window_size"] = fps//30  # averaging emission over this window size (100ms)
+    data_config["predict_window_size"] = fps//30  # averaging emission over this window size
+    data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
+    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
+    data_config['ncos'] = 4
     data_config['input_labels'] = OrderedDict({
         'mFV': 'z-mFV',
         'mLS': 'z-mLS',
         'mfDist': 'z-mfDist',
 
         'fmAng_sin': 'maleLR',
-        'wingAlign': 'z-wingAlign',
+        # 'wingAlign': 'z-wingAlign',
 
         'pfast_i': 'pulse',
         'sine_i': 'sine',
@@ -348,29 +429,29 @@ if __name__ == '__main__':
 
         # 'fDistWall': 'distWall',
     })
-
     data_config['emission_labels'] = OrderedDict({
-        'fFV': 'forward velocity',
-        'fLV': 'lateral velocity',
-        'dfTheta': 'orientation change',
+        'fFV': 'z-fFV',
+        'fLV': 'z-fLV',
+        # 'dfTheta': 'orientation change',
+        'dfmAng': 'z-dfmAng',
+        # 'wingFlickTheta': 'wing flick',
     })
-
     data_config['auxiliary_labels'] = OrderedDict({
-        'mFV': 'z-mFV',
+        'mFV': 'z-mFV',     # we basically need full series as well as windowed-versions of inputs
         'mLS': 'z-mLS',
         'mfDist': 'z-mfDist',
         'pfast_i': 'pulse',
         'sine_i': 'sine',
         'tap2': 'tap2',
     })
-    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
-    data_config['ncos'] = 4
 
-    # describe_sessions()
-    # sys.exit()
-
-    data = get_x_and_y_data(data_config, display=True)
-    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_o={data_config["predict_window_size"]}_varlen.pkl'
+    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
+               f'o={data_config["predict_window_size"]}_smoothed.pkl'
+    data = get_x_and_y_data(sessions_features, data_config, display=False)
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')
     print("Saved at:", filename)
+
+
+if __name__ == '__main__':
+    extract()

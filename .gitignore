@@ -1,7 +1,9 @@
 models
+old_models
 data
 debug_logs
 scratch
+.ipynb_checkpoints
 
 **/*.pdf
 **/*.svg

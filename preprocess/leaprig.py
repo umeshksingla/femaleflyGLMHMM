@@ -5,6 +5,7 @@ import h5py
 from preprocess import visual_features, tactile_features
 from preprocess.preproc_utils import h5read
 from preprocess import preproc_utils
+from trig_avg_utils import split_name, mech_feature_list
 
 
 class WT_DATA:
@@ -15,6 +16,15 @@ class WT_DATA:
     PIXEL_TO_MM = 30.3
     RADIUS = 15
     dataset = 'wt'
+
+    # tap constants
+    MERGE_BOUTS_CLOSER_THAN = 1     # frames
+    MIN_GAP_BW_BOUTS = 150          # frames
+    event_pre = 75   # frames; before event bout onset
+    event_post = 75  # frames; after event bout onset
+    event_window = np.arange(-event_pre, event_post+1)   # window around an event bout onset
+    before_event_window = np.arange(-6*event_pre, -event_pre)  # pre window to use to subtract mean of features preceding
+    # each window. Refer Coen et al. 2014 BTAs calculation.
 
     @staticmethod
     def get_session_name(session_path):
@@ -115,6 +125,13 @@ class WT_DATA:
             "eyeR",
         ]
         return fly_nodes
+
+    @staticmethod
+    def get_max_event_bout_len(event):
+        base_event_name = split_name(event)[0]
+        return 15 if base_event_name in mech_feature_list else 10000  # [3 frames (20ms), 15 frames (100ms)];
+        # Remove tap bouts longer than MAX_EVENT_BOUT_LEN frames coz on longer tap bouts female behavior gets finicky.
+        # This can also be used to retain only spike-kind taps
 
 
 class AC_BOTH(WT_DATA):

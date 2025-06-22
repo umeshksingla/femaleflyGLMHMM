@@ -50,27 +50,20 @@ class LRFemaleFly(BaseFemaleFly):
         return ~np.any(np.isnan(self.learned_params['w']))
 
     def predict(self, emissions, inputs):
-        """
-
-        :param emissions: Unused
-        :param inputs:
-        :return:
-        """
-        # X_tr = inputs.reshape(-1, inputs.shape[-1])
-        # y_preds = self.model.predict(X_tr)
-        # z_seqs = np.zeros(y_preds.shape[0])
-        #
-        # y_preds = y_preds.reshape(inputs.shape[0], -1, self.data_config['emission_dim'])
-        # z_seqs = z_seqs.reshape(inputs.shape[0], -1)
-        #
+        """ emissions is unused """
         y_preds = []
         z_seqs = []
+        y_preds_per_state = []
         for _ in inputs:
             y_preds_ = self.model.predict(_)
             z_seqs_ = np.zeros(_.shape[0])
             y_preds.append(y_preds_)
+            y_preds_per_state.append(y_preds_[:, None])
             z_seqs.append(z_seqs_)
-        return y_preds, z_seqs
+        return y_preds, z_seqs, y_preds_per_state
+
+    def predict_v3(self, emissions, inputs):
+        return self.predict(emissions, inputs)[:2]
 
     def get_data_logprob(self, emissions, inputs):
         """
@@ -91,8 +84,25 @@ class LRFemaleFly(BaseFemaleFly):
         lp = np.sum([fit_normal_residuals(yp, yt) for yp, yt in zip(emissions_pred, emissions)]) / total_emissions_size
         return lp
 
+    def get_data_logprob_by_fly(self, emissions, inputs):
+        """
+        Linear regression P(Y|X, w), by fly
+        """
+        def fit_normal_residuals(fit_y, true_y):
+            residuals = fit_y - true_y
+            sigma = jnp.cov(residuals.T)
+            mu = jnp.zeros(residuals.shape[-1])
+            p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).prob(residuals)
+            p = jnp.maximum(p, 1e-15)
+            log_Y_given_wx = jnp.sum(jnp.log(p))
+            return log_Y_given_wx
+
+        emissions_pred = self.predict(None, inputs)[0]
+        lps = np.array([fit_normal_residuals(yp, yt)/yt.size for yp, yt in zip(emissions_pred, emissions)])
+        return lps
+
     def get_state_probs(self, emissions, inputs=None):
-        z_probs = [np.ones(_.shape[0]) for _ in emissions]
+        z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in emissions]
         return z_probs
 
     def get_forward_state_probs(self, emissions, inputs=None):

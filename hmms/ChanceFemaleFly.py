@@ -32,10 +32,9 @@ class ChanceFemaleFly(BaseFemaleFly):
         self.learned_lps = None
         super().__init__()
 
-    def fit(self, emissions, inputs):
-
-        y = emissions.reshape(-1, self.data_config['emission_dim'])
-        print(emissions.shape, y.shape)
+    def fit(self, emissions, inputs, output_mn_std=None):
+        y = np.concatenate(emissions, axis=0)
+        print(y.shape)
         mu = jnp.mean(y, axis=0)
         cov = jnp.cov(y.T)
         print(mu, mu.shape)
@@ -68,10 +67,12 @@ class ChanceFemaleFly(BaseFemaleFly):
         Multivariate gaussian model
         """
         # p = multivariate_normal.pdf(y, mean=mu, cov=cov)
-        p = self.model.prob(emissions)
+        p = self.model.prob(np.concatenate(emissions, axis=0))
         p = jnp.maximum(p, 1e-15)
         log_Y_given_mvn = jnp.sum(jnp.log(p))
-        lp = log_Y_given_mvn.sum() / emissions.size
+        emissions_size = np.sum(e.size for e in emissions)
+        lp = log_Y_given_mvn.sum() / emissions_size
+        print("chance lp", lp)
         return lp
 
     def score(self, emissions, inputs):

@@ -16,7 +16,6 @@ from hmms.LRFemaleFly import LRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
-from hmms.LRHMMIndFemaleFly import LRHMMCustomInit2FemaleFly
 from utilities import utils
 
 
@@ -38,7 +37,7 @@ def run(mc):
 
     path = mc['path']
     data_path = mc['data_path']
-    model_prefix = mc['names']
+    model_prefix = mc['name']
 
     print(f"Fitting {model_prefix} with model_config: {mc}")
 
@@ -54,14 +53,12 @@ def run(mc):
     train_session_indices = np.arange(num_train_batches).astype(int)
     test_session_indices = np.arange(num_train_batches, num_batches).astype(int)
 
-    train_emissions = emissions[train_session_indices]
-    test_emissions = emissions[test_session_indices]
-    train_inputs = inputs[train_session_indices]
-    test_inputs = inputs[test_session_indices]
-    train_output_mn_std = output_mn_std[train_session_indices]
+    train_emissions = [emissions[e] for e in train_session_indices]
+    train_inputs = [inputs[e] for e in train_session_indices]
+    train_output_mn_std = [output_mn_std[e] for e in train_session_indices]
 
-    print("# Train sessions:", train_session_indices, len(train_session_indices))
-    print("# Test sessions:", test_session_indices, len(test_session_indices))
+    print("# Train sessions:", train_session_indices, "total=", len(train_session_indices))
+    print("# Test sessions:", test_session_indices, "total=", len(test_session_indices))
 
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
@@ -69,8 +66,6 @@ def run(mc):
         model = GHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
-    elif model_prefix == 'lrhmmci2':
-        model = LRHMMCustomInit2FemaleFly(data_config, mc)
     elif model_prefix == 'chance':
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
@@ -78,19 +73,15 @@ def run(mc):
     else:
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
+    dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
+
     print(">> Fitting")
     model.fit(train_emissions, train_inputs, train_output_mn_std)
     print(">> Fit done.")
 
-    dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
-
     print(">> Saving basic checkpoint at:", dump_filepath)
     utils.save(model, data, train_session_indices, test_session_indices, dump_filepath)   # save model parameters and data used for train and test
     print(">> Saved.\n")
-
-    print(">> Calculating overall r2 scores for this fit:")
-    print("train r2: ", model.score(train_emissions, train_inputs))
-    print("test r2: ", model.score(test_emissions, test_inputs))
 
     print(">> Saving enhanced checkpoint:")
     utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
@@ -103,15 +94,15 @@ def run(mc):
     print(">> Done with figures.\n")
 
     print(">> Generating trajectories:")
-    utils.generate_trajs(dump_filepath, savefig=True, display=False)
+    utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
     print(">> Done with trajectories.\n")
 
-    print(">> Generating videos:")
-    utils.generate_videos(dump_filepath)
-    print(">> Done with videos.\n")
+    # print(">> Generating videos:")
+    # utils.generate_videos(dump_filepath)
+    # print(">> Done with videos.\n")
 
     print("Finished.\n")
-    return
+    return dump_filepath
 
 
 if __name__ == '__main__':

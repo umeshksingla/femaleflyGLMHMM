@@ -52,7 +52,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
 
         # OR Reindex by the activity index
         _, zseq = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, zseq, output_mn_std, self.num_states)
+        emissions_z = utils.get_emissions_by_state(emissions, zseq, self.num_states, output_mn_std)
         state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
         new_index = np.argsort(state_activity_index)[::-1]
         print("state_tot_activity_mean", state_activity_index)
@@ -89,7 +89,9 @@ class LRHMMFemaleFly(BaseFemaleFly):
         return ~np.any(np.isnan(self.learned_params.transitions.transition_matrix))
 
     def predict(self, emissions, inputs):
-        return self.predict_v3(emissions, inputs)
+        return self.predict_v4(emissions, inputs)
+
+    def predict_v1(self, emissions, inputs):
 
         def calc(params, z, i):
             return params.emissions.weights[z] @ i + params.emissions.biases[z]
@@ -133,24 +135,65 @@ class LRHMMFemaleFly(BaseFemaleFly):
         y_preds = []
         z_seqs = []
         for btch in range(len(emissions)):
-            post = self.model.filter(self.learned_params, emissions[btch], inputs[btch])
+            post = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
             y_pred = vmap(partial(calc, self.learned_params))(post.predicted_probs, inputs[btch])  # computed y given z
             y_preds.append(y_pred)
 
-            post = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
             z_seq = np.argmax(post.smoothed_probs, axis=1)
             z_seqs.append(z_seq)
 
-        y_preds = np.array(y_preds)
-        z_seqs = np.array(z_seqs)
         return y_preds, z_seqs
+
+    def predict_v4(self, emissions, inputs):
+        """Soft predictions"""
+
+        W = self.learned_params.emissions.weights   # shape: (K, D, I)
+        b = self.learned_params.emissions.biases    # shape: (K, D)
+        K = self.num_states
+
+        y_preds = []
+        z_seqs = []
+        preds_per_states = []
+        for btch in range(len(emissions)):
+            y_true = emissions[btch]    # shape: (T, D)
+            x = inputs[btch]            # shape: (T, I)
+
+            post = self.model.smoother(self.learned_params, y_true, x)
+            gamma = post.smoothed_probs     # shape: (T, K)
+
+            preds_per_state = np.stack([x @ W[k].T + b[k] for k in range(K)], axis=1)   # (T, K, D)
+            soft_predictions = np.sum(gamma[:, :, None] * preds_per_state, axis=1)      # (T, D)
+
+            y_pred = soft_predictions
+            z_seq = np.argmax(gamma, axis=1)    # shape: (T, 1)
+
+            y_preds.append(y_pred)
+            z_seqs.append(z_seq)
+            preds_per_states.append(preds_per_state)
+        return y_preds, z_seqs, preds_per_states
 
     def get_data_logprob(self, emissions, inputs=None):
         """Evaluate the log probability of the data under the given model and model parameters"""
-        lp = vmap(partial(self.model.marginal_log_prob, self.learned_params))(emissions, inputs).sum()
-        lp += self.model.log_prior(self.learned_params)
-        lp = lp / emissions.size
+
+        lps = [self.model.marginal_log_prob(self.learned_params, e, i) for e, i in zip(emissions, inputs)]
+        print("lps", lps)
+        lp = np.sum(lps)
+        print("lp", lp)
+        lp_prior = self.model.log_prior(self.learned_params)
+        print("lp_prior", lp_prior)
+        lp += lp_prior
+        emissions_size = np.sum(e.size for e in emissions)
+        lp = lp / emissions_size
+        print("lp", lp, "emissions_size", emissions_size)
         return lp
+
+    def get_data_logprob_by_fly(self, emissions, inputs=None):
+        """Evaluate the log probability of the data under the given model and model parameters, by fly."""
+        lp_prior = self.model.log_prior(self.learned_params)
+        print("lp_prior", lp_prior)
+        lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i) + lp_prior)/e.size for e, i in zip(emissions, inputs)])
+        print("lps", lps)
+        return lps
 
     def get_state_probs(self, emissions, inputs=None):
         z_probs = []
@@ -158,7 +201,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
             z_prob = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
             # print(z_prob.smoothed_probs.shape)
             z_probs.append(z_prob.smoothed_probs)
-        z_probs = np.array(z_probs)
+        # z_probs = np.array(z_probs)
         return z_probs
 
     def get_forward_state_probs(self, emissions, inputs=None):
@@ -167,5 +210,5 @@ class LRHMMFemaleFly(BaseFemaleFly):
             z_prob = self.model.filter(self.learned_params, emissions[btch], inputs[btch])
             # print(z_prob.filtered_probs.shape)
             z_probs.append(z_prob.filtered_probs)
-        z_probs = np.array(z_probs)
+        # z_probs = np.array(z_probs)
         return z_probs
