@@ -52,10 +52,11 @@ def r2_score_custom(y_true, preds_per_state, gamma):
     resid_sq = gamma[:, :, None] * (y_true[:, None, :] - preds_per_state) ** 2  # (T, K, D)
     total_sq = gamma[:, :, None] * (y_true[:, None, :] - mean_y_k[None, :, :]) ** 2  # (T, K, D)
 
-    num = resid_sq.sum(axis=0).sum(axis=1)  # (K,)
-    den = total_sq.sum(axis=0).sum(axis=1)  # (K,)
+    num = np.array(resid_sq.sum(axis=0).sum(axis=1))  # (K,)
+    den = np.array(total_sq.sum(axis=0).sum(axis=1))  # (K,)
 
-    r2 = 1.0 - num / den
+    r2 = 1.0 - num / den    # if both are non-zero, then regular r2
+    r2[(den == 0) & (num == 0)] = 0.0  # if both are zero, then 0.0
     return r2
 
 
@@ -101,11 +102,13 @@ class BaseFemaleFly:
         for o in range(self.data_config["emission_dim"]):
             r2_by_o[o] = []
             for i in range(len(emissions)):
-                # print(emissions[i][o], emissions[i].shape, emissions[i][o].shape)
-                # print(y_preds[i][o], y_preds[i].shape, y_preds[i][o].shape)
-                r2_by_o[o].append(r2_score(emissions[i][:, o], y_preds[i][:, o]))
+                if not len(emissions[i]):  # if the session is empty, can happen when emissions are passed after z_masking
+                    r = 0.
+                else:
+                    r = r2_score(emissions[i][:, o], y_preds[i][:, o])
+                r2_by_o[o].append(r)
             r2_by_o[o] = np.array(r2_by_o[o])
-        print("r2_by_o", r2_by_o)
+        print("r2_by_o by_fly", r2_by_o)
         return r2_by_o
 
     def score_by_z(self, emissions, y_preds, z_seqs):
@@ -139,6 +142,7 @@ class BaseFemaleFly:
                     r = r2_score(emissions[i][z_mask], y_preds[i][z_mask], multioutput='variance_weighted')
                     r2_z_by_fly[z].append(r)
                 else:
+                    r2_z_by_fly[z].append(0.)
                     print(f'nothing for state {z} for session {i}')
             r2_z_by_fly[z] = np.array(r2_z_by_fly[z])
         print("r2_z_by_fly", r2_z_by_fly)
@@ -201,7 +205,7 @@ class BaseFemaleFly:
             emissions_z = [emissions[i][z_seqs[i] == z] for i in range(len(emissions))]
             y_preds_z = [y_preds[i][z_seqs[i] == z] for i in range(len(emissions))]
             r2_z_o[z] = self.score_by_o_by_fly(emissions_z, y_preds_z)
-        print("r2_z_o", r2_z_o)
+        print("r2_z_o by fly", r2_z_o)
         return r2_z_o
 
     def score_by_z_and_o_by_fly_soft(self, emissions, y_preds_per_state, z_probs):
