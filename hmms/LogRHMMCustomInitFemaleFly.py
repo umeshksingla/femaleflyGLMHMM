@@ -1,30 +1,31 @@
 import jax
 import numpy as np
 import jax.random as jr
-from hmms.LRHMMFemaleFly import LRHMMFemaleFly
-from hmms.LRFemaleFly import LRFemaleFly
+from hmms.LogRHMMFemaleFly import LogRHMMFemaleFly
+from hmms.LogRFemaleFly import LogRFemaleFly
 
 from utilities import fitting
 
 jax.config.update("jax_enable_x64", True)
 
 
-class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
+class LogRHMMCustomInitFemaleFly(LogRHMMFemaleFly):
 
-    prefix = 'GLM-HMM'
+    prefix = 'logrhmmci'
 
     def fit(self, emissions, inputs, output_mn_std):
         print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
 
-        lr = LRFemaleFly(self.data_config, self.model_config)
+        lr = LogRFemaleFly(self.data_config, self.model_config)
         lr.fit(emissions, inputs, output_mn_std)
-        W = np.repeat(lr.learned_params['w'], repeats=self.num_states, axis=0)
-        b = np.repeat(lr.learned_params['b'], repeats=self.num_states, axis=0)
+        print("LR global W and b computed.", lr.learned_params['w'].shape, lr.learned_params['b'].shape)
+        W = np.repeat(lr.learned_params['w'].squeeze(axis=0), repeats=self.num_states, axis=0)  # NOTE .squeeze() coz LogRegHMM only supports one emission
+        b = np.repeat(lr.learned_params['b'].squeeze(axis=0), repeats=self.num_states, axis=0)
         W = W + np.random.random(W.shape) * 0.01
         b = b + np.random.random(b.shape) * 0.01
         print("LR global W and b computed.", W.shape, b.shape)
-        em_params, em_lps = fitting.fitEMCustomInit(key, self.model, emissions, train_inputs=inputs,
+        em_params, em_lps = fitting.fitEMLogRHMMCustomInit(key, self.model, emissions, train_inputs=inputs,
                                                     emission_weights=W, emission_biases=b)
         self.learned_params = em_params
         # self.learned_params = self.reindex_params(em_params, emissions, inputs, output_mn_std)

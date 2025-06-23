@@ -15,7 +15,7 @@ jax.config.update("jax_enable_x64", True)
 
 class LRHMMFemaleFly(BaseFemaleFly):
 
-    prefix = 'lrhmm'
+    prefix = 'GLMHMM_'
 
     def __init__(self, data_config, model_config):
         self.data_config = data_config
