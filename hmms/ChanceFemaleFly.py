@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from sklearn.metrics import r2_score
 
 from utilities import utils
+from utilities.io import get_chance_logprob
 from hmms.BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
@@ -63,17 +64,15 @@ class ChanceFemaleFly(BaseFemaleFly):
         return y_preds, z_seqs
 
     def get_data_logprob(self, emissions, inputs):
-        """
-        Multivariate gaussian model
-        """
-        # p = multivariate_normal.pdf(y, mean=mu, cov=cov)
-        p = self.model.prob(np.concatenate(emissions, axis=0))
-        p = jnp.maximum(p, 1e-15)
-        log_Y_given_mvn = jnp.sum(jnp.log(p))
-        emissions_size = np.sum(e.size for e in emissions)
-        lp = log_Y_given_mvn.sum() / emissions_size
-        print("chance lp", lp)
-        return lp
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        print("chance lp", chance_lp)
+        return chance_lp
+
+    def get_data_logprob_by_fly(self, emissions, inputs):
+        chance_lps = np.array([get_chance_logprob(yt) / len(yt) for yt in emissions])
+        print("chance lps by fly", chance_lps)
+        return chance_lps
 
     def score(self, emissions, inputs):
         y_preds = self.predict(None, inputs)[0]

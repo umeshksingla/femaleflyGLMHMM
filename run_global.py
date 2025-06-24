@@ -1,8 +1,9 @@
 ####################################
 
-# Example usage: python run_single.py  --mc '{"names": "lrhmmci", "seeds": 6205, "num_states": 2, "transition_matrix_stickiness": 10}' --path "general"
-# OR
-# python run_single.py --mc '{"names": "chance"}' --path "general"
+# Example usage:
+# python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}'
+# python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}' --enhance
+# python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}' --enhance --genfig
 
 ####################################
 
@@ -32,10 +33,22 @@ def create_cli_parser():
         required=True,
         help="model config",
     )
+    parser.add_argument(
+        "--enhance",
+        dest="enhance",
+        action="store_true",
+        help="Enable enhanced analysis (default is off)",
+    )
+    parser.add_argument(
+        "--genfig",
+        dest="genfig",
+        action="store_true",
+        help="Enable enhanced analysis and generate figures (default is off)",
+    )
     return parser
 
 
-def run(mc):
+def run(mc, enhance=False, genfig=False):
     if not len(mc): return  # if empty dict is passed
 
     path = mc['path']
@@ -92,23 +105,25 @@ def run(mc):
     utils.save(model, data, train_session_indices, test_session_indices, dump_filepath)   # save model parameters and data used for train and test
     print(">> Saved.\n")
 
-    print(">> Saving enhanced checkpoint:")
-    utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
-    print(">> Saved.\n")
+    if enhance or genfig:
+        print(">> Saving enhanced checkpoint:")
+        utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
+        print(">> Saved.\n")
 
-    if model.prefix == 'chance': return
+        if model.prefix == 'chance': return
 
-    print(">> Making figures:")
-    utils.generate_figures(dump_filepath, savefig=True, display=False)
-    print(">> Done with figures.\n")
+        if genfig:
+            print(">> Making figures:")
+            utils.generate_figures(dump_filepath, savefig=True, display=False)
+            print(">> Done with figures.\n")
 
-    print(">> Generating trajectories:")
-    utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
-    print(">> Done with trajectories.\n")
+            print(">> Generating trajectories:")
+            utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
+            print(">> Done with trajectories.\n")
 
-    # print(">> Generating videos:")
-    # utils.generate_videos(dump_filepath)
-    # print(">> Done with videos.\n")
+            # print(">> Generating videos:")
+            # utils.generate_videos(dump_filepath)
+            # print(">> Done with videos.\n")
 
     print("Finished.\n")
     return dump_filepath
@@ -121,4 +136,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print("Args:", vars(args))
     model_config = json.loads(args.mc)
-    run(model_config)
+    print(model_config)
+    run(model_config, args.enhance, args.genfig)

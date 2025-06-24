@@ -392,7 +392,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_var_explained_by_fly(model_ckp['train_data']['train_score_by_fly'], model_ckp['test_data']['test_score_by_fly'], savefig=savefig, fig_dir=fig_dir, display=display)
 
     plots.plot_ll(model_ckp['train_data']['train_lp'], model_ckp['test_data']['test_lp'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_ll_by_fly(model_ckp['train_data']['train_lp_by_fly'], model_ckp['test_data']['test_lp_by_fly'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_ll_by_fly(model_ckp['train_data']['train_lps_by_fly'], model_ckp['test_data']['test_lps_by_fly'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
 
     def plot_func(prefix_data):
         data_key = f'{prefix_data}_data'
