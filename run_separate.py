@@ -70,65 +70,18 @@ import run_global
 #     return imodel
 
 
-def run(mc):
-
-    if not len(mc):
-        return  # if empty dict is passed
-
-    print(">> Fitting global fit")
-    # global_mc = {
-    #     "name": mc['name'],
-    #     "seed": mc['seed'],
-    #     "num_states": mc['num_states'],
-    #     "transition_matrix_stickiness": 100,
-    #     "path": mc['path'],
-    #     "data_path": mc['data_path_fixlen'],
-    # }
-    global_mc = mc
-
-    global_dump_filepath = run_global.run(global_mc)
-    print("Global model dumped at:", global_dump_filepath)
-
-    # Now load the sessions used for training and testing in global fit
-    # model_pkl, _, _ = utils.load_specific_path(global_dump_filepath)
-    # train_session_keys = model_pkl['train_data']['train_session_keys']
-    # test_session_keys = model_pkl['test_data']['test_session_keys']
-    # global_params = model_pkl['learned_params']
-
-    data_varlen = joblib.load(mc['data_path_varlen'])
-    # data_config = data_varlen['data_config']
-    #
-    # ind_dump_filepath_train = os.path.join(global_dump_filepath, 'individual_train')
-    # ind_dump_filepath_test = os.path.join(global_dump_filepath, 'individual_test')
-    # mc['data_path'] = mc['data_path_varlen']
-    #
-    # print(">> Fitting each train session separately:")
-    # for s in train_session_keys:
-    #     fit_individual(s, global_params, data_varlen, data_config, mc, ind_dump_filepath_train, trained_bool=True)
-    # print(">> Individual train fits done.")
-    # utils.generate_figures_all_singles_merged(ind_dump_filepath_train)
-    #
-    # print(">> Fitting each test session separately:")
-    # for s in data_config['session_keys']:   # sessions for fixed are less than total, so we have more sessions held out than just in test_session_keys, especially the shorter ones
-    #     if s in train_session_keys:
-    #         continue
-    #     fit_individual(s, global_params, data_varlen, data_config, mc, ind_dump_filepath_test, trained_bool=False)
-    # print(">> Individual test fits done.")
-    # utils.generate_figures_all_singles_merged(ind_dump_filepath_test)
-    return
-
-
 if __name__ == '__main__':
-
     dataset = 'wt'
-    run({
+    mc = {
         "name": 'lrhmmci',
         "seed": 64378,
         "num_states": 30,
         "transition_matrix_stickiness": 100,
         "path": f'general_{dataset}',
-
         "data_path": f'data/{dataset}_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl',
         # "data_path_varlen": f'data/{dataset}_fly_data_cos=4_ortho_o=5_fixlen=False.pkl',
-    })
+    }
 
+    print(">> Fitting global fit")
+    global_dump_filepath = run_global.run(mc)
+    print("Global model dumped at:", global_dump_filepath)

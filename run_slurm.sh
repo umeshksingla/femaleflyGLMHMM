@@ -7,7 +7,7 @@
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 
-PY_SCRIPT="run_single.py"
+PY_SCRIPT="run_global.py"
 echo "$PY_SCRIPT"
 
 array_args_file="$1"
