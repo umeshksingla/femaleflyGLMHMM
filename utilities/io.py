@@ -12,8 +12,8 @@ from wonderwords import RandomWord
 from datetime import datetime
 from collections import defaultdict
 
-from plotting import plots
-from utilities.video_utils import clip_session
+import tensorflow_probability.substrates.jax.distributions as tfd
+import jax.numpy as jnp
 
 
 def getafilepath(model_name):
@@ -83,7 +83,7 @@ def calculate_steady_state_p(P):
     return steady_state_vector
 
 
-def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=True):
+def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=True, effective_fps=None):
     emissions_z = {}
     for btch in range(len(stateseq)):
         for z in range(num_states):
@@ -91,6 +91,7 @@ def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, 
             if rescaled:
                 mn_std_btch = output_mn_std[btch]
                 eez = emissions[btch][stateseq[btch] == z] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+                eez = eez * effective_fps  # velocity (mm/s) = velocity (mm/frame) × effective_fps
             else:
                 eez = emissions[btch][stateseq[btch] == z]
             emissions_z[z].append(eez)
@@ -142,7 +143,7 @@ def get_windows_to_plot(effective_fps, num_timestamps):
 
     # Helper to safely generate window arrays
     def make_windows(window_duration_frames, n_windows):
-        max_start = max(0, num_timestamps - window_duration_frames - 10)    # to avoid linspace going negative
+        max_start = max(0, num_timestamps - window_duration_frames - 1)    # to avoid linspace going negative
         if max_start == 0:
             return np.empty((0, 2), dtype=int)
         starts = np.linspace(0, max_start, num=n_windows)
@@ -156,9 +157,7 @@ def get_windows_to_plot(effective_fps, num_timestamps):
     windows2 = make_windows(window_size * 60 * 5, n_windows=5)  # 5 min
     windows3 = make_windows(window_size, n_windows=5)  # 1 sec
 
-    full_session_window = np.array([[0, num_timestamps - 1]])   # Full session window
-
-    windows = np.vstack((windows1, windows2, windows3, full_session_window)).astype(int)
+    windows = np.vstack((windows1, windows2, windows3)).astype(int)
 
     return windows
 
@@ -166,10 +165,27 @@ def get_windows_to_plot(effective_fps, num_timestamps):
 def get_cop_window_to_plot(effective_fps, num_timestamps):
 
     window_size = effective_fps * 1  # 1 second windows
-    last_window_size = window_size * 10   # Last 10-second window, to visualize near-copulation
+    last_window_size = window_size * 30   # Last 30-second window, to visualize near-copulation
     if num_timestamps > last_window_size:
         last_window = np.array([[num_timestamps - last_window_size, num_timestamps - 1]])
     else:
         last_window = np.empty((0, 2), dtype=int)
     windows = np.vstack((last_window)).astype(int)
     return windows
+
+
+def get_full_window_to_plot(effective_fps, num_timestamps):
+    full_session_window = np.array([[0, num_timestamps - 1]])  # Full session window
+    windows = np.vstack((full_session_window)).astype(int)
+    return windows
+
+
+def get_chance_logprob(y):
+    mu = jnp.mean(y, axis=0)
+    cov = jnp.cov(y.T)
+    model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
+    p = model.prob(y)
+    p = jnp.maximum(p, 1e-15)
+    log_Y_given_mvn = jnp.sum(jnp.log(p))
+    lp = log_Y_given_mvn.sum()
+    return lp

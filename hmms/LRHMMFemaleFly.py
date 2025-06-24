@@ -7,6 +7,7 @@ import jax.random as jr
 from dynamax.hidden_markov_model import LinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
 
+from utilities.io import get_chance_logprob
 from utilities import fitting, utils
 
 # print("jax.config", jax.config.values)
@@ -15,7 +16,7 @@ jax.config.update("jax_enable_x64", True)
 
 class LRHMMFemaleFly(BaseFemaleFly):
 
-    prefix = 'GLMHMM_'
+    prefix = 'glmhmm_'
 
     def __init__(self, data_config, model_config):
         self.data_config = data_config
@@ -182,18 +183,24 @@ class LRHMMFemaleFly(BaseFemaleFly):
         lp_prior = self.model.log_prior(self.learned_params)
         print("lp_prior", lp_prior)
         lp += lp_prior
-        emissions_size = np.sum(e.size for e in emissions)
-        lp = lp / emissions_size
-        print("lp", lp, "emissions_size", emissions_size)
-        return lp
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        lp = lp / total_emissions_size
+        print("lp", lp, "emissions_size", total_emissions_size)
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0))/total_emissions_size
+        relative_lp = lp - chance_lp
+        print("chance_lp", chance_lp)
+        return relative_lp
 
     def get_data_logprob_by_fly(self, emissions, inputs=None):
         """Evaluate the log probability of the data under the given model and model parameters, by fly."""
         lp_prior = self.model.log_prior(self.learned_params)
         print("lp_prior", lp_prior)
-        lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i) + lp_prior)/e.size for e, i in zip(emissions, inputs)])
+        lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i) + lp_prior)/len(e) for e, i in zip(emissions, inputs)])
         print("lps", lps)
-        return lps
+        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
+        print("chance_lps", chance_lps)
+        relative_lps = lps - chance_lps
+        return relative_lps
 
     def get_state_probs(self, emissions, inputs=None):
         z_probs = []

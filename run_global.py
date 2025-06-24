@@ -12,10 +12,13 @@ import json
 import numpy as np
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
+from hmms.LogRHMMFemaleFly import LogRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
+from hmms.LogRFemaleFly import LogRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
+from hmms.LogRHMMCustomInitFemaleFly import LogRHMMCustomInitFemaleFly
 from utilities import utils
 
 
@@ -62,14 +65,20 @@ def run(mc):
 
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
+    elif model_prefix == 'logrhmm':
+        model = LogRHMMFemaleFly(data_config, mc)
     elif model_prefix == 'ghmm':
         model = GHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
+    elif model_prefix == 'logrhmmci':
+        model = LogRHMMCustomInitFemaleFly(data_config, mc)
     elif model_prefix == 'chance':
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
         model = LRFemaleFly(data_config, mc)
+    elif model_prefix == 'logr':
+        model = LogRFemaleFly(data_config, mc)
     else:
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 

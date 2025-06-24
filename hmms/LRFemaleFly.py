@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from sklearn.linear_model import LinearRegression
 
 from hmms.BaseFemaleFly import BaseFemaleFly
+from utilities.io import get_chance_logprob
 
 # print("jax.config", jax.config.values)
 jax.config.update("jax_enable_x64", True)
@@ -67,7 +68,7 @@ class LRFemaleFly(BaseFemaleFly):
 
     def get_data_logprob(self, emissions, inputs):
         """
-        Linear regression P(Y|X, w)
+        Linear regression P(Y|X, w), relative to chance.
         """
         def fit_normal_residuals(fit_y, true_y):
             residuals = fit_y - true_y
@@ -79,10 +80,13 @@ class LRFemaleFly(BaseFemaleFly):
             return log_Y_given_wx
 
         emissions_pred = self.predict(None, inputs)[0]
-        # lp = vmap(fit_normal_residuals)(emissions_pred, emissions).sum() / emissions.size
         total_emissions_size = np.sum([len(_) for _ in emissions])
-        lp = np.sum([fit_normal_residuals(yp, yt) for yp, yt in zip(emissions_pred, emissions)]) / total_emissions_size
-        return lp
+        lp = fit_normal_residuals(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
+        print("LR lp calc tog", lp)
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        relative_lp = lp - chance_lp
+        print("chance_lp", chance_lp)
+        return relative_lp
 
     def get_data_logprob_by_fly(self, emissions, inputs):
         """
@@ -98,8 +102,12 @@ class LRFemaleFly(BaseFemaleFly):
             return log_Y_given_wx
 
         emissions_pred = self.predict(None, inputs)[0]
-        lps = np.array([fit_normal_residuals(yp, yt)/yt.size for yp, yt in zip(emissions_pred, emissions)])
-        return lps
+        lps = np.array([fit_normal_residuals(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
+        print("LR lps by fly", lps)
+
+        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions]) # chance model per fly. "How much better does my model predict behavior than a naive, non-informative model — for this specific session?"
+        print("chance_lps", chance_lps)
+        return lps - chance_lps
 
     def get_state_probs(self, emissions, inputs=None):
         z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in emissions]

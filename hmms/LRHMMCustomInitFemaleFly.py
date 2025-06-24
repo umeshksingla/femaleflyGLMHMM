@@ -11,7 +11,7 @@ jax.config.update("jax_enable_x64", True)
 
 class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
 
-    prefix = 'GLM-HMM'
+    prefix = 'glm-hmm'
 
     def fit(self, emissions, inputs, output_mn_std):
         print(f'Begin fitting {self.__class__.__name__}...')

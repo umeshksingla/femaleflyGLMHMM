@@ -75,7 +75,7 @@ def get_input_feat(sessions_features, s, f_name):
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
         ts = smooth_gaussian(ts, sigma=3)
-        feat = zscore(ts)     # it is okay to zscore these alignment angles as they are treated linearly
+        feat = zscore(ts)     # it is okay to zscore these alignment angles as if they are being treated linearly
     elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
         f_name_ = f_name.split('_directed')[0]
         feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
@@ -135,16 +135,7 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         std = dfTheta_abs.std()
         dfTheta_abs = zscore(dfTheta_abs)
         f = dfTheta_abs
-    elif f_name in ['wingFlickTheta']:
-        ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
-        ts = smooth_gaussian(ts, sigma=3)
-        wingFlickTheta = ts * sf['wingFlick']
-        wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
-        mn = 0  # no zscoring for wing flick angles, as most of them are zeros
-        std = 1
-        f = wingFlickTheta
     elif f_name in ['dfmAng']:
-
         # r = np.r_[:100000]
         #
         # fig, ax = plt.subplots(3, 1, figsize=(18, 8), sharex=True)
@@ -181,6 +172,21 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         mn = dfmAng_abs.mean()
         std = dfmAng_abs.std()
         f = zscore(dfmAng_abs)
+    elif f_name in ['wingFlickTheta']:
+        ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
+        ts = smooth_gaussian(ts, sigma=3)
+        wingFlickTheta = ts * sf['wingFlick']
+        wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
+        mn = 0  # no zscoring for wing flick angles, as most of them are zeros
+        std = 1
+        f = wingFlickTheta
+    elif f_name in ['wingFlickBin']:
+        ts = sf['wingFlick']
+        wingFlickBin = (np.sum(ts[output_windows], axis=1) >= 1).astype(float)
+        mn = 0
+        std = 1
+        f = wingFlickBin
+        print(np.unique(f, return_counts=True))
     else:
         raise Exception(f'unsupported {f_name} output feature.')
     # print(f_name, mn, std)
@@ -417,7 +423,8 @@ def extract():
         'mfDist': 'z-mfDist',
 
         'fmAng_sin': 'maleLR',
-        # 'wingAlign': 'z-wingAlign',
+        'fmAng_cos': 'front_back',
+        'wingAlign': 'z-wingAlign',
 
         'pfast_i': 'pulse',
         'sine_i': 'sine',
@@ -432,9 +439,10 @@ def extract():
     data_config['emission_labels'] = OrderedDict({
         'fFV': 'z-fFV',
         'fLV': 'z-fLV',
-        # 'dfTheta': 'orientation change',
-        'dfmAng': 'z-dfmAng',
-        # 'wingFlickTheta': 'wing flick',
+        'dfTheta': 'z-dfTheta',
+        # 'dfmAng': 'z-dfmAng',
+        # 'wingFlickTheta': 'wingAngFlick',
+        # 'wingFlickBin': 'wingFlickBin',
     })
     data_config['auxiliary_labels'] = OrderedDict({
         'mFV': 'z-mFV',     # we basically need full series as well as windowed-versions of inputs
@@ -446,7 +454,7 @@ def extract():
     })
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset.pkl'
     data = get_x_and_y_data(sessions_features, data_config, display=False)
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')

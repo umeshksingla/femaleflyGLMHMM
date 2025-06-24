@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from wonderwords import RandomWord
 from datetime import datetime
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from plotting import plots
 from utilities.video_utils import clip_session
@@ -128,7 +128,9 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     test_aux_data = [aux_data[e] for e in test_session_indices]
 
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
+    train_lps_by_fly = model.get_data_logprob_by_fly(train_emissions, train_inputs)
     test_lp = model.get_data_logprob(test_emissions, test_inputs)
+    test_lps_by_fly = model.get_data_logprob_by_fly(test_emissions, test_inputs)
 
     model_ckp = {
         'prefix': model.prefix,
@@ -141,6 +143,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
             'train_inputs': train_inputs,
             'train_aux_data': train_aux_data,
             'train_lp': train_lp,
+            'train_lps_by_fly': train_lps_by_fly,
             'train_session_indices': train_session_indices,
             'train_output_mn_std': output_mn_std[train_session_indices],
             'train_session_keys': session_keys[train_session_indices],
@@ -155,6 +158,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
             'test_inputs': test_inputs,
             'test_aux_data': test_aux_data,
             'test_lp': test_lp,
+            'test_lps_by_fly': test_lps_by_fly,
             'test_session_indices': test_session_indices,
             'test_output_mn_std': output_mn_std[test_session_indices],
             'test_session_keys': session_keys[test_session_indices],
@@ -234,7 +238,8 @@ def enhance(output_dir=None, model_ckp=None):
         #         plt.close()
 
         # model_ckp[data_key][f'{prefix_data}_predictions'] = emission_predictions
-        model_ckp[data_key][f'{prefix_data}_lp_by_fly'] = model.get_data_logprob_by_fly(emissions, inputs)
+        model_ckp[data_key][f'{prefix_data}_lp_again'] = model.get_data_logprob(emissions, inputs)
+        model_ckp[data_key][f'{prefix_data}_lp_by_fly_again'] = model.get_data_logprob_by_fly(emissions, inputs)
         model_ckp[data_key][f'{prefix_data}_soft_predictions'] = soft_emission_predictions
         model_ckp[data_key][f'{prefix_data}_soft_predictions_per_state'] = soft_emission_predictions_per_state
         model_ckp[data_key][f'{prefix_data}_stateseq'] = z_seq
@@ -269,11 +274,77 @@ def enhance(output_dir=None, model_ckp=None):
     return model_ckp
 
 
+def update_labels(data_config):
+    input_labels_text = OrderedDict({
+        'mFV': 'mFV',
+        'mLS': 'mLS',
+        'mfDist': 'mfDist',
+
+        'fmAng_sin': 'side',
+        'fmAng_cos': 'front_back',
+        'wingAlign': 'wingAlign',
+
+        'pfast_i': 'pulse',
+        'sine_i': 'sine',
+        'tap2': 'tap',
+
+        'pfast_i_directed': 'pulse x side',
+        'sine_i_directed': 'sine x side',
+        'tap2_directed': 'tap x side',
+
+        # 'fDistWall': 'distWall',
+    })
+    emission_labels_text = OrderedDict({
+        'fFV': 'forward velocity',
+        'fLV': 'lateral velocity',
+        'dfTheta': '$\Delta$ orientation',
+        # 'dfmAng': 'z-dfmAng',
+        # 'wingFlickTheta': 'wingAngFlick',
+        # 'wingFlickBin': 'wingFlickBin',
+    })
+    emission_labels_units_text = OrderedDict({
+        'fFV': 'forward velocity\n(mm/s)',
+        'fLV': 'lateral velocity\n(mm/s)',
+        'dfTheta': '$\Delta$ orientation\n(deg/s)',
+        # 'dfmAng': 'z-dfmAng',
+        # 'wingFlickTheta': 'wingAngFlick',
+        # 'wingFlickBin': 'wingFlickBin',
+    })
+    emission_labels_zscored_text = OrderedDict({
+        'fFV': 'forward velocity\n(zscored)',
+        'fLV': 'lateral velocity\n(zscored)',
+        'dfTheta': '$\Delta$ orientation\n(zscored)',
+        # 'dfmAng': 'z-dfmAng',
+        # 'wingFlickTheta': 'wingAngFlick',
+        # 'wingFlickBin': 'wingFlickBin',
+    })
+    auxiliary_labels_text = OrderedDict({
+        'mFV': 'mFV\n(zscored)',
+        'mLS': 'mLS\n(zscored)',
+        'mfDist': 'mfDist\n(zscored)',
+        'pfast_i': 'pulse',
+        'sine_i': 'sine',
+        'tap2': 'tap',
+    })
+
+    # replace labels
+    data_config['emission_labels_units'] = data_config['emission_labels'].copy()
+    data_config['emission_labels_zscored'] = data_config['emission_labels'].copy()
+    data_config['input_labels'].update(input_labels_text)
+    data_config['emission_labels'].update(emission_labels_text)
+    data_config['auxiliary_labels'].update(auxiliary_labels_text)
+    data_config['emission_labels_units'].update(emission_labels_units_text)
+    data_config['emission_labels_zscored'].update(emission_labels_zscored_text)
+    return
+
+
 def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=True):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
         return
+
+    update_labels(data_config)
 
     fig_dir = os.path.join(model_dir, 'figures')
     if os.path.exists(fig_dir) and override_fig_dir:
@@ -283,11 +354,14 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     learned_params = model_ckp['learned_params']
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
+    emission_labels_units = data_config['emission_labels_units']
+    emission_labels_zscored = data_config['emission_labels_zscored']
     auxiliary_labels = data_config['auxiliary_labels']
+    effective_fps = data_config['effective_fps']
     num_states = model_ckp['num_states']
     prefix = model_ckp['prefix']
 
-    if 'hmm' in prefix:
+    if 'hmm' in prefix or 'HMM' in prefix:
         plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
                                 savefig=savefig, fig_dir=fig_dir, display=display)
@@ -302,17 +376,23 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,
                                       savefig=savefig, fig_dir=fig_dir, display=display)
 
-    weights = learned_params.emissions.weights if 'hmm' in prefix else learned_params['w']
-    weights = weights[:, np.newaxis, :] if 'logrhmm' in prefix else weights
-    print("weights shape", learned_params.emissions.weights.shape, learned_params.emissions.biases.shape)
+    if 'hmm' in prefix or 'HMM' in prefix:
+        weights = learned_params.emissions.weights
+    elif 'logrhmm' in prefix:
+        weights = learned_params.emissions.weights[:, np.newaxis, :]
+    elif prefix == 'lr':
+        weights = learned_params['w']
+    else:
+        raise Exception(f'wrong prefix={prefix}')
+    print("weights shape", weights.shape)
     plots.plot_filters(weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_filter_amplitudes(weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
 
     plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'], savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_fly(model_ckp['train_data']['train_score_by_fly'], model_ckp['test_data']['test_score_by_fly'], savefig=savefig, fig_dir=fig_dir, display=display)
 
-    plots.plot_ll(model_ckp['train_data']['train_lp'], model_ckp['test_data']['test_lp'], savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_ll_by_fly(model_ckp['train_data']['train_lp_by_fly'], model_ckp['test_data']['test_lp_by_fly'], savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_ll(model_ckp['train_data']['train_lp'], model_ckp['test_data']['test_lp'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_ll_by_fly(model_ckp['train_data']['train_lp_by_fly'], model_ckp['test_data']['test_lp_by_fly'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
 
     def plot_func(prefix_data):
         data_key = f'{prefix_data}_data'
@@ -323,11 +403,14 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
 
         plots.plot_state_mean_outputs_by_o_dists(
             get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
-            emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
+            emission_labels_zscored, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_state_mean_outputs_by_o_dists(
-            get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True),
-            emission_labels, title=f'{prefix_data}_ data rescaled (ignore "z-")', savefig=savefig, fig_dir=fig_dir, display=False)
+            get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True, effective_fps=effective_fps),
+            emission_labels_units, title=f'{prefix_data} data (rescaled)', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_state_mean_aux_dists(
+            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
+            auxiliary_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_state_mean_aux_dists_hist(
             get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
             auxiliary_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix_data}_score_by_z'], title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
@@ -377,6 +460,8 @@ def plot_xlims(model_dir, windows, batch, prefix_data, suffix='', savefig=True, 
     if model_ckp is None:
         return
 
+    update_labels(data_config)
+
     fig_dir = os.path.join(model_dir, 'figures')
     trajs_dir = os.path.join(fig_dir, 'trajs')
     probs_dir = os.path.join(fig_dir, 'probs')
@@ -391,25 +476,29 @@ def plot_xlims(model_dir, windows, batch, prefix_data, suffix='', savefig=True, 
     effective_fps = data_config['effective_fps']
     key_b = model_ckp[data_key][sessions_key][batch]
 
-    for xlim_ in windows:
+    for i, xlim_ in enumerate(windows):
         xlim = (int(xlim_[0]), int(xlim_[1]))
-        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_config, batch, effective_fps, xlim=xlim, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_comparison_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
-        plots.plot_trajectories(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_w_partner_xlim={xlim}{suffix}.pdf', display=display)
+        len_traj = xlim[1] - xlim[0]
+        xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
+        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
+        plots.plot_trajectories(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
 
         if gen_corr_video:
-            xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
             clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")), xlim_orig, output_path=f'{fig_dir}/trajs/{prefix_data}{batch}_xlim_orig={xlim_orig}_xlim={xlim}{suffix}.mp4')
     return
 
 
 def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False):
 
-    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    model_ckp, data_config, _ = load_specific_path(model_dir)
     if model_ckp is None:
         return
-
+    print(data_config['auxiliary_labels'])
+    update_labels(data_config)
+    print(data_config['auxiliary_labels'])
+    print(data_config['emission_labels_zscored'])
     effective_fps = data_config['effective_fps']
 
     def f(prefix_data):
@@ -419,15 +508,17 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
 
         for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
             batch = 31 if prefix_data == 'train' else batch
+            batch = 10 if prefix_data == 'test' else batch
             key_b = model_ckp[data_key][f'{prefix_data}_session_keys'][batch]
             num_timestamps = model_ckp[data_key][f'{prefix_data}_stateseq'][batch].shape[0]
             print("batch", batch, "key_b", key_b, "num_timestamps", num_timestamps)
             windows = get_windows_to_plot(effective_fps, num_timestamps)
             # print("windows", windows)
             plot_xlims(model_dir, windows, batch, prefix_data, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
-            lastwindows = get_cop_window_to_plot(effective_fps, num_timestamps)
-            # print("lastwindows", lastwindows)
-            plot_xlims(model_dir, lastwindows, batch, prefix_data, suffix='_nearend', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            lastwindows = get_cop_window_to_plot(data_config['effective_fps'], num_timestamps)
+            plot_xlims(model_dir, lastwindows, batch, prefix_data, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            fullwindows = get_full_window_to_plot(data_config['effective_fps'], num_timestamps)
+            plot_xlims(model_dir, fullwindows, batch, prefix_data, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             break
     f('train')
     f('test')
@@ -439,6 +530,8 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
 #     model_ckp, data_config, model_config = load_specific_path(model_dir)
 #     if model_ckp is None:
 #         return
+#
+#     update_labels(data_config)
 #
 #     vid_dir = os.path.join(model_dir, 'videos')
 #     if os.path.exists(vid_dir) and override_vid_dir:
