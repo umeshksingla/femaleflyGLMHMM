@@ -40,8 +40,8 @@ if __name__ == '__main__':
 
     path = f'june24_{src}'
     model_configs = {
-        'names': ['lrhmmci'],
-        'seeds': [random.randint(1, 10000) for _ in range(3)],
+        'name': ['lrhmmci'],
+        'seed': [random.randint(1, 10000) for _ in range(3)],
         'num_states': [
             2, 5,
         ],

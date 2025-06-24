@@ -245,8 +245,10 @@ def enhance(output_dir=None, model_ckp=None):
         model_ckp[data_key][f'{prefix_data}_stateseq'] = z_seq
         model_ckp[data_key][f'{prefix_data}_state_probs'] = z_probs
         model_ckp[data_key][f'{prefix_data}_fwd_state_probs'] = fwd_z_probs
+
         model_ckp[data_key][f'{prefix_data}_score'] = model.score(emissions, soft_emission_predictions)
         model_ckp[data_key][f'{prefix_data}_score_by_fly'] = model.scores_by_fly(emissions, soft_emission_predictions)
+
         model_ckp[data_key][f'{prefix_data}_score_by_z'] = model.score_by_z(emissions, emission_predictions, z_seq)
         model_ckp[data_key][f'{prefix_data}_score_by_z_soft'] = model.score_by_z_soft(emissions, soft_emission_predictions_per_state, z_probs)
         model_ckp[data_key][f'{prefix_data}_score_by_z_by_fly'] = model.score_by_z_by_fly(emissions, emission_predictions, z_seq)

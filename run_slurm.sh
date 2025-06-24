@@ -19,4 +19,4 @@ model_config=$(sed -n "$linenum p" $array_args_file)
 
 source activate /scratch/gpfs/MMURTHY/usingla/femaleflyenv
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-python "$PY_SCRIPT" --mc "$model_config"
+python "$PY_SCRIPT" --mc "$model_config" --enhance

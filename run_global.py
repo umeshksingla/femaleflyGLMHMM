@@ -51,13 +51,9 @@ def create_cli_parser():
 def run(mc, enhance=False, genfig=False):
     if not len(mc): return  # if empty dict is passed
 
-    path = mc['path']
-    data_path = mc['data_path']
-    model_prefix = mc['name']
+    print(f"Fitting {mc['name']} with model_config: {mc}")
 
-    print(f"Fitting {model_prefix} with model_config: {mc}")
-
-    data = joblib.load(data_path)
+    data = joblib.load(mc['data_path'])
     emissions, inputs, output_mn_std = data['emissions'], data['inputs'], data['output_mn_std']
 
     data_config = data['data_config']
@@ -76,6 +72,7 @@ def run(mc, enhance=False, genfig=False):
     print("# Train sessions:", train_session_indices, "total=", len(train_session_indices))
     print("# Test sessions:", test_session_indices, "total=", len(test_session_indices))
 
+    model_prefix = mc['name']
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
     elif model_prefix == 'logrhmm':
@@ -95,7 +92,7 @@ def run(mc, enhance=False, genfig=False):
     else:
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
-    dump_filepath = utils.getafilepath(f'{path}/{model.prefix}_{model.model_config["num_states"]}_cv')
+    dump_filepath = utils.getafilepath(f'{mc["path"]}/{model.prefix}_{model.model_config["num_states"]}_cv')
 
     print(">> Fitting")
     model.fit(train_emissions, train_inputs, train_output_mn_std)

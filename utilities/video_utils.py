@@ -1,8 +1,8 @@
 import os
-import cv2
 
 
 def clip_session(video_path, interval, output_path):
+    import cv2
     print(video_path)
     video_start_frame, video_end_frame = interval
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
