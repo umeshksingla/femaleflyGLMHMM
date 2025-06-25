@@ -25,22 +25,23 @@ def get_features(DATA, expt_path, cop_start_frame):
     fTrx = fill_missing_tracks_SR(fTrx_, kind="cubic")
     mTrx = fill_missing_tracks_SR(mTrx_, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
 
-    # Compute wing flick features using various body points
-    female_wing_flick_ftr_dict = female_features.compute_wing_flick_features(fTrx, fly_nodes)
-    female_fending_ftr_dict = female_features.compute_fending_features(fTrx, fly_nodes)
-    # return
+    all_session_features = dict()
 
     # Compute visual features using various body points
     visual_ftr_dict = visual_features.compute_visual_features(fTrx, mTrx, fly_nodes)
+    all_session_features.update(visual_ftr_dict)
 
     # Compute tactile features using various body points
     tap_ftr_dict = DATA.get_tap_feature(expt_path, cop_start_frame, mTrx, fTrx)
-
-    all_session_features = dict()
-    all_session_features.update(visual_ftr_dict)
     all_session_features.update(tap_ftr_dict)
+
+    # Compute wing flick features using various body points
+    female_wing_flick_ftr_dict = female_features.compute_wing_flick_features(fTrx, fly_nodes)
     all_session_features.update(female_wing_flick_ftr_dict)
-    all_session_features.update(female_fending_ftr_dict)
+
+    # Compute fending (or leg extension) features using various body points, NOT available for wt_fred
+    # female_fending_ftr_dict = female_features.compute_fending_features(fTrx, fly_nodes)
+    # all_session_features.update(female_fending_ftr_dict)
 
     # Get auditory bout features
     song = DATA.get_all_song(expt_path)[:cop_start_frame]
@@ -70,9 +71,9 @@ def get_features(DATA, expt_path, cop_start_frame):
 
 if __name__ == '__main__':
 
-    DATA = WT_DATA
+    # DATA = WT_DATA
     # DATA = AC_BOTH
-    # DATA = FREDCLEANED_DATA
+    DATA = FREDCLEANED_DATA
 
     BASE_FOLDER = f'data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)

@@ -72,16 +72,21 @@ import run_global
 
 if __name__ == '__main__':
     dataset = 'wt'
+    if dataset == 'wt':
+        data_path = f'data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl'
+    elif dataset == 'wt_fred':
+        data_path = f'data/wt_fred_fly_data_cos=4_ortho_o=2_smoothed_stdset.pkl'
+    else:
+        raise Exception(f'Wrong dataset {dataset} specified.')
     mc = {
-        "name": 'lrhmmci',
-        "seed": 64378,
-        "num_states": 30,
+        "name": 'lr',
+        "seed": 313,
+        "num_states": 1,
         "transition_matrix_stickiness": 100,
-        "path": f'general_{dataset}',
-        "data_path": f'data/{dataset}_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl',
-        # "data_path_varlen": f'data/{dataset}_fly_data_cos=4_ortho_o=5_fixlen=False.pkl',
+        "path": f'general_{dataset}_lrcalc',
+        "data_path": data_path,
     }
 
     print(">> Fitting global fit")
-    global_dump_filepath = run_global.run(mc)
+    global_dump_filepath = run_global.run(mc, genfig=True)
     print("Global model dumped at:", global_dump_filepath)

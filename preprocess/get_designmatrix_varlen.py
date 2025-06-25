@@ -12,16 +12,16 @@ from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
 
-def smooth_moving_average(x, smooth_window):
-    return np.convolve(x, np.ones(smooth_window), 'valid') / smooth_window
-
-
-def smooth_savgol(x, smooth_window):
-    return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
+# def smooth_moving_average(x, smooth_window):
+#     return np.convolve(x, np.ones(smooth_window), 'valid') / smooth_window
+#
+#
+# def smooth_savgol(x, smooth_window):
+#     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
 
 
 def smooth_gaussian(x, sigma):
-    return gaussian_filter1d(x, sigma=sigma)
+    return gaussian_filter1d(x, sigma=sigma, mode='nearest')
 
 
 def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0):
@@ -391,11 +391,10 @@ def get_x_and_y_data(sessions_features, config, display=False):
     return data
 
 
-def extract():
+def extract(source):
 
     data_config = {}
 
-    source = 'wt'
     if source == 'wt':
         sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
         fps = sessions_features.get('fps', 150)
@@ -403,7 +402,7 @@ def extract():
         sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
         fps = sessions_features.get('fps', 150)
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11.pkl')
+        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_may30.pkl')
         fps = sessions_features.get('fps', 60)
     else:
         raise Exception('Wrong data source.')
@@ -462,4 +461,5 @@ def extract():
 
 
 if __name__ == '__main__':
-    extract()
+    src = 'wt_fred'
+    extract(src)
