@@ -90,7 +90,7 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
-    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed']:
+    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed', 'wingFlick']:
         ts = sf[f_name]
         feat = (np.sum(ts[aux_windows], axis=1) >= 1).astype(float)
     else:
@@ -239,6 +239,7 @@ def get_x_and_y_data(sessions_features, config, display=False):
     x_labels = config['input_labels']
     y_labels = config['emission_labels']
     a_labels = config['auxiliary_labels']
+    ay_labels = config['auxiliary_emission_labels']
     n_inputs = len(x_labels)
     emission_dim = len(y_labels)
     input_raw_each_dim = config['input_raw_each_dim']
@@ -258,6 +259,7 @@ def get_x_and_y_data(sessions_features, config, display=False):
     inputs_raw = []
     emissions = []
     aux_data = []
+    aux_emissions = []
     output_mn_std = []
     start_frames = []
     end_frames = []
@@ -319,9 +321,17 @@ def get_x_and_y_data(sessions_features, config, display=False):
             a_feats.append(f)
         s_aux_data = np.vstack(a_feats).T
 
+        # AUXILIARY EMISSIONS
+        ay_feats = []
+        for _ in ay_labels:
+            f = get_aux_feat(sessions_features, s, _, s_output_windows)
+            ay_feats.append(f)
+        s_aux_emissions = np.vstack(ay_feats).T
+
         inputs_raw.append(s_inputs)
         emissions.append(s_emissions)
         aux_data.append(s_aux_data)
+        aux_emissions.append(s_aux_emissions)
         output_mn_std.append(s_o_mn_std)
         start_frames.append(s_start_frame)
         end_frames.append(s_end_frame)
@@ -337,6 +347,7 @@ def get_x_and_y_data(sessions_features, config, display=False):
     inputs_raw = np.array(inputs_raw, dtype=object)
     emissions = np.array(emissions, dtype=object)
     aux_data = np.array(aux_data, dtype=object)
+    aux_emissions = np.array(aux_emissions, dtype=object)
     downsampled_indices = np.array(downsampled_indices, dtype=object)
     upsampled_indices = np.array(upsampled_indices, dtype=object)
     output_mn_std = np.array(output_mn_std)
@@ -351,10 +362,10 @@ def get_x_and_y_data(sessions_features, config, display=False):
 
     print("basis", basis.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim,
           "input_dim", input_dim, "input_each_dim", input_each_dim)
-    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape",
-          inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape)
-    print("inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape",
-          inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape)
+    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape",
+          inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape)
+    print("inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape",
+          inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape)
 
     # emissions = np.array(emissions)
     # aux_data = np.array(aux_data)
@@ -375,6 +386,7 @@ def get_x_and_y_data(sessions_features, config, display=False):
         'emissions': emissions,
         'inputs': inputs,
         'aux_data': aux_data,
+        'aux_emissions': aux_emissions,
         'output_mn_std': np.array(output_mn_std),
         'start_frames': np.array(start_frames),
         'end_frames': np.array(end_frames),
@@ -440,8 +452,6 @@ def extract(source):
         'fLV': 'z-fLV',
         'dfTheta': 'z-dfTheta',
         # 'dfmAng': 'z-dfmAng',
-        # 'wingFlickTheta': 'wingAngFlick',
-        # 'wingFlickBin': 'wingFlickBin',
     })
     data_config['auxiliary_labels'] = OrderedDict({
         'mFV': 'z-mFV',     # we basically need full series as well as windowed-versions of inputs
@@ -451,9 +461,14 @@ def extract(source):
         'sine_i': 'sine',
         'tap2': 'tap2',
     })
+    data_config['auxiliary_emission_labels'] = OrderedDict({
+        'wingFlick': 'wing_flick',
+        # 'wingFlickTheta': 'wingAngFlick',
+        # 'wingFlickBin': 'wingFlickBin',
+    })
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem.pkl'
     data = get_x_and_y_data(sessions_features, data_config, display=False)
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')
@@ -461,5 +476,5 @@ def extract(source):
 
 
 if __name__ == '__main__':
-    src = 'wt_fred'
+    src = 'wt'
     extract(src)

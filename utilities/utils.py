@@ -116,8 +116,8 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     emissions = data['emissions']
     inputs = data['inputs']
     aux_data = data['aux_data']
+    aux_emissions = data['aux_emissions']
     output_mn_std = data['output_mn_std']
-    # output_indices = data['output_indices']
     session_keys = np.array(model.data_config['session_keys'])
 
     train_emissions = [emissions[e] for e in train_session_indices]
@@ -126,6 +126,8 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     test_inputs = [inputs[e] for e in test_session_indices]
     train_aux_data = [aux_data[e] for e in train_session_indices]
     test_aux_data = [aux_data[e] for e in test_session_indices]
+    train_aux_emissions = [aux_emissions[e] for e in train_session_indices]
+    test_aux_emissions = [aux_emissions[e] for e in test_session_indices]
 
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
     train_lps_by_fly = model.get_data_logprob_by_fly(train_emissions, train_inputs)
@@ -142,6 +144,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
             'train_emissions': train_emissions,
             'train_inputs': train_inputs,
             'train_aux_data': train_aux_data,
+            'train_aux_emissions': train_aux_emissions,
             'train_lp': train_lp,
             'train_lps_by_fly': train_lps_by_fly,
             'train_session_indices': train_session_indices,
@@ -157,6 +160,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
             'test_emissions': test_emissions,
             'test_inputs': test_inputs,
             'test_aux_data': test_aux_data,
+            'test_aux_emissions': test_aux_emissions,
             'test_lp': test_lp,
             'test_lps_by_fly': test_lps_by_fly,
             'test_session_indices': test_session_indices,
@@ -184,6 +188,83 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     return
 
 
+def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
+
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import log_loss, accuracy_score
+
+    def logreg(x, y):
+        # print(x.shape, y.shape)
+        model = LogisticRegression(solver='lbfgs', max_iter=1000, class_weight='balanced')
+        model.fit(x, y)
+        probs = model.predict_proba(x)[:, 1]  # probability of class 1
+        preds = (probs >= 0.5).astype(int)
+        loss = log_loss(y, probs)
+        acc = accuracy_score(y, preds)
+        weights = model.coef_[0]  # shape: (D,)
+        bias = model.intercept_[0]
+        return loss, probs, acc, weights, bias
+
+    inputs_ = np.concatenate(inputs, axis=0)
+    aux_emissions_ = np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
+    z_seq_ = np.concatenate(z_seqs, axis=0)
+
+    aux_emission_dim = aux_emissions_.shape[-1]
+    input_dim = inputs_.shape[-1]
+    # print(inputs_.shape, aux_emissions_.shape, z_seq_.shape)
+
+    loss, probs, accuracy, counts = {}, {}, {}, {}
+    w = np.empty((num_z, aux_emission_dim, input_dim))
+    b = np.empty((num_z, aux_emission_dim))
+    # print(w.shape, b.shape)
+    for z in range(num_z):
+        loss[z] = {}
+        probs[z] = {}
+        accuracy[z] = {}
+        counts[z] = {}
+        z_mask = (z_seq_ == z)
+        for o in range(aux_emission_dim):
+            counts[z][o] = np.sum(aux_emissions_[z_mask][:, o])/len(aux_emissions_[z_mask][:, o])
+            loss[z][o], probs[z][o], accuracy[z][o], w[z, o], b[z, o] = logreg(inputs_[z_mask], aux_emissions_[z_mask][:, o])
+
+    # print(loss, probs, accuracy)
+    # print(w, b, w.shape, b.shape)
+    return accuracy, counts, w, b
+
+
+def predict_aux_emissions(weights, inputs, aux_emissions, z_seqs, num_z):
+    from scipy.special import expit
+
+    inputs_ = np.concatenate(inputs, axis=0)
+    aux_emissions_ = np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
+    z_seq_ = np.concatenate(z_seqs, axis=0)
+    aux_emission_dim = aux_emissions_.shape[-1]
+    W, B = weights['w'], weights['b']
+
+    def predict(x, y_true, w, b):
+        # print(x.shape, y_true.shape, w.shape, b.shape)
+        logits = x @ w + b  # shape (N,)
+        # print(logits.shape)
+        probs = expit(logits)  # sigmoid to get probabilities
+        # print(probs, probs.shape)
+        preds = (probs >= 0.5).astype(int)  # threshold at 0.5
+        # print(preds, preds.shape)
+        acc = np.mean(preds == y_true)  # compute accuracy
+        return acc
+
+    accuracy = {}
+    counts = {}
+    for z in range(num_z):
+        accuracy[z] = {}
+        counts[z] = {}
+        z_mask = (z_seq_ == z)
+        for o in range(aux_emission_dim):
+            counts[z][o] = np.sum(aux_emissions_[z_mask][:, o]) / len(aux_emissions_[z_mask][:, o])
+            accuracy[z][o] = predict(inputs_[z_mask], aux_emissions_[z_mask][:, o], W[z, o], B[z, o])
+    # print("accuracy", accuracy)
+    return accuracy, counts
+
+
 def enhance(output_dir=None, model_ckp=None):
     """Load or use the basic model checkpoint with train and test data and store the full checkpoint enhanced with r2 scores,
     etc. computed."""
@@ -197,17 +278,30 @@ def enhance(output_dir=None, model_ckp=None):
 
     model = model_ckp['model']
 
-    def evaluate(prefix_data):
-        data_key = f'{prefix_data}_data'
+    def evaluate(prefix):
+        data_key = f'{prefix}_data'
 
-        emissions = model_ckp[data_key][f'{prefix_data}_emissions']
-        inputs = model_ckp[data_key][f'{prefix_data}_inputs']
-        print(f"Calculating enhanced stats etc on {prefix_data} data...")
+        emissions = model_ckp[data_key][f'{prefix}_emissions']
+        aux_emissions = model_ckp[data_key][f'{prefix}_aux_emissions']
+        inputs = model_ckp[data_key][f'{prefix}_inputs']
+        print(f"Calculating enhanced stats etc on {prefix} data...")
 
         emission_predictions, _ = model.predict_v3(emissions, inputs)
-        soft_emission_predictions, z_seq, soft_emission_predictions_per_state = model.predict(emissions, inputs)
+        soft_emission_predictions, z_seqs, soft_emission_predictions_per_state = model.predict(emissions, inputs)
         z_probs = model.get_state_probs(emissions, inputs)
         fwd_z_probs = model.get_forward_state_probs(emissions, inputs)
+
+        if prefix == 'train':
+            accuracy, counts, w, b = train_aux_emissions(inputs, aux_emissions, z_seqs, model.num_states)
+            model_ckp[data_key][f'{prefix}_auxem_acc_scores_z_and_o'] = accuracy
+            model_ckp[data_key][f'{prefix}_auxem_eventcounts_z_and_o'] = counts
+            model_ckp['logreg_params'] = {'w': w, 'b': b}
+        elif prefix == 'test':
+            accuracy, counts = predict_aux_emissions(model_ckp['logreg_params'], inputs, aux_emissions, z_seqs, model.num_states)
+            model_ckp[data_key][f'{prefix}_auxem_acc_scores_z_and_o'] = accuracy
+            model_ckp[data_key][f'{prefix}_auxem_eventcounts_z_and_o'] = counts
+        else:
+            raise Exception('huh')
 
         # from sklearn.metrics import r2_score
         # all_emissions = np.concatenate(emissions, axis=0)
@@ -237,35 +331,43 @@ def enhance(output_dir=None, model_ckp=None):
         #         plt.show()
         #         plt.close()
 
-        # model_ckp[data_key][f'{prefix_data}_predictions'] = emission_predictions
-        model_ckp[data_key][f'{prefix_data}_lp_again'] = model.get_data_logprob(emissions, inputs)
-        model_ckp[data_key][f'{prefix_data}_lp_by_fly_again'] = model.get_data_logprob_by_fly(emissions, inputs)
-        model_ckp[data_key][f'{prefix_data}_soft_predictions'] = soft_emission_predictions
-        model_ckp[data_key][f'{prefix_data}_soft_predictions_per_state'] = soft_emission_predictions_per_state
-        model_ckp[data_key][f'{prefix_data}_stateseq'] = z_seq
-        model_ckp[data_key][f'{prefix_data}_state_probs'] = z_probs
-        model_ckp[data_key][f'{prefix_data}_fwd_state_probs'] = fwd_z_probs
+        # model_ckp[data_key][f'{prefix}_predictions'] = emission_predictions
+        model_ckp[data_key][f'{prefix}_lp_again'] = model.get_data_logprob(emissions, inputs)
+        model_ckp[data_key][f'{prefix}_lp_by_fly_again'] = model.get_data_logprob_by_fly(emissions, inputs)
+        model_ckp[data_key][f'{prefix}_soft_predictions'] = soft_emission_predictions
+        model_ckp[data_key][f'{prefix}_soft_predictions_per_state'] = soft_emission_predictions_per_state
+        model_ckp[data_key][f'{prefix}_stateseq'] = z_seqs
+        model_ckp[data_key][f'{prefix}_state_probs'] = z_probs
+        model_ckp[data_key][f'{prefix}_fwd_state_probs'] = fwd_z_probs
 
-        model_ckp[data_key][f'{prefix_data}_score'] = model.score(emissions, soft_emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_score_by_fly'] = model.scores_by_fly(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_score'] = model.score(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_fly'] = model.scores_by_fly(emissions, soft_emission_predictions)
 
-        model_ckp[data_key][f'{prefix_data}_score_by_z'] = model.score_by_z(emissions, emission_predictions, z_seq)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_soft'] = model.score_by_z_soft(emissions, soft_emission_predictions_per_state, z_probs)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_by_fly'] = model.score_by_z_by_fly(emissions, emission_predictions, z_seq)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_by_fly_soft'] = model.score_by_z_by_fly_soft(emissions, soft_emission_predictions_per_state, z_probs)
+        model_ckp[data_key][f'{prefix}_score_by_z'] = model.score_by_z(emissions, emission_predictions, z_seqs)
+        model_ckp[data_key][f'{prefix}_score_by_z_soft'] = model.score_by_z_soft(emissions, soft_emission_predictions_per_state, z_probs)
+        model_ckp[data_key][f'{prefix}_score_by_z_by_fly'] = model.score_by_z_by_fly(emissions, emission_predictions, z_seqs)
+        model_ckp[data_key][f'{prefix}_score_by_z_by_fly_soft'] = model.score_by_z_by_fly_soft(emissions, soft_emission_predictions_per_state, z_probs)
 
-        model_ckp[data_key][f'{prefix_data}_score_by_o'] = model.score_by_o(emissions, emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_score_by_o_soft'] = model.score_by_o(emissions, soft_emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_score_by_o_by_fly'] = model.score_by_o_by_fly(emissions, emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_score_by_o_by_fly_soft'] = model.score_by_o_by_fly(emissions, soft_emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_and_o'] = model.score_by_z_and_o(emissions, emission_predictions, z_seq)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_soft'] = model.score_by_z_and_o_soft(emissions, soft_emission_predictions_per_state, z_probs)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_by_fly'] = model.score_by_z_and_o_by_fly(emissions, emission_predictions, z_seq)
-        model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_by_fly_soft'] = model.score_by_z_and_o_by_fly_soft(emissions, soft_emission_predictions_per_state, z_probs)
-        model_ckp[data_key][f'{prefix_data}_correlation_by_o'] = model.correlation_by_o(emissions, emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_correlation_by_o_soft'] = model.correlation_by_o(emissions, soft_emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_correlation_by_o_by_fly'] = model.correlation_by_o_by_fly(emissions, emission_predictions)
-        model_ckp[data_key][f'{prefix_data}_correlation_by_o_by_fly_soft'] = model.correlation_by_o_by_fly(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_o'] = model.score_by_o(emissions, emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_o_soft'] = model.score_by_o(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_o_by_fly'] = model.score_by_o_by_fly(emissions, emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_o_by_fly_soft'] = model.score_by_o_by_fly(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_score_by_z_and_o'] = model.score_by_z_and_o(emissions, emission_predictions, z_seqs)
+        model_ckp[data_key][f'{prefix}_score_by_z_and_o_soft'] = model.score_by_z_and_o_soft(emissions, soft_emission_predictions_per_state, z_probs)
+        model_ckp[data_key][f'{prefix}_score_by_z_and_o_by_fly'] = model.score_by_z_and_o_by_fly(emissions, emission_predictions, z_seqs)
+        model_ckp[data_key][f'{prefix}_score_by_z_and_o_by_fly_soft'] = model.score_by_z_and_o_by_fly_soft(emissions, soft_emission_predictions_per_state, z_probs)
+
+        model_ckp[data_key][f'{prefix}_correlation_by_o'] = model.correlation_by_o(emissions, emission_predictions)
+        model_ckp[data_key][f'{prefix}_correlation_by_o_soft'] = model.correlation_by_o(emissions, soft_emission_predictions)
+        max_c, max_lags = model.correlation_max_by_o(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_correlation_max_by_o_soft'] = max_c
+        model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_soft'] = max_lags
+
+        model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly'] = model.correlation_by_o_by_fly(emissions, emission_predictions)
+        model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly_soft'] = model.correlation_by_o_by_fly(emissions, soft_emission_predictions)
+        max_c, max_lags = model.correlation_max_by_o_by_fly(emissions, soft_emission_predictions)
+        model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'] = max_c
+        model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'] = max_lags
         return
 
     evaluate('train')
@@ -284,7 +386,7 @@ def update_labels(data_config):
 
         'fmAng_sin': 'side',
         'fmAng_cos': 'front_back',
-        'wingAlign': 'wingAlign',
+        'wingAlign': 'wing_align',
 
         'pfast_i': 'pulse',
         'sine_i': 'sine',
@@ -328,6 +430,10 @@ def update_labels(data_config):
         'sine_i': 'sine',
         'tap2': 'tap',
     })
+    auxiliary_emission_labels_text = OrderedDict({
+        'wingFlick': 'wing_flick',
+        'wingFlick2': 'wing_flick2',
+    })
 
     # replace labels
     data_config['emission_labels_units'] = data_config['emission_labels'].copy()
@@ -335,6 +441,7 @@ def update_labels(data_config):
     data_config['input_labels'].update(input_labels_text)
     data_config['emission_labels'].update(emission_labels_text)
     data_config['auxiliary_labels'].update(auxiliary_labels_text)
+    data_config['auxiliary_emission_labels'].update(auxiliary_emission_labels_text)
     data_config['emission_labels_units'].update(emission_labels_units_text)
     data_config['emission_labels_zscored'].update(emission_labels_zscored_text)
     return
@@ -359,6 +466,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     emission_labels_units = data_config['emission_labels_units']
     emission_labels_zscored = data_config['emission_labels_zscored']
     auxiliary_labels = data_config['auxiliary_labels']
+    auxiliary_emission_labels = data_config['auxiliary_emission_labels']
     effective_fps = data_config['effective_fps']
     num_states = model_ckp['num_states']
     prefix = model_ckp['prefix']
@@ -386,9 +494,70 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         weights = learned_params['w']
     else:
         raise Exception(f'wrong prefix={prefix}')
-    print("weights shape", weights.shape)
-    plots.plot_filters(weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filter_amplitudes(weights, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    def plot_func(prefix):
+        data_key = f'{prefix}_data'
+        emissions = model_ckp[data_key][f'{prefix}_emissions']
+        # inputs = model_ckp[data_key][f'{prefix}_inputs']
+        aux_data = model_ckp[data_key][f'{prefix}_aux_data']
+        # aux_emissions = model_ckp[data_key][f'{prefix}_aux_emissions']
+        stateseq = model_ckp[data_key][f'{prefix}_stateseq']
+        output_mn_std = model_ckp[data_key][f'{prefix}_output_mn_std']
+
+        plots.plot_auxem_acc_by_z_o(model_ckp[data_key][f'{prefix}_auxem_acc_scores_z_and_o'], auxiliary_emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_auxem_fraction_by_z_o(model_ckp[data_key][f'{prefix}_auxem_eventcounts_z_and_o'], auxiliary_emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+
+        plots.plot_state_mean_outputs_by_o_dists(
+            get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
+            emission_labels_zscored, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_state_mean_outputs_by_o_dists(
+            get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True, effective_fps=effective_fps),
+            emission_labels_units, title=f'{prefix} data (rescaled)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_state_mean_aux_dists(
+            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
+            auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_state_mean_aux_dists_hist(
+            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
+            auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+
+        plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix}_score_by_z'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix}_score_by_z_soft'], title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_by_fly_soft'], title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_o(model_ckp[data_key][f'{prefix}_score_by_o'], emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_o(model_ckp[data_key][f'{prefix}_score_by_o_soft'], emission_labels, title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_o_by_fly'], emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_o_by_fly_soft'], emission_labels, title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_o(model_ckp[data_key][f'{prefix}_score_by_z_and_o'], emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_o(model_ckp[data_key][f'{prefix}_score_by_z_and_o_soft'], emission_labels, title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_and_o_by_fly'], emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_var_explained_by_z_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_and_o_by_fly_soft'], emission_labels, title=f'{prefix} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
+
+        plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_by_o'], emission_labels, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_by_o_soft'], emission_labels, title=f'{prefix} data (soft) (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_max_by_o_soft'], emission_labels, title=f'{prefix} data (soft, max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_lags_by_o(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_soft'], emission_labels, effective_fps, title=f'{prefix} data (soft, max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
+
+        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly'], emission_labels, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly_soft'], emission_labels, title=f'{prefix} data (soft) (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'], emission_labels, title=f'{prefix} data (soft, max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
+        plots.plot_correlation_lags_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'], emission_labels, effective_fps, title=f'{prefix} data (soft, max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
+        return
+
+    plot_func('train')
+    plot_func('test')
+
+    # plots common to train and test
+    auxem_filters = model_ckp['logreg_params']['w']
+    plots.plot_filters(auxem_filters, data_config, auxiliary_emission_labels, filesuffix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters_statewise(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', plot_top_k=True, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters_statewise(weights, data_config, emission_labels, prefix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(weights, data_config, emission_labels, prefix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(weights, data_config, emission_labels, prefix='emissions', plot_top_k=True, savefig=savefig, fig_dir=fig_dir, display=display)
 
     plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'], savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_var_explained_by_fly(model_ckp['train_data']['train_score_by_fly'], model_ckp['test_data']['test_score_by_fly'], savefig=savefig, fig_dir=fig_dir, display=display)
@@ -396,67 +565,20 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_ll(model_ckp['train_data']['train_lp'], model_ckp['test_data']['test_lp'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_ll_by_fly(model_ckp['train_data']['train_lps_by_fly'], model_ckp['test_data']['test_lps_by_fly'], data_config, savefig=savefig, fig_dir=fig_dir, display=display)
 
-    def plot_func(prefix_data):
-        data_key = f'{prefix_data}_data'
-        emissions = model_ckp[data_key][f'{prefix_data}_emissions']
-        aux_data = model_ckp[data_key][f'{prefix_data}_aux_data']
-        stateseq = model_ckp[data_key][f'{prefix_data}_stateseq']
-        output_mn_std = model_ckp[data_key][f'{prefix_data}_output_mn_std']
+    padded_arrays, n_le = pad_to_equal_length([*model_ckp['train_data']['train_state_probs'], *model_ckp['test_data']['test_state_probs']])
+    plots.plot_prob_states_aligned(padded_arrays, n_le, 200, model_config, title=f'All data',
+                                   xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=fig_dir, display=display)
 
-        plots.plot_state_mean_outputs_by_o_dists(
-            get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
-            emission_labels_zscored, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_state_mean_outputs_by_o_dists(
-            get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True, effective_fps=effective_fps),
-            emission_labels_units, title=f'{prefix_data} data (rescaled)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_state_mean_aux_dists(
-            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
-            auxiliary_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_state_mean_aux_dists_hist(
-            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
-            auxiliary_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix_data}_score_by_z'], title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix_data}_score_by_z_soft'], title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_z_by_fly'], title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_z_by_fly_soft'], title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_o(model_ckp[data_key][f'{prefix_data}_score_by_o'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_o(model_ckp[data_key][f'{prefix_data}_score_by_o_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_o_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_o_by_fly'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_o_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_o_by_fly_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_o(model_ckp[data_key][f'{prefix_data}_score_by_z_and_o'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_o(model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_o_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_by_fly'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_o_by_fly(model_ckp[data_key][f'{prefix_data}_score_by_z_and_o_by_fly_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix_data}_correlation_by_o'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix_data}_correlation_by_o_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix_data}_correlation_by_o_by_fly'], emission_labels, title=f'{prefix_data} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix_data}_correlation_by_o_by_fly_soft'], emission_labels, title=f'{prefix_data} data (soft)', savefig=savefig, fig_dir=fig_dir, display=display)
-
-        padded_arrays, n_le = pad_to_equal_length(model_ckp[data_key][f'{prefix_data}_state_probs'])
-        plots.plot_prob_states_aligned(padded_arrays, n_le, 200, model_config, title=f'All ({prefix_data} data)',
-                                       xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=fig_dir, display=display)
-
-        state_probs = [model_ckp[data_key][f'{prefix_data}_state_probs'][i] for i, c in enumerate(model_ckp[data_key][f'{prefix_data}_copulation_bools']) if c == True]
-        plots.plot_prob_states_aligned(normalize_to_equal_length(state_probs, GRID=50000), None, 200,
-                                       config=model_config, title=f'All Copulation ({prefix_data} data)',
-                                       xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=fig_dir, display=display)
-
-        padded_arrays, n_le = pad_to_equal_length(model_ckp[data_key][f'{prefix_data}_fwd_state_probs'])
-        plots.plot_prob_states_aligned(padded_arrays, n_le, 200, model_config, title=f'All ({prefix_data} data) (fwd)',
-                                       xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=fig_dir, display=display)
-
-        state_probs = [model_ckp[data_key][f'{prefix_data}_fwd_state_probs'][i] for i, c in enumerate(model_ckp[data_key][f'{prefix_data}_copulation_bools']) if c == True]
-        plots.plot_prob_states_aligned(normalize_to_equal_length(state_probs, GRID=50000), None, 200,
-                                       config=model_config, title=f'All Copulation ({prefix_data} data) (fwd)',
-                                       xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=fig_dir, display=display)
-        return
-
-    plot_func('train')
-    plot_func('test')
+    train_cop_state_probs = [model_ckp['train_data']['train_state_probs'][i] for i, c in enumerate(model_ckp['train_data']['train_copulation_bools']) if c == True]
+    test_cop_state_probs = [model_ckp['test_data']['test_state_probs'][i] for i, c in enumerate(model_ckp['test_data']['test_copulation_bools']) if c == True]
+    cop_state_probs = [*train_cop_state_probs, *test_cop_state_probs]
+    plots.plot_prob_states_aligned(normalize_to_equal_length(cop_state_probs, GRID=50000), None, 200,
+                                   config=model_config, title=f'All Copulation data',
+                                   xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=fig_dir, display=display)
     return
 
 
-def plot_xlims(model_dir, windows, batch, prefix_data, suffix='', savefig=True, display=False, gen_corr_video=False):
+def plot_xlims(model_dir, windows, batch, prefix, suffix='', savefig=True, display=False, gen_corr_video=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
@@ -471,9 +593,9 @@ def plot_xlims(model_dir, windows, batch, prefix_data, suffix='', savefig=True, 
     os.makedirs(trajs_dir, exist_ok=True)
     os.makedirs(probs_dir, exist_ok=True)
 
-    data_key = f'{prefix_data}_data'
-    sessions_key = f'{prefix_data}_session_keys'
-    dwnsmpl_key = f'{prefix_data}_downsampled_indices'
+    data_key = f'{prefix}_data'
+    sessions_key = f'{prefix}_session_keys'
+    dwnsmpl_key = f'{prefix}_downsampled_indices'
 
     effective_fps = data_config['effective_fps']
     key_b = model_ckp[data_key][sessions_key][batch]
@@ -482,13 +604,13 @@ def plot_xlims(model_dir, windows, batch, prefix_data, suffix='', savefig=True, 
         xlim = (int(xlim_[0]), int(xlim_[1]))
         len_traj = xlim[1] - xlim[0]
         xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
-        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix_data}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix_data}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
-        plots.plot_trajectories(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix_data=prefix_data, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix_data}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{fig_dir}/probs/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
+        plots.plot_trajectories(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{fig_dir}/trajs/{prefix}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
 
         if gen_corr_video:
-            clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")), xlim_orig, output_path=f'{fig_dir}/trajs/{prefix_data}{batch}_xlim_orig={xlim_orig}_xlim={xlim}{suffix}.mp4')
+            clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")), xlim_orig, output_path=f'{fig_dir}/trajs/{prefix}{batch}_xlim_orig={xlim_orig}_xlim={xlim}{suffix}.mp4')
     return
 
 
@@ -503,24 +625,24 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
     print(data_config['emission_labels_zscored'])
     effective_fps = data_config['effective_fps']
 
-    def f(prefix_data):
+    def f(prefix):
 
-        data_key = f'{prefix_data}_data'
-        n_sessions = len(model_ckp[data_key][f'{prefix_data}_session_keys'])
+        data_key = f'{prefix}_data'
+        n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
         for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
-            batch = 31 if prefix_data == 'train' else batch
-            batch = 10 if prefix_data == 'test' else batch
-            key_b = model_ckp[data_key][f'{prefix_data}_session_keys'][batch]
-            num_timestamps = model_ckp[data_key][f'{prefix_data}_stateseq'][batch].shape[0]
+            # batch = 31 if prefix_data == 'train' else batch
+            # batch = 10 if prefix_data == 'test' else batch
+            key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
+            num_timestamps = model_ckp[data_key][f'{prefix}_stateseq'][batch].shape[0]
             print("batch", batch, "key_b", key_b, "num_timestamps", num_timestamps)
             windows = get_windows_to_plot(effective_fps, num_timestamps)
             # print("windows", windows)
-            plot_xlims(model_dir, windows, batch, prefix_data, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, windows, batch, prefix, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             lastwindows = get_cop_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, lastwindows, batch, prefix_data, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, lastwindows, batch, prefix, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             fullwindows = get_full_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, fullwindows, batch, prefix_data, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, fullwindows, batch, prefix, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             break
     f('train')
     f('test')
