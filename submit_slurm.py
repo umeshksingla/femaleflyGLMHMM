@@ -34,16 +34,16 @@ if __name__ == '__main__':
     if src == 'wt':
         data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl'
     elif src == 'wt_fred':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl'
+        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=2_smoothed_stdset.pkl'
     else:
         raise Exception(f'Incorrect data source specified "{src}".')
 
     path = f'june24_{src}'
     model_configs = {
         'name': ['lrhmmci'],
-        'seed': [random.randint(1, 10000) for _ in range(3)],
+        'seed': [random.randint(1, 10000) for _ in range(5)],
         'num_states': [
-            2, 5,
+            2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30
         ],
         'transition_matrix_stickiness': [100],
         'data_path': [data_path],
