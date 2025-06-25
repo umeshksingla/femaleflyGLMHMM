@@ -66,17 +66,16 @@ class LRFemaleFly(BaseFemaleFly):
     def predict_v3(self, emissions, inputs):
         return self.predict(emissions, inputs)[:2]
 
-    def get_data_logprob(self, emissions, inputs):
+    def get_data_logprob_old(self, emissions, inputs):
         """
-        Linear regression P(Y|X, w), relative to chance.
+        OUTDATED: Linear regression P(Y|X, w), relative to chance.
         """
         def fit_normal_residuals(fit_y, true_y):
             residuals = fit_y - true_y
             sigma = jnp.cov(residuals.T)
             mu = jnp.zeros(residuals.shape[-1])
-            p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).prob(residuals)
-            p = jnp.maximum(p, 1e-15)
-            log_Y_given_wx = jnp.sum(jnp.log(p))
+            p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).log_prob(residuals)
+            log_Y_given_wx = jnp.sum(p)
             return log_Y_given_wx
 
         emissions_pred = self.predict(None, inputs)[0]
@@ -86,11 +85,44 @@ class LRFemaleFly(BaseFemaleFly):
         chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
         relative_lp = lp - chance_lp
         print("chance_lp", chance_lp)
+        print("relative_lp", relative_lp)
+        print("relative_lp", relative_lp*30/np.log(2))
         return relative_lp
 
-    def get_data_logprob_by_fly(self, emissions, inputs):
+    def get_data_logprob(self, emissions, inputs):
+        def calc(y_pred, y_true):
+            """
+            Compute frequentist log-likelihood of linear regression model.
+            Assumes: Gaussian noise, independent across output dimensions.
+            Parameters:
+                y_true: (N, D) observed
+                y_pred: (N, D) predicted
+            Returns:
+                log_likelihood: float (total over N and D)
+            """
+            residuals = y_true - y_pred
+            N = len(residuals)
+            var = np.var(residuals, axis=0, ddof=1)  # (D,) # Estimate variance per dimension (ddof=1 for unbiased)
+
+            # Avoid log(0). ideally the variance should be close to 1 as each session is zscored
+            # (separately, that's why var not 1 but close to 1)
+            var = np.maximum(var, 1e-15)
+            log_likelihood_c = -0.5 * np.sum(N * np.log(2 * np.pi * var) - np.sum((residuals ** 2) / var, axis=0))
+            return log_likelihood_c
+
+        emissions_pred = self.predict(None, inputs)[0]
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        lp = calc(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
+        print("lp", lp)
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        print("chance_lp", chance_lp)
+        relative_lp = lp - chance_lp
+        print("relative_lp", relative_lp)
+        return relative_lp
+
+    def get_data_logprob_by_fly_old(self, emissions, inputs):
         """
-        Linear regression P(Y|X, w), by fly
+        OUTDATED: Linear regression P(Y|X, w), by fly
         """
         def fit_normal_residuals(fit_y, true_y):
             residuals = fit_y - true_y
@@ -106,6 +138,29 @@ class LRFemaleFly(BaseFemaleFly):
         print("LR lps by fly", lps)
 
         chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions]) # chance model per fly. "How much better does my model predict behavior than a naive, non-informative model — for this specific session?"
+        print("chance_lps", chance_lps)
+        return lps - chance_lps
+
+    def get_data_logprob_by_fly(self, emissions, inputs):
+        """
+        Linear regression P(Y|X, w), by fly
+        """
+
+        def calc(y_pred, y_true):
+            residuals = y_true - y_pred
+            N = len(residuals)
+            var = np.var(residuals, axis=0, ddof=1)  # (D,)
+            var = np.maximum(var, 1e-15)
+            log_likelihood_c = -0.5 * np.sum(N * np.log(2 * np.pi * var) - np.sum((residuals ** 2) / var, axis=0))
+            return log_likelihood_c
+
+        emissions_pred = self.predict(None, inputs)[0]
+        lps = np.array([calc(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
+        print("LR lps by fly", lps)
+
+        # chance model per fly. "How much better does my model predict behavior
+        # than a naive, non-informative model — for this specific session?"
+        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
         print("chance_lps", chance_lps)
         return lps - chance_lps
 
