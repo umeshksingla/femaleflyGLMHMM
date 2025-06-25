@@ -61,9 +61,16 @@ def run(mc, enhance=False, genfig=False):
     print('Emissions:', data_config['emission_labels'])
 
     num_batches = data_config['num_sessions']
+    datasplit_seed = mc.get('datasplit_seed', 0)
     num_train_batches = int(num_batches * 0.8)
-    train_session_indices = np.arange(num_train_batches).astype(int)
-    test_session_indices = np.arange(num_train_batches, num_batches).astype(int)
+
+    # Set up reproducible RNG and shuffle indices
+    rng = np.random.default_rng(datasplit_seed)
+    all_indices = np.arange(num_batches)
+    rng.shuffle(all_indices)
+
+    train_session_indices = all_indices[:num_train_batches].astype(int)
+    test_session_indices = all_indices[num_train_batches:].astype(int)
 
     train_emissions = [emissions[e] for e in train_session_indices]
     train_inputs = [inputs[e] for e in train_session_indices]

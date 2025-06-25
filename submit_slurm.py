@@ -38,10 +38,11 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Incorrect data source specified "{src}".')
 
-    path = f'june24_{src}'
+    path = f'june25_kfoldcv_{src}'
     model_configs = {
         'name': ['lrhmmci'],
-        'seed': [random.randint(1, 10000) for _ in range(5)],
+        'seed': [40],
+        'datasplit_seed': [random.randint(1, 10000) for _ in range(5)],
         'num_states': [
             2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30
         ],

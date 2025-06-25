@@ -172,6 +172,7 @@ def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, filesuff
     test_jitter = np.random.uniform(-0.2, 0.2, size=len(lr_test_lps))
     # plt.plot(1+train_jitter, lr_train_lps*factor_bits_per_sec, 'ko', mfc='none', markersize=3, label='Train')
     plt.plot(1+test_jitter, lr_test_lps*factor_bits_per_sec, 'ko', markersize=3)
+    plt.errorbar(1 + 0.4, np.mean(lr_test_lps*factor_bits_per_sec), yerr=np.std(lr_test_lps*factor_bits_per_sec), color='k', fmt='o', capsize=0)
 
     # Plot for num_states > 1 now
     for i, s in enumerate(num_states_configs):
@@ -376,17 +377,17 @@ if __name__ == '__main__':
     CHANCE_MODEL_PATH = f'models/{path}/chance_1_cv/20250625_001932_chord'
 
     # path = 'june24_wt_fred'
-    # CHANCE_MODEL_PATH = 'models/{path}/chance_1_cv/20250625_012323_coil'
+    # CHANCE_MODEL_PATH = f'models/{path}/chance_1_cv/20250625_012323_coil'
 
     num_states_configs = [ 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20]
     plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, filesuffix='')
     plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='')
     plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, filesuffix='')
 
-    num_states_configs = [ 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30 ]
+    num_states_configs = num_states_configs + [ 25, 30 ]
     plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
     plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
     plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
 
-    # plotCV_same_model_Corr(path, 'lrhmmci', num_states_configs)
+    # plotCV_same_model_Corr(path, 'lrhmmci', num_states_configs)   # maybe plot other metrics too
     # plotCV_same_model_R2adj(path, 'lrhmmci', num_states_configs)
