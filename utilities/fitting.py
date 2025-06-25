@@ -28,7 +28,7 @@ def fitEMCustomInit(key, hmm, train_emissions, train_inputs,
     em_lps = -em_losses / train_emissions_size
     # print("em_lps:", em_lps)
     ll_diff = np.diff(em_lps)
-    print(ll_diff)
+    # print(ll_diff)
     converged = np.abs(ll_diff[-1]) < 1e-3
     if not converged:
         print("!!! !!! EM not converged !!! !!!")

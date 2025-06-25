@@ -81,12 +81,11 @@ class LRFemaleFly(BaseFemaleFly):
         emissions_pred = self.predict(None, inputs)[0]
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = fit_normal_residuals(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
-        print("LR lp calc tog", lp)
+        # print("LR lp calc tog", lp)
         chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
         relative_lp = lp - chance_lp
-        print("chance_lp", chance_lp)
-        print("relative_lp", relative_lp)
-        print("relative_lp", relative_lp*30/np.log(2))
+        # print("chance_lp", chance_lp)
+        # print("relative_lp", relative_lp)
         return relative_lp
 
     def get_data_logprob(self, emissions, inputs):
@@ -113,11 +112,11 @@ class LRFemaleFly(BaseFemaleFly):
         emissions_pred = self.predict(None, inputs)[0]
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = calc(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
-        print("lp", lp)
+        # print("lp", lp)
         chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
-        print("chance_lp", chance_lp)
+        # print("chance_lp", chance_lp)
         relative_lp = lp - chance_lp
-        print("relative_lp", relative_lp)
+        # print("relative_lp", relative_lp)
         return relative_lp
 
     def get_data_logprob_by_fly_old(self, emissions, inputs):
@@ -135,10 +134,10 @@ class LRFemaleFly(BaseFemaleFly):
 
         emissions_pred = self.predict(None, inputs)[0]
         lps = np.array([fit_normal_residuals(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
-        print("LR lps by fly", lps)
+        # print("LR lps by fly", lps)
 
         chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions]) # chance model per fly. "How much better does my model predict behavior than a naive, non-informative model — for this specific session?"
-        print("chance_lps", chance_lps)
+        # print("chance_lps", chance_lps)
         return lps - chance_lps
 
     def get_data_logprob_by_fly(self, emissions, inputs):
@@ -156,12 +155,12 @@ class LRFemaleFly(BaseFemaleFly):
 
         emissions_pred = self.predict(None, inputs)[0]
         lps = np.array([calc(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
-        print("LR lps by fly", lps)
+        # print("LR lps by fly", lps)
 
         # chance model per fly. "How much better does my model predict behavior
         # than a naive, non-informative model — for this specific session?"
         chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
-        print("chance_lps", chance_lps)
+        # print("chance_lps", chance_lps)
         return lps - chance_lps
 
     def get_state_probs(self, emissions, inputs=None):
