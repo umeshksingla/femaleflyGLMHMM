@@ -43,6 +43,8 @@ mpl.rcParams['xtick.major.width'] = 1
 mpl.rcParams['ytick.major.width'] = 1
 mpl.rcParams['xtick.major.size'] = 4
 mpl.rcParams['ytick.major.size'] = 4
+mpl.rcParams['xtick.direction'] = 'in'
+mpl.rcParams['ytick.direction'] = 'in'
 
 # -- Fonts --
 mpl.rcParams['font.size'] = 16  # Panel label
@@ -299,13 +301,12 @@ def plot_hmm_data_whole_session_with_aux_with_states(predicted_emissions, true_e
     return fig
 
 
-def plot_filters(weights, data_config, savefig=False, fig_dir=None, display=True):
+def plot_filters_statewise(weights, data_config, y_labels, prefix, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = weights.shape[0]
     emission_dim = weights.shape[1]
     filter_len = weights.shape[-1]
-    emission_labels = data_config['emission_labels']
     input_labels = data_config['input_labels']
     n_inputs = len(input_labels)
     basis = data_config['basis']
@@ -315,9 +316,71 @@ def plot_filters(weights, data_config, savefig=False, fig_dir=None, display=True
     weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
     weights = weights/np.linalg.norm(weights)
 
-    fig, axs = plt.subplots(emission_dim, n_inputs, figsize=(21, 2.75 * len(emission_labels)), sharey=True)
+    fig, axs = plt.subplots(emission_dim, num_states, figsize=(2.4 * num_states, 2.4 * len(y_labels)), sharey=True)
     d = 0
-    for _ in emission_labels:
+    for _ in y_labels:
+        w = weights[:, d]
+        for z in range(num_states):
+
+            if emission_dim > 1 and num_states > 1:
+                ax = axs[d, z]
+            elif emission_dim > 1 and num_states == 1:
+                ax = axs[d]
+            elif emission_dim == 1 and num_states > 1:
+                ax = axs[z]
+            else:
+                ax = axs
+
+            if ax.get_subplotspec().is_first_row():
+                ax.set_title(f'State {z + 1}', fontsize='large', color=COLORS[z])
+            if ax.get_subplotspec().is_first_col():
+                ax.set_ylabel(f'{y_labels[_]}\nfilter amplitude (a.u.)', fontsize='x-small')
+
+            stim = 0
+            for __ in input_labels:
+                if __ not in ['mFV', 'side', 'pfast_i', 'tap2']:
+                    stim += 1
+                    continue
+                ax.plot(np.arange(-w[z, stim].shape[-1], 0)/data_config['orig_fps'], w[z, stim], linewidth=3, label=input_labels[__])
+                ax.axhline(0, ls=':', c='k', lw=0.5)
+                ax.set_xticks([-w[0, stim].shape[-1]//data_config['orig_fps'], 0])
+                ax.margins(y=0.05)
+                if ax.get_subplotspec().is_last_row():
+                    ax.set_xlabel('Time (s)')
+                stim += 1
+
+        d += 1
+
+    if emission_dim > 1 and num_states > 1:
+        fig.align_ylabels(axs[:, 0])
+    elif emission_dim > 1 and num_states == 1:
+        fig.align_ylabels(axs[:])
+
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filters_statewise.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return fig
+
+
+def plot_filters(weights, data_config, y_labels, filesuffix, savefig=False, fig_dir=None, display=True):
+    # print(weights.shape)
+
+    num_states = weights.shape[0]
+    emission_dim = weights.shape[1]
+    filter_len = weights.shape[-1]
+    input_labels = data_config['input_labels']
+    n_inputs = len(input_labels)
+    basis = data_config['basis']
+
+    if basis is not None:
+        weights = BasisProjection(basis).inverse_transform(weights.reshape(-1, filter_len)).reshape(num_states, emission_dim, -1)
+    weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
+    weights = weights/np.linalg.norm(weights)
+
+    fig, axs = plt.subplots(emission_dim, n_inputs, figsize=(21, 2.25 * len(y_labels)), sharey=True)
+    d = 0
+    for _ in y_labels:
         w = weights[:, d]
         stim = 0
         for __ in input_labels:
@@ -329,36 +392,36 @@ def plot_filters(weights, data_config, savefig=False, fig_dir=None, display=True
             if d == 0:
                 ax.set_title(f'{input_labels[__]}', fontsize='large')
             if stim == 0:
-                # ax.set_ylabel(emission_labels[_], fontsize='large', color='magenta')
-                ax.set_ylabel(f'{emission_labels[_]}\nfilter amplitude (a.u.)', fontsize='medium')
+                ax.set_ylabel(f'{y_labels[_]}\nfilter amplitude (a.u.)', fontsize='x-small')
 
-            ax.axhline(0, ls=':', c='k')
-            ax.margins(0.05)
+            ax.axhline(0, ls=':', c='k', lw=0.5)
+            ax.set_xticks([-w[0, stim].shape[-1]//data_config['orig_fps'], 0])
+            ax.margins(y=0.05)
             # ax.set_ylim(-0.1, 0.1)
-            # ax.set_xlabel('Time (s)')
+            if ax.get_subplotspec().is_last_row():
+                ax.set_xlabel('Time (s)')
             stim += 1
 
         d += 1
 
     ax = axs[0, 0] if emission_dim > 1 else axs[0]
     ax.legend(loc='upper left')
-    fig.supxlabel("Time relative to prediction (s)")
+    # fig.supxlabel("Time relative to prediction (s)")
     if emission_dim > 1: fig.align_ylabels(axs[:, 0])
     plt.margins(0.02)
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, 'filters.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'filters_{filesuffix}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig
 
 
-def plot_filter_amplitudes(weights, data_config, savefig=False, fig_dir=None, display=True):
+def plot_filter_amplitudes(weights, data_config, y_labels, prefix, plot_top_k=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = weights.shape[0]
     emission_dim = weights.shape[1]
     filter_len = weights.shape[-1]
-    emission_labels = data_config['emission_labels']
     input_labels = data_config['input_labels']
     n_inputs = len(input_labels)
     basis = data_config['basis']
@@ -368,17 +431,23 @@ def plot_filter_amplitudes(weights, data_config, savefig=False, fig_dir=None, di
     weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
     weights = weights/np.linalg.norm(weights)
 
-    fig, axs = plt.subplots(num_states, emission_dim, figsize=(15, 10), sharey=True)
+    if plot_top_k:
+        fig_width = 10
+    else:
+        fig_width = 15
+    fig, axs = plt.subplots(num_states, emission_dim, figsize=(fig_width, 10), sharey=True)
     xticklabels = np.array([_ for _ in list(input_labels.values())])
     # print("weights.shape", weights.shape)
 
     d = 0
-    for _ in emission_labels:
+    for _ in y_labels:
         for z in range(num_states):
             w_l2 = np.linalg.norm(weights[z][d], axis=-1)
             w_l2_scaled = (w_l2 - np.min(w_l2))/(np.max(w_l2) - np.min(w_l2) + 1e-5)
             # print(w_l2_scaled, w_l2.shape, w_l2_scaled.shape)
             sorted_idxs = np.argsort(w_l2_scaled)
+            if plot_top_k:
+                sorted_idxs = sorted_idxs[np.r_[-5:0]]  # highest weighted inputs only
             if (num_states > 1) and (emission_dim > 1):
                 ax = axs[z, d]
             elif (num_states == 1) and (emission_dim > 1):
@@ -388,20 +457,20 @@ def plot_filter_amplitudes(weights, data_config, savefig=False, fig_dir=None, di
             elif (num_states == 1) and (emission_dim == 1):
                 ax = axs
             ax.plot(w_l2_scaled[sorted_idxs], 'k.', markersize=12)
-            ax.set_xticks(range(len(input_labels)), xticklabels[sorted_idxs], rotation=90, fontsize='small')
-            ax.set_yticks([0, 0.5, 1])
-            ax.margins(0.1)
+            ax.set_xticks(range(len(sorted_idxs)), xticklabels[sorted_idxs], rotation=90, fontsize='small')
+            ax.set_yticks([0, 0.5, 1], [0, '', 1])
+            ax.set_ylim([-0.1, 1.1])
+            ax.margins(x=0.1)
             ax.spines['top'].set_visible(True)
             ax.spines['right'].set_visible(True)
+            ax.tick_params(axis='both', direction='in', top=True, right=True)
             if d == 0: ax.set_ylabel(f'State {z + 1}', color=COLORS[z], fontsize='x-large')
-            if z == 0: ax.set_title(emission_labels[_], fontsize='large', color='magenta')
+            if z == 0: ax.set_title(y_labels[_], fontsize='large', color='magenta')
         d += 1
-
-    # axs[0].set_title('forward velocity (fFV)', fontsize='large', color='magenta')
 
     fig.suptitle('Amplitude of filters')
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, 'filter_amplitudes.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filter_amplitudes_plot_top_k={plot_top_k}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
@@ -487,7 +556,7 @@ def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefi
         # ax.set_xscale('symlog')  # symmetric log, can handle negative emission values with log_scale in sns.histplot can't.
         # ax.set_yscale('log')
         ax.set_xlabel(o_labels[ol], color='magenta')
-        ax.margins(y=0.1)
+        # ax.margins(y=0.1)
         ax.set_xlim([x0, x99])
         # ax.axhline(0, ls=":", lw=2, c='k')
 
@@ -511,7 +580,7 @@ def plot_state_mean_aux_dists(aux_z, a_labels, title=None, savefig=False, fig_di
             data = np.random.choice(np.round(aux_z[z][:, a], decimals=3), min(10000, len(aux_z[z])), replace=False)
             x0 = min(x0, 2*np.percentile(data, 0.1))
             x99 = max(x99, np.percentile(data, 99.5))
-            print(al, x0, x99)
+            # print(al, x0, x99)
             sns.kdeplot(data, color=COLORS[z], ax=ax[a],
                         # common_norm=True,
                         label=f'State {z+1}',
@@ -569,7 +638,7 @@ def plot_state_mean_aux_dists_hist(aux_z, a_labels, title=None, savefig=False, f
                         )
         ax[a].set_xlabel(a_labels[al])
         # ax[a].set_yscale('log')
-        ax[a].margins(y=0.1)
+        # ax[a].margins(y=0.1)
         ax[a].set_xlim([x0-0.1, x99+0.1])
         # ax[a].axhline(0, ls=":", lw=2, c='k')
     ax[-1].legend(loc='upper right')
@@ -1065,7 +1134,7 @@ def plot_correlation_by_o(corr_z, o_labels, title=None, savefig=False, fig_dir=N
     for o in corr_z:
         plt.bar(o, corr_z[o], color='magenta', width=0.6)
     plt.xticks(list(corr_z.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Correlation (lag=0)')
+    plt.ylabel('Correlation values')
     plt.margins(0.1)
     plt.xticks(list(corr_z.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1093,7 +1162,7 @@ def plot_correlation_by_o_by_fly(corr_o, o_labels, title=None, savefig=False, fi
         plt.errorbar(o + 0.2, np.mean(coors), yerr=np.std(coors), color='k', alpha=0.5, fmt='o', capsize=0)
 
     plt.xticks(list(corr_o.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Correlation (lag=0)')
+    plt.ylabel('Correlation values')
     plt.margins(0.1)
     plt.xticks(list(corr_o.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1101,6 +1170,56 @@ def plot_correlation_by_o_by_fly(corr_o, o_labels, title=None, savefig=False, fi
     plt.tight_layout()
     if savefig:
         fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_correlation_by_o_by_fly.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return fig
+
+
+def plot_correlation_lags_by_o(lags_o, o_labels, effective_fps, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot correlation max lags for each emission timeseries.
+    :return:
+    """
+    fig = plt.figure()
+    for o in lags_o:
+        plt.bar(o, (lags_o[o] * 1000) / effective_fps, color='magenta', width=0.3)
+    plt.xticks(list(lags_o.keys()), list(o_labels.values()), rotation=0)
+    plt.ylabel('Lag for max correlation value (ms)')
+    plt.margins(0.1)
+    plt.xticks(list(lags_o.keys()))
+    plt.axhline(0, c='k', ls=':', lw=2)
+    plt.title(title)
+    plt.tight_layout()
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_correlation_max_lags_by_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return fig
+
+
+def plot_correlation_lags_by_o_by_fly(lags_o, o_labels, effective_fps, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot correlation max lags for each emission timeseries., by fly.
+    :return:
+    """
+    fig = plt.figure()
+    sort_by = np.argsort(lags_o[0])[::-1]
+    colors = np.linspace(0, 1, len(lags_o[0]))  # so colors are now in order of decreasing lags for emission0
+    for o in lags_o:
+        lags = (lags_o[o] * 1000) / effective_fps
+        jitter = np.random.uniform(-0.1, 0.1, len(lags))
+        plt.scatter(o + jitter, lags[sort_by], c=colors, cmap='BrBG', s=20)
+        plt.errorbar(o + 0.2, np.mean(lags), yerr=np.std(lags), color='k', alpha=0.5, fmt='o', capsize=0)
+
+    plt.xticks(list(lags_o.keys()), list(o_labels.values()), rotation=0)
+    plt.ylabel('Lag for max correlation values (ms)')
+    plt.margins(0.1)
+    plt.xticks(list(lags_o.keys()))
+    plt.axhline(0, c='k', ls=':', lw=2)
+    plt.title(title)
+    plt.tight_layout()
+    if savefig:
+        fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_correlation_max_lags_by_o_by_fly.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display:
         plt.show()
     return fig
@@ -1126,6 +1245,54 @@ def plot_var_explained_by_z_o(r2_z_o, o_labels, title=None, savefig=False, fig_d
     # plt.ylim(-10, 20)
     # plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_score_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    return fig
+
+
+def plot_auxem_acc_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot accuracy scores in each state for each auxiliary emission dimension separately
+    """
+    fig, ax = plt.subplots(1, len(acc_z_o), figsize=(10, 10), sharey=True, layout='constrained')
+    for z in acc_z_o:
+        axes = ax[z] if len(acc_z_o) > 1 else ax
+        for o in acc_z_o[z]:
+            axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
+        axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
+        axes.set_title(f'State {z+1}', color=COLORS[z])
+        axes.axhline(0, c='k', ls=':', lw=2)
+        axes.margins(0.1)
+
+    axes = ax[0] if len(acc_z_o) > 1 else ax
+    axes.set_ylabel('Accuracy (%)')
+    plt.suptitle(title)
+    plt.ylim(0, 100)
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_acc_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    return fig
+
+
+def plot_auxem_fraction_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
+    """
+    Plot aux em event fractions in each state for each auxiliary emission dimension separately
+    """
+    fig, ax = plt.subplots(1, len(acc_z_o), figsize=(10, 10), sharey=True, layout='constrained')
+    for z in acc_z_o:
+        axes = ax[z] if len(acc_z_o) > 1 else ax
+        for o in acc_z_o[z]:
+            axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
+        axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
+        axes.set_title(f'State {z+1}', color=COLORS[z])
+        axes.axhline(0, c='k', ls=':', lw=2)
+        axes.margins(0.1)
+
+    axes = ax[0] if len(acc_z_o) > 1 else ax
+    axes.set_ylabel('Fraction of events (%)')
+    plt.suptitle(title)
+    plt.ylim(0, 100)
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     return fig
 
@@ -1169,6 +1336,7 @@ def plot_var_explained_by_z_o_by_fly(r2_z_o, o_labels, title=None, savefig=False
     if display: plt.show()
     return fig
 
+
 def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     fig = plt.figure(figsize=(10, 10), constrained_layout=True)
     plt.plot(em_losses, '.-')
@@ -1182,7 +1350,7 @@ def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     return fig
 
 
-def plot_smoothed_probs(state_probs, model_config, data_config, batch, effective_fps, xlim=None, xlim_orig=None, prefix_data='', suffix='', savefig=False, fig_path=None, display=True):
+def plot_smoothed_probs(state_probs, model_config, data_config, batch, effective_fps, xlim=None, xlim_orig=None, prefix='', suffix='', savefig=False, fig_path=None, display=True):
     xlim_ = np.r_[xlim[0]:xlim[1]+1]
 
     fig = plt.figure(figsize=(10, 4))
@@ -1202,7 +1370,7 @@ def plot_smoothed_probs(state_probs, model_config, data_config, batch, effective
     ax.set_xticklabels([f"{round((pws * x + init_period) / orig_fps, 1)}" for x in xt])
 
     plt.ylabel('P(state | data)')
-    plt.title(f'{prefix_data.title()}:{batch} {suffix}')
+    plt.title(f'{prefix.title()}:{batch} {suffix}')
     plt.xlabel('Time (s)')
     plt.legend(loc='upper right')
 
@@ -1240,39 +1408,39 @@ def plot_comparison_probs(state_probs1, state_probs2, config, batch, effective_f
     return
 
 
-def plot_trajectories(model_ckp, model_config, data_config, batch, prefix_data='', suffix='', xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
+def plot_trajectories(model_ckp, model_config, data_config, batch, prefix='', suffix='', xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
 
     # num_states = model_config['num_states']
     model_label = model_ckp['prefix'].upper() #+ '_' + str(num_states)
     emission_labels = data_config['emission_labels']
     emission_labels_zscored = data_config['emission_labels_zscored']
 
-    emissions = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_soft_predictions'][batch]
-    true_emissions = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_emissions'][batch]
-    stateseq = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_stateseq'][batch]
+    emissions = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'][batch]
+    true_emissions = model_ckp[f'{prefix}_data'][f'{prefix}_emissions'][batch]
+    stateseq = model_ckp[f'{prefix}_data'][f'{prefix}_stateseq'][batch]
 
     plot_hmm_data_whole_session_with_states(
         emissions, true_emissions, stateseq, data_config, model_label=model_label, y_labels=emission_labels_zscored, xlim=xlim, xlim_orig=xlim_orig,
-        title=f'Predicted female trajectory ({prefix_data.capitalize()}:{batch}) {suffix}',
+        title=f'Predicted female trajectory ({prefix.capitalize()}:{batch}) {suffix}',
         savefig=savefig, fig_path=fig_path, display=display)
     return
 
 
-def plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix_data='', suffix='', xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
+def plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix='', suffix='', xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
 
     model_label = model_ckp['prefix'].upper()
     emission_labels = data_config['emission_labels']
     emission_labels_zscored = data_config['emission_labels_zscored']
     auxiliary_labels = data_config['auxiliary_labels']
 
-    emissions = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_soft_predictions'][batch]
-    true_emissions = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_emissions'][batch]
-    stateseq = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_stateseq'][batch]
-    aux_data = model_ckp[f'{prefix_data}_data'][f'{prefix_data}_aux_data'][batch]
+    emissions = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'][batch]
+    true_emissions = model_ckp[f'{prefix}_data'][f'{prefix}_emissions'][batch]
+    stateseq = model_ckp[f'{prefix}_data'][f'{prefix}_stateseq'][batch]
+    aux_data = model_ckp[f'{prefix}_data'][f'{prefix}_aux_data'][batch]
 
     plot_hmm_data_whole_session_with_aux_with_states(
         emissions, true_emissions, aux_data, stateseq, data_config, model_label=model_label, y_labels=emission_labels_zscored, aux_labels=auxiliary_labels, xlim=xlim, xlim_orig=xlim_orig,
-        title=f'Sensory inputs and predicted female trajectory ({prefix_data.capitalize()}:{batch}) {suffix}')
+        title=f'Sensory inputs and predicted female trajectory ({prefix.capitalize()}:{batch}) {suffix}')
 
     if savefig: plt.savefig(fig_path, dpi=300, bbox_inches='tight', transparent=True)
     if display: plt.show()
