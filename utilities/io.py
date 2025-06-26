@@ -11,6 +11,7 @@ import numpy as np
 from wonderwords import RandomWord
 from datetime import datetime
 from collections import defaultdict
+from itertools import groupby
 
 import tensorflow_probability.substrates.jax.distributions as tfd
 import jax.numpy as jnp
@@ -100,15 +101,15 @@ def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, 
     return emissions_z
 
 
-def get_stateseq_indices(indices_seq, state_seq, min_length=10):
-    intervals = defaultdict(list)
-    transitions_at = np.where(np.diff(state_seq) != 0)[0]+1
-    transitions_at = np.insert(transitions_at, 0, 0)
-    transitions_at = np.append(transitions_at, len(indices_seq)-1)
-    for s, e in zip(transitions_at, transitions_at[1:]):
-        if (e-s) >= min_length:
-            intervals[state_seq[s]].append((indices_seq[s], indices_seq[e]-1))  # state doesn't end at e-1 frame but original_indexing-1
-    return intervals
+# def get_stateseq_indices(indices_seq, state_seq, min_length=10):
+#     intervals = defaultdict(list)
+#     transitions_at = np.where(np.diff(state_seq) != 0)[0]+1
+#     transitions_at = np.insert(transitions_at, 0, 0)
+#     transitions_at = np.append(transitions_at, len(indices_seq)-1)
+#     for s, e in zip(transitions_at, transitions_at[1:]):
+#         if (e-s) >= min_length:
+#             intervals[state_seq[s]].append((indices_seq[s], indices_seq[e]-1))  # state doesn't end at e-1 frame but original_indexing-1
+#     return intervals
 
 
 def normalize_to_equal_length(arr_list, GRID=101):
@@ -189,3 +190,36 @@ def get_chance_logprob(y):
     log_Y_given_mvn = jnp.sum(jnp.log(p))
     lp = log_Y_given_mvn.sum()
     return lp
+
+
+def calc_dwell_times_by_z(z_seqs, num_states):
+    print("z_seqs", len(z_seqs))
+    dwell_times_z = {z: [] for z in range(num_states)}
+    for z_seq in z_seqs:
+        for z, group in groupby(np.array(z_seq)):
+            dwell_times_z[z].append(len(list(group)))
+
+    for z in dwell_times_z:
+        dwell_times_z[z] = np.array(dwell_times_z[z])
+    for z, durations in dwell_times_z.items():
+        print(f"State {z+1}: Mean dwell time = {np.mean(durations):.2f}, n = {len(durations)}")
+    return dwell_times_z
+
+
+def get_state_indices(z_seq, z, min_length=5, max_clips=5):
+    state_sequence = np.array(z_seq)
+    is_target = (state_sequence == z).astype(int)
+    diff = np.diff(is_target, prepend=0, append=0)
+
+    starts = np.where(diff == 1)[0]
+    ends = np.where(diff == -1)[0] - 1
+    lengths = ends - starts + 1
+    keep = (lengths >= min_length)
+    clips = np.stack([starts[keep], ends[keep]], axis=1)
+
+    if len(clips) > max_clips:
+        rng = np.random.default_rng(0)
+        indices = rng.choice(len(clips), size=max_clips, replace=False)
+        clips = clips[indices]
+
+    return clips

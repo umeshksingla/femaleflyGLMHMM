@@ -56,6 +56,7 @@ mpl.rcParams['axes.labelcolor'] = 'black'
 # -- Figure size --
 # plt.rcParams['figure.figsize'] = (6, 4)
 # plt.rcParams['figure.dpi'] = 300
+mpl.rcParams['legend.frameon'] = False
 
 # -- Saving Options --
 # plt.rcParams['savefig.bbox'] = 'tight'
@@ -651,6 +652,80 @@ def plot_state_mean_aux_dists_hist(aux_z, a_labels, title=None, savefig=False, f
     return
 
 
+def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', savefig=False, fig_dir=None, display=True):
+    fig = plt.figure(figsize=(6, 4))
+    ax = plt.gca()
+    durations = []
+    for z in range(num_states):
+        d = dwell_times_z[z] / effective_fps    # in seconds
+        durations.append(d.tolist())
+
+    import pandas as pd
+    df = pd.DataFrame({
+        "dwell_time": sum(durations, []),
+        "state": sum([[z] * len(v) for z, v in enumerate(durations)], [])
+    })
+    state_labels = dict([(z, f'State {z+1}') for z in np.arange(num_states)])
+    palette = dict([(f'State {z+1}', COLORS[z]) for z in np.arange(num_states)])
+    df["state_label"] = df["state"].map(state_labels)
+
+    sns.kdeplot(
+        ax=ax,
+        data=df,
+        x="dwell_time",
+        hue="state_label",
+        palette=palette,
+        # bw_adjust=0.5,
+        # cut=0,
+        clip=(0, None),
+        # common_norm=True,
+        linewidth=3,
+    )
+    x = list(range(0, 4))
+    plt.xlim([x[0], x[-1]])
+    plt.xticks(x)
+    plt.xlabel("Time (s)")
+    plt.title("State residency")
+
+    legend = ax.get_legend()
+    legend.set_title(None)
+    legend.set_loc('upper right')
+
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'state_dwell_times.pdf'),
+                            bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_state_dwell_times_gkde(dwell_times_z, num_states, effective_fps, title='', savefig=False, fig_dir=None, display=True):
+    fig = plt.figure(figsize=(6, 4))
+
+    from scipy.stats import gaussian_kde
+    for z, durations in dwell_times_z.items():
+        durations = durations / effective_fps
+        if len(durations) > 1:  # KDE needs >1 data point
+            kde = gaussian_kde(durations)
+            x = np.arange(-2, max(durations) + 1)
+            pdf_vals = kde(x)
+            pdf_vals /= pdf_vals.sum()  # normalize to make it sum to 1
+            plt.plot(x, pdf_vals, label=f"State {z+1}", c=COLORS[z], linewidth=2)
+    x = list(range(0, 4))
+    plt.xlim([x[0], x[-1]])
+    plt.xticks(x)
+    plt.ylabel("p(state)")
+    plt.xlabel("Time (s)")
+    plt.title("State residency")
+    plt.legend(loc='upper right')
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'state_dwell_times_gkde.pdf'),
+                            bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
 def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None, display=True):
     # print("state_seqs", state_seqs.shape)
 
@@ -1134,7 +1209,7 @@ def plot_correlation_by_o(corr_z, o_labels, title=None, savefig=False, fig_dir=N
     for o in corr_z:
         plt.bar(o, corr_z[o], color='magenta', width=0.6)
     plt.xticks(list(corr_z.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Correlation values')
+    plt.ylabel('Correlation coefficient')
     plt.margins(0.1)
     plt.xticks(list(corr_z.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1162,7 +1237,7 @@ def plot_correlation_by_o_by_fly(corr_o, o_labels, title=None, savefig=False, fi
         plt.errorbar(o + 0.2, np.mean(coors), yerr=np.std(coors), color='k', alpha=0.5, fmt='o', capsize=0)
 
     plt.xticks(list(corr_o.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Correlation values')
+    plt.ylabel('Correlation coefficient')
     plt.margins(0.1)
     plt.xticks(list(corr_o.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1184,7 +1259,7 @@ def plot_correlation_lags_by_o(lags_o, o_labels, effective_fps, title=None, save
     for o in lags_o:
         plt.bar(o, (lags_o[o] * 1000) / effective_fps, color='magenta', width=0.3)
     plt.xticks(list(lags_o.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Lag for max correlation value (ms)')
+    plt.ylabel('Lag for max correlation coefficient (ms)')
     plt.margins(0.1)
     plt.xticks(list(lags_o.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1212,7 +1287,7 @@ def plot_correlation_lags_by_o_by_fly(lags_o, o_labels, effective_fps, title=Non
         plt.errorbar(o + 0.2, np.mean(lags), yerr=np.std(lags), color='k', alpha=0.5, fmt='o', capsize=0)
 
     plt.xticks(list(lags_o.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Lag for max correlation values (ms)')
+    plt.ylabel('Lag for max correlation coefficient (ms)')
     plt.margins(0.1)
     plt.xticks(list(lags_o.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1347,6 +1422,7 @@ def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     plt.margins(0.2)
     if savefig: fig.savefig(os.path.join(fig_dir, 'loss.pdf'), bbox_inches='tight', dpi=300)
     if display: plt.show()
+    plt.close()
     return fig
 
 

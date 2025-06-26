@@ -125,9 +125,9 @@ def run(mc, enhance=False, genfig=False):
             utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
             print(">> Done with trajectories.\n")
 
-            # print(">> Generating videos:")
-            # utils.generate_videos(dump_filepath)
-            # print(">> Done with videos.\n")
+            print(">> Generating videos:")
+            utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
+            print(">> Done with videos.\n")
 
     print("Finished.\n")
     return dump_filepath

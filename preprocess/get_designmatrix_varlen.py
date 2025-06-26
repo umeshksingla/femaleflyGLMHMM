@@ -435,14 +435,14 @@ def extract(source):
 
         'fmAng_sin': 'maleLR',
         'fmAng_cos': 'front_back',
-        'wingAlign': 'z-wingAlign',
 
+        'wingAlign': 'z-wingAlign',
         'pfast_i': 'pulse',
         'sine_i': 'sine',
-        'tap2': 'tap2',
-
         'pfast_i_directed': 'pulseLR',
         'sine_i_directed': 'sineLR',
+
+        'tap2': 'tap2',
         'tap2_directed': 'tap2LR',
 
         # 'fDistWall': 'distWall',
