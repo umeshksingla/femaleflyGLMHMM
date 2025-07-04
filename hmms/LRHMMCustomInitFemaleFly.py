@@ -27,7 +27,7 @@ class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
         em_params, em_lps = fitting.fitEMCustomInit(key, self.model, emissions, train_inputs=inputs,
                                                     emission_weights=W, emission_biases=b)
         self.learned_params = em_params
-        # self.learned_params = self.reindex_params(em_params, emissions, inputs, output_mn_std)
+        self.learned_params = self.reindex_params(em_params, emissions, inputs, output_mn_std)
         self.learned_lps = em_lps
         self.update_status()
         print(f'End fitting {self.__class__.__name__}...')

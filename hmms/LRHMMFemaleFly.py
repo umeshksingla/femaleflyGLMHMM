@@ -52,7 +52,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
         # print("new ordering:", new_index)
 
         # OR Reindex by the activity index
-        _, zseq = self.predict(emissions, inputs)
+        _, zseq, _ = self.predict(emissions, inputs)
         emissions_z = utils.get_emissions_by_state(emissions, zseq, self.num_states, output_mn_std)
         state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
         new_index = np.argsort(state_activity_index)[::-1]
