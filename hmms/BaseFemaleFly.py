@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import scipy
 import numpy as np
 from sklearn.metrics import r2_score
+from scipy.stats import pearsonr
 from scipy.ndimage import gaussian_filter1d
 
 
@@ -39,6 +40,46 @@ def r2_score_custom(y_true, preds_per_state, gamma):
     r2 = 1.0 - num / den    # if both are non-zero, then regular r2
     r2[(den == 0) & (num == 0)] = 0.0  # if both are zero, then 0.0
     return r2
+
+
+def pearsonr_custom(y_true, preds_per_state, gamma):
+    """
+    Compute pearsonr per state, works for **ONLY** scalar (1D) outputs. Does not handle multi-dimensional outputs.
+
+    Parameters:
+    - y_true: (T,)
+    - preds_per_state: (T, K)
+    - gamma: (T, K)
+
+    Returns:
+    - pearsonr: (K,) array of pearsonr values per state
+    """
+
+    y_true = y_true.squeeze()  # (T,)
+    T, K = gamma.shape
+
+    pr = np.zeros(K)
+
+    for k in range(K):
+        w = gamma[:, k]
+        y_k = y_true
+        yhat_k = preds_per_state[:, k]
+
+        # Weighted means
+        w_sum = np.sum(w)
+        mu_y = np.sum(w * y_k) / w_sum
+        mu_yhat = np.sum(w * yhat_k) / w_sum
+
+        # Weighted covariance
+        cov = np.sum(w * (y_k - mu_y) * (yhat_k - mu_yhat)) / w_sum
+
+        # Weighted variances
+        var_y = np.sum(w * (y_k - mu_y) ** 2) / w_sum
+        var_yhat = np.sum(w * (yhat_k - mu_yhat) ** 2) / w_sum
+
+        pr[k] = cov / (np.sqrt(var_y * var_yhat) + 1e-8)  # epsilon for stability
+
+    return pr
 
 
 class BaseFemaleFly:
@@ -93,6 +134,7 @@ class BaseFemaleFly:
         return r2_by_o
 
     def score_by_z(self, emissions, y_preds, z_seqs):
+        raise NotImplementedError
         y_preds = np.concatenate(y_preds, axis=0)
         emissions = np.concatenate(emissions, axis=0)
         z_seqs = np.concatenate(z_seqs, axis=0)
@@ -114,6 +156,7 @@ class BaseFemaleFly:
         return r2_z
 
     def score_by_z_by_fly(self, emissions, y_preds, z_seqs):
+        raise NotImplementedError
         r2_z_by_fly = {}
         for z in range(self.num_states):
             r2_z_by_fly[z] = []
@@ -146,6 +189,7 @@ class BaseFemaleFly:
         return r2_z_by_fly
 
     def score_by_z_and_o(self, emissions, y_preds, z_seqs):
+        raise NotImplementedError
         y_preds = np.concatenate(y_preds, axis=0)
         emissions = np.concatenate(emissions, axis=0)
         z_seqs = np.concatenate(z_seqs, axis=0)
@@ -179,6 +223,7 @@ class BaseFemaleFly:
         return r2_z_o
 
     def score_by_z_and_o_by_fly(self, emissions, y_preds, z_seqs):
+        raise NotImplementedError
         r2_z_o = {}
         for z in range(self.num_states):
             emissions_z = [emissions[i][z_seqs[i] == z] for i in range(len(emissions))]
@@ -208,28 +253,66 @@ class BaseFemaleFly:
         # print("r2_z_o_by_fly soft", r2_z_o_by_fly)
         return r2_z_o_by_fly
 
-    def correlation_by_o(self, emissions, y_preds):
+    def pearson_by_o(self, emissions, y_preds):
         y_preds = np.concatenate(y_preds, axis=0)
         emissions = np.concatenate(emissions, axis=0)
-        corrs_dict = {}
+        pearson_o = {}
+
         for o in range(self.data_config["emission_dim"]):
             a = y_preds[:, o]
             b = emissions[:, o]
-            c = scipy.signal.correlate(a, b, mode='valid') / (np.linalg.norm(a) * np.linalg.norm(b))
-            corrs_dict[o] = c[0]     # zero lag correlation only at the moment
-        return corrs_dict
+            pearson_o[o] = pearsonr(a, b)     # basically, zero lag correlation, ensures mean-centered and normalized
+        return pearson_o
 
-    def correlation_by_o_by_fly(self, emissions, y_preds):
-        corrs_dict = {}
+    def pearson_by_o_by_fly(self, emissions, y_preds):
+        pearson_o = {}
         for o in range(self.data_config["emission_dim"]):
-            corrs_dict[o] = []
+            pearson_o[o] = []
             for i in range(len(emissions)):
                 a = y_preds[i][:, o]
                 b = emissions[i][:, o]
-                c = scipy.signal.correlate(a, b, mode='valid') / (np.linalg.norm(a) * np.linalg.norm(b))
-                corrs_dict[o].append(c[0])     # zero lag correlation only at the moment
-            corrs_dict[o] = np.array(corrs_dict[o])
-        return corrs_dict
+                c = pearsonr(a, b)
+                pearson_o[o].append(c[0])     # basically, zero lag correlation
+            pearson_o[o] = np.array(pearson_o[o])
+        return pearson_o
+
+    def pearson_by_z_by_o(self, emissions, y_preds_per_state, z_probs):
+
+        y_preds_per_state = np.concatenate(y_preds_per_state, axis=0)
+        emissions = np.concatenate(emissions, axis=0)
+        z_probs = np.concatenate(z_probs, axis=0)
+
+        pearson_z_o = {}
+        for z in range(self.num_states):
+            pearson_z_o[z] = {}
+
+        for o in range(self.data_config["emission_dim"]):
+            pro = pearsonr_custom(emissions[:, o], y_preds_per_state[..., o], z_probs)  # pearson for emission o in each state
+            for z in range(self.num_states):
+                pearson_z_o[z][o] = pro[z]
+        print(pearson_z_o)
+        return pearson_z_o
+
+    def pearson_by_z_and_o_by_fly(self, emissions, y_preds_per_state, z_probs):
+
+        pearson_z_o_by_fly = {}
+
+        for z in range(self.num_states):
+            pearson_z_o_by_fly[z] = {}
+            for o in range(self.data_config["emission_dim"]):
+                pearson_z_o_by_fly[z][o] = []
+
+        for i in range(len(emissions)):
+            for o in range(self.data_config["emission_dim"]):
+                pro = pearsonr_custom(emissions[i][:, o], y_preds_per_state[i][..., o], z_probs[i])  # pearson for emission o in each state
+                print("flyi", i, "o", o, pro)
+                for z in range(self.num_states):
+                    pearson_z_o_by_fly[z][o].append(pro[z])
+
+        for z in range(self.num_states):
+            for o in range(self.data_config["emission_dim"]):
+                pearson_z_o_by_fly[z][o] = np.array(pearson_z_o_by_fly[z][o])
+        return pearson_z_o_by_fly
 
     def correlation_max_by_o(self, emissions, y_preds):
         """To summarize: with the calculation done as above, a positive lag means the first series lags the second,
@@ -237,7 +320,7 @@ class BaseFemaleFly:
         Source: https://currents.soest.hawaii.edu/ocn_data_analysis/_static/SEM_EDOF.html
 
         +ve lags at the peak will mean "a" lags "b", or "b" leads "a". So, a=model lags b=truth, i.e. model prediction
-        is delayed — it aligns best with future ground truth, meaning it's lagging behind the behavior.
+        is delayed — it's lagging behind the behavior.
         """
         y_preds = np.concatenate(y_preds, axis=0)
         emissions = np.concatenate(emissions, axis=0)
@@ -266,7 +349,7 @@ class BaseFemaleFly:
                 b = emissions[i][:, o]
                 a = a - np.mean(a)  # ensure both are mean-centered
                 b = b - np.mean(b)
-                print(i, np.mean(a), np.mean(b))
+                # print(i, np.mean(a), np.mean(b))
                 c = scipy.signal.correlate(a, b, mode='full') / (np.linalg.norm(a) * np.linalg.norm(b))
                 lags = np.arange(-len(a) + 1, len(a))
                 corrs_dict[o].append(np.max(c))
