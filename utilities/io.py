@@ -84,7 +84,7 @@ def calculate_steady_state_p(P):
     return steady_state_vector
 
 
-def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=True, effective_fps=None):
+def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None):
     emissions_z = {}
     for btch in range(len(stateseq)):
         for z in range(num_states):

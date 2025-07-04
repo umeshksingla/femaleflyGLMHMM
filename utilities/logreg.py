@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import log_loss, accuracy_score
+from sklearn.metrics import log_loss, balanced_accuracy_score
 
 
 def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
@@ -13,13 +13,13 @@ def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
         probs = model.predict_proba(x)[:, 1]  # probability of class 1
         preds = (probs >= 0.5).astype(int)
         loss = log_loss(y, probs)
-        acc = accuracy_score(y, preds)
+        acc = balanced_accuracy_score(y, preds)
         weights = model.coef_[0]  # shape: (D,)
         bias = model.intercept_[0]
         return loss, probs, acc, weights, bias
 
     inputs_ = np.concatenate(inputs, axis=0)
-    aux_emissions_ = np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
+    aux_emissions_ = np.concatenate(aux_emissions, axis=0) # np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
     z_seq_ = np.concatenate(z_seqs, axis=0)
 
     aux_emission_dim = aux_emissions_.shape[-1]
@@ -48,7 +48,7 @@ def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
 def predict_aux_emissions(weights, inputs, aux_emissions, z_seqs, num_z):
 
     inputs_ = np.concatenate(inputs, axis=0)
-    aux_emissions_ = np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
+    aux_emissions_ = np.concatenate(aux_emissions, axis=0)
     z_seq_ = np.concatenate(z_seqs, axis=0)
     aux_emission_dim = aux_emissions_.shape[-1]
     W, B = weights['w'], weights['b']
@@ -61,7 +61,7 @@ def predict_aux_emissions(weights, inputs, aux_emissions, z_seqs, num_z):
         # print(probs, probs.shape)
         preds = (probs >= 0.5).astype(int)  # threshold at 0.5
         # print(preds, preds.shape)
-        acc = np.mean(preds == y_true)  # compute accuracy
+        acc = balanced_accuracy_score(y_true, preds)  # compute accuracy
         return acc
 
     accuracy = {}
