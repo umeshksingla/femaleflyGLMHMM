@@ -17,6 +17,14 @@ class FREDCLEANED_DATA:
     RADIUS = 21
     dataset = 'wt_fredcleaned'
 
+    copulation_frame_idxs = {
+        '20190927_161548_right': 12750,
+        '20191001_114431_left': 25540,
+        '20191002_105826_left': 90155,
+        '20191002_120717_right': 103050,
+        '20191015_135433_right': 46744,
+    }
+
     @classmethod
     def get_tracks(cls, expt_path, cop_start_frame):
         fTrx = h5read(expt_path, '/tracks')[1, ..., :cop_start_frame].T / cls.PIXEL_TO_MM
@@ -30,16 +38,13 @@ class FREDCLEANED_DATA:
     @staticmethod
     def get_copulation_frame(session_path):
         session = FREDCLEANED_DATA.get_session_name(session_path)
-        copulation_frame_idxs = {
-            '20190927_161548_right': 12750,
-            '20191001_114431_left': 25540,
-            '20191002_105826_left': 90155,
-            '20191002_120717_right': 103050,
-            '20191015_135433_right': 46744,
-        }
-        cop_frame = copulation_frame_idxs.get(session, None)
+        cop_frame = FREDCLEANED_DATA.copulation_frame_idxs.get(session, None)
         print("Getting copulation frame:", session, "cop_frame=", cop_frame)
         return cop_frame
+
+    @staticmethod
+    def get_copulation_bool_from_session(session, session_len):
+        return session in FREDCLEANED_DATA.copulation_frame_idxs
 
     @staticmethod
     def get_circle_estimator_helper(trxM=None, trxF=None):

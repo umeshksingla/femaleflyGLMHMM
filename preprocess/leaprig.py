@@ -5,7 +5,7 @@ import h5py
 from preprocess import visual_features, tactile_features
 from preprocess.preproc_utils import h5read
 from preprocess import preproc_utils
-from trig_avg_utils import split_name, mech_feature_list
+from preprocess.trig_avg_utils import split_name, mech_feature_list
 
 
 class WT_DATA:
@@ -36,6 +36,10 @@ class WT_DATA:
         track_occupancy = h5read(tracking_h5_path, 'track_occupancy')
         cop_start_frame = np.where(np.sum(track_occupancy, axis=1) == 2)[0][-1] + 1
         return cop_start_frame
+
+    @staticmethod
+    def get_copulation_bool_from_session(session, session_len):
+        return session_len < 270000
 
     @staticmethod
     def get_circle_estimator_helper(trxM=None, trxF=None):

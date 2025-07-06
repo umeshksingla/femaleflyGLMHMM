@@ -1,3 +1,5 @@
+import time
+
 import joblib
 import numpy as np
 from scipy.stats import zscore
@@ -5,11 +7,15 @@ import scipy
 from collections import OrderedDict
 from scipy.signal import savgol_filter
 from scipy.ndimage import uniform_filter1d, gaussian_filter1d
+import scipy.ndimage
 import pywt
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
+
+from leaprig import WT_DATA, AC_BOTH
+from new16mic import FREDCLEANED_DATA
 
 
 # def smooth_moving_average(x, smooth_window):
@@ -20,8 +26,40 @@ import matplotlib.pyplot as plt
 #     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
 
 
+def halfgaussian_kernel1d(sigma, radius):
+    """
+    Computes a 1-D Half-Gaussian convolution kernel.
+    """
+    sigma2 = sigma * sigma
+    x = np.arange(0, radius+1)
+    phi_x = np.exp(-0.5 / sigma2 * x ** 2)
+    phi_x = phi_x / phi_x.sum()
+
+    return phi_x
+
+
+def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
+                      mode="constant", cval=0.0, truncate=4.0):
+    """
+    Convolves a 1-D Half-Gaussian convolution kernel.
+    """
+    sd = float(sigma)
+    # make the radius of the filter equal to truncate standard deviations
+    lw = int(truncate * sd + 0.5)
+    weights = halfgaussian_kernel1d(sigma, lw)
+    origin = -lw // 2
+    return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
+
+
 def smooth_gaussian(x, sigma):
-    return gaussian_filter1d(x, sigma=sigma, mode='nearest')
+    return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
+
+
+def safe_zscore(x):
+    std_dev = np.std(x)
+    if np.isclose(std_dev, 0, atol=1e-2):
+        return np.zeros_like(x)
+    return zscore(x)
 
 
 def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0):
@@ -55,20 +93,32 @@ def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0
 
 def get_input_feat(sessions_features, s, f_name):
     sf = sessions_features[s]
-    if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall']:
+    if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall', 'fFV', 'fLS', 'fLV']:
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(ts)
     elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap', 'tap2']:
-        feat = sf[f_name].astype(float)
+
+        # print(f_name, np.mean(sf[f_name]), np.std(sf[f_name]))
+
+        # fig, ax = plt.subplots(2, 1, figsize=(20, 6), sharex=True)
+        # ax[0].plot(sf[f_name], label=f'{f_name}')
+        # ax[1].plot(safe_zscore(sf[f_name]), label=f'z-{f_name}')
+        # ax[0].legend()
+        # ax[1].legend()
+        # plt.suptitle(s)
+        # plt.tight_layout()
+        # plt.show()
+
+        feat = safe_zscore(sf[f_name]).astype(float)
     elif f_name in ['fmAng_cos']:
-        ts = np.radians(sf['fmAng'])
+        ts = np.radians(np.abs(sf['fmAng']))
         ts = smooth_gaussian(ts, sigma=3)
-        feat = np.cos(ts)    # cos: front to back
+        feat = zscore(np.cos(ts))    # cos: front to back
     elif f_name in ['fmAng_sin']:
         ts = np.radians(sf['fmAng'])
         ts = smooth_gaussian(ts, sigma=3)
-        feat = np.sin(ts)    # sin: left or right of the fly
+        feat = zscore(np.sin(ts))    # sin: left or right of the fly
     elif f_name in ['wingAlign']:
         ts = np.min([sf['wingLAristaLAlignAng'],
                        sf['wingRAristaRAlignAng'],
@@ -79,20 +129,57 @@ def get_input_feat(sessions_features, s, f_name):
     elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
         f_name_ = f_name.split('_directed')[0]
         feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
+
+        # fig, ax = plt.subplots(2, 1, figsize=(20, 6), sharex=True)
+        # ax[0].plot(feat, label=f'{f_name}')
+        # ax[1].plot(safe_zscore(feat), label=f'z-{f_name}')
+        # ax[0].legend()
+        # ax[1].legend()
+        # plt.suptitle(s)
+        # plt.tight_layout()
+        # plt.show()
+
+        feat = safe_zscore(feat)
     else:
         raise Exception(f'unsupported {f_name} input feature.')
+    # print(f_name, "done.")
     return feat
 
 
 def get_aux_feat(sessions_features, s, f_name, aux_windows):
     sf = sessions_features[s]
-    if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist']:
+    if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist', 'fFV', 'fFS', 'fLS', 'fLV']:
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
-    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2', 'tap2_directed', 'wingFlick']:
+    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2']:
         ts = sf[f_name]
-        feat = (np.sum(ts[aux_windows], axis=1) >= 1).astype(float)
+        # feat = (np.sum(ts[aux_windows], axis=1) >= 1).astype(float)
+        feat = np.mean(safe_zscore(ts)[aux_windows], axis=1)
+    elif f_name in ['fmAng_cos']:
+        ts_abs = np.abs(sf['fmAng'])
+        ts_rad = np.radians(ts_abs)
+        ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
+        ts_cos = np.cos(ts_smoothed)  # cos: front (180deg) to back (0deg)
+        # print("cos: mean std", np.mean(ts_cos), np.std(ts_cos))
+
+        # fig, ax  = plt.subplots(3, 1, sharex=True)
+        # ax[0].plot(ts_abs)
+        # ax[1].plot(ts_cos)
+        # ax[2].plot(ts_z, label=f'mean {np.mean(ts_z)}')
+        # ax[2].axhline(0, lw=1, ls=':', c='k')
+        # ax[2].legend()
+        # plt.tight_layout()
+        # plt.show()
+
+        feat = np.mean(zscore(ts_cos)[aux_windows], axis=1)
+    elif f_name in ['fmAng_sin']:
+        ts_rad = np.radians(sf['fmAng'])
+        ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
+        ts_cos = np.sin(ts_smoothed)  # sin: left <-> right
+        # print("sin: mean std", np.mean(ts_cos), np.std(ts_cos))
+
+        feat = np.mean(zscore(ts_cos)[aux_windows], axis=1)
     else:
         raise Exception(f'unsupported {f_name} aux feature.')
     return feat
@@ -109,7 +196,7 @@ def wavelet_denoise(signal):
 
 def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
-    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA']:
+    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
@@ -135,6 +222,16 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         std = dfTheta_abs.std()
         dfTheta_abs = zscore(dfTheta_abs)
         f = dfTheta_abs
+    elif f_name in ['dmTheta']:
+        ts = sf['mTheta']
+        ts = smooth_gaussian(ts, sigma=3)
+        mTheta = ts[output_windows]
+        dmTheta = mTheta[:, -1] - mTheta[:, 0]
+        dmTheta = np.where(np.abs(dmTheta) > 90, 0, dmTheta)
+        mn = dmTheta.mean()
+        std = dmTheta.std()
+        dmTheta = zscore(dmTheta)
+        f = dmTheta
     elif f_name in ['dfmAng']:
         # r = np.r_[:100000]
         #
@@ -186,10 +283,31 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         mn = 0
         std = 1
         f = wingFlickBin
-        print(np.unique(f, return_counts=True))
+        # print(np.unique(f, return_counts=True))
+
+        # print(sf.keys())
+        # fig = plt.figure(figsize=(20, 4))
+        # ax = plt.gca()
+        #
+        # # Find where it goes from 0→1 and 1→0
+        # diff = np.diff(ts, prepend=0, append=0)
+        # starts = np.where(diff == 1)[0]
+        # ends = np.where(diff == -1)[0]
+        #
+        # # Shade regions where binary == 1
+        # for start, end in zip(starts, ends):
+        #     ax.axvspan(start, end, color='orange', alpha=0.3)
+        #
+        # ax.plot(sf['wingFL'], label='wingFL')
+        # ax.plot(sf['wingFR'], label='wingFR')
+        # plt.suptitle(s)
+        # plt.tight_layout()
+        # plt.show()
+
     else:
         raise Exception(f'unsupported {f_name} output feature.')
-    # print(f_name, mn, std)
+    # print(f_name, f.shape)
+    # np.random.shuffle(f)
     return f, mn, std
 
 
@@ -204,35 +322,36 @@ def some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, inp
     plt.show()
     plt.close()
 
-    random_session = np.random.choice(len(inputs_raw))
-    idxs = np.random.choice(inputs_raw[random_session].shape[0], 10)
-    fig, ax = plt.subplots(3, 1)
+    for _ in range(5):
+        random_session = np.random.choice(len(inputs_raw))
+        idxs = np.random.choice(inputs_raw[random_session].shape[0], 10)
+        fig, ax = plt.subplots(3, 1, figsize=(17, 10))
 
-    ax[0].plot(inputs_raw[random_session][idxs].T)
-    ax[0].set_title(f'Raw input series ({basis_transformed})')
+        ax[0].plot(inputs_raw[random_session][idxs].T)
+        ax[0].set_title(f'Raw input series ({basis_transformed})')
 
-    ax[1].plot(inputs[random_session][idxs].T)
-    ax[1].set_title(f'Basis transformed series ({basis_transformed})')
+        ax[1].plot(inputs[random_session][idxs].T)
+        ax[1].set_title(f'Basis transformed series ({basis_transformed})')
 
-    ax[2].plot(BasisProjection(basis).inverse_transform(inputs[random_session][idxs]).T)
-    ax[2].set_title(f'Basis inverse-transformed series ({basis_transformed})')
+        ax[2].plot(BasisProjection(basis).inverse_transform(inputs[random_session][idxs]).T)
+        ax[2].set_title(f'Basis inverse-transformed series ({basis_transformed})')
 
-    # plot vertical lines
-    c = 0
-    for _ in x_labels:
-        ax[0].axvline(c * input_raw_each_dim, ls=':', c='k')
-        ax[1].axvline(c * input_each_dim, ls=':', c='k')
-        ax[2].axvline(c * input_raw_each_dim, ls=':', c='k')
-        ax[0].text(c * input_raw_each_dim + 1, 0.1, x_labels[_], color='r', rotation=90)
-        c += 1
+        # plot vertical lines
+        c = 0
+        for _ in x_labels:
+            ax[0].axvline(c * input_raw_each_dim, ls=':', c='k')
+            ax[1].axvline(c * input_each_dim, ls=':', c='k')
+            ax[2].axvline(c * input_raw_each_dim, ls=':', c='k')
+            ax[0].text(c * input_raw_each_dim + 1, 0.1, x_labels[_], color='r', rotation=90)
+            c += 1
 
-    plt.tight_layout()
-    plt.show()
-    plt.close()
+        plt.tight_layout()
+        plt.show()
+        plt.close()
     return
 
 
-def get_x_and_y_data(sessions_features, config, display=False):
+def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
     basis_transformed = config['basis_transformed']
 
@@ -250,7 +369,7 @@ def get_x_and_y_data(sessions_features, config, display=False):
 
     # Cosine basis transformation of inputs
     input_each_dim = config['ncos']
-    b = raised_cosine(0, input_each_dim, [0, 2*input_raw_each_dim/3], 10, input_raw_each_dim)
+    b = raised_cosine(0, input_each_dim, [0, 3*input_raw_each_dim/4], 10, input_raw_each_dim)
     b_multi = multifeature_basis(b, n_inputs)
     basis_ortho = scipy.linalg.orth(b_multi)
     basis = basis_ortho
@@ -272,18 +391,20 @@ def get_x_and_y_data(sessions_features, config, display=False):
     for s_i, s in enumerate(sessions_features):
         if s_i == 0:
             print('Available features:', sessions_features[s].keys())
+        if s_i == 41:
+            continue
         session_len = len(sessions_features[s]['mFV'])
         print(f"Session {s_i} ({s}) length: {session_len}.")
 
         num_timesteps = session_len
-        if session_len < num_timesteps:
-            print(f"Too short. Skipped.\n============")
-            continue
+        # if session_len < num_timesteps:
+        #     print(f"Too short. Skipped.\n============")
+        #     continue
 
         print(f"Proceeding with the session {s_i}.")
         session_keys.append(s)
-        session_copulation = (session_len < 270000)
-        print(f'Session {s_i} copulation={session_copulation}.')
+        session_copulation = datacls.get_copulation_bool_from_session(s, session_len)
+        print(f'Session {s_i} copulation={session_copulation} session_len={session_len}.')
 
         input_windows, output_windows = create_x_and_y_windows(num_timesteps, x_size=input_raw_each_dim,
                                                                y_size=predict_window_size, x_overlap=input_raw_overlap,
@@ -299,9 +420,13 @@ def get_x_and_y_data(sessions_features, config, display=False):
         # INPUTS
         feats = []
         for _ in x_labels:
-            f = get_input_feat(sessions_features, s, _)[s_input_windows]
+            f_ = get_input_feat(sessions_features, s, _)
+            # print(_, "mean=", np.mean(f_), "std", np.std(f_))
+            f = f_[s_input_windows]
             feats.append(f)
+        print(f"session {s_i} inp computed")
         s_inputs = np.hstack(feats)
+        print(f"session {s_i} inp processed")
 
         # EMISSIONS
         o_feats = []
@@ -313,6 +438,15 @@ def get_x_and_y_data(sessions_features, config, display=False):
             o_mn_std.append([mn, std])
         s_emissions = np.vstack(o_feats).T
         s_o_mn_std = np.vstack(o_mn_std)
+        print(f"session {s_i} output processed")
+
+        # AUXILIARY EMISSIONS
+        ay_feats = []
+        for _ in ay_labels:
+            f, _, _ = get_output_feat(sessions_features, s, _, s_output_windows)
+            ay_feats.append(f)
+        s_aux_emissions = np.vstack(ay_feats).T
+        print(f"session {s_i} auxem processed")
 
         # AUXILIARY DAta
         a_feats = []
@@ -320,13 +454,8 @@ def get_x_and_y_data(sessions_features, config, display=False):
             f = get_aux_feat(sessions_features, s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
             a_feats.append(f)
         s_aux_data = np.vstack(a_feats).T
-
-        # AUXILIARY EMISSIONS
-        ay_feats = []
-        for _ in ay_labels:
-            f = get_aux_feat(sessions_features, s, _, s_output_windows)
-            ay_feats.append(f)
-        s_aux_emissions = np.vstack(ay_feats).T
+        print(f"session {s_i} aux processed")
+        print(f"session {s_i} processed")
 
         inputs_raw.append(s_inputs)
         emissions.append(s_emissions)
@@ -403,22 +532,86 @@ def get_x_and_y_data(sessions_features, config, display=False):
     return data
 
 
+def extract_male(source):
+
+    data_config = {}
+
+    if source == 'wt':
+        sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
+        datacls = WT_DATA
+    elif source == 'ac_both':
+        sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
+        datacls = AC_BOTH
+    elif source == 'wt_fred':
+        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_may30.pkl')
+        datacls = FREDCLEANED_DATA
+    else:
+        raise Exception('Wrong data source.')
+
+    fps = sessions_features.get('fps', datacls.fps)
+    data_config['source'] = source
+    data_config['orig_fps'] = fps
+    data_config['input_raw_each_dim'] = 3*fps
+    data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
+    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
+    data_config["predict_window_size"] = fps//30  # averaging emission over this window size
+    data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
+    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
+    data_config['ncos'] = 4
+    data_config['input_labels'] = OrderedDict({
+        'fFV': 'z-fFV',
+        'fLS': 'z-fLS',
+        'mfDist': 'z-mfDist',
+
+        'mfAng_cos': 'front_back',
+
+    })
+    data_config['emission_labels'] = OrderedDict({
+        'mFV': 'z-mFV',
+        'mLV': 'z-mLV',
+        'dmTheta': 'z-dmTheta',
+        # 'dfmAng': 'z-dfmAng',
+    })
+    data_config['auxiliary_labels'] = OrderedDict({
+        'fFV': 'z-fFV',     # we basically need full series as well as windowed-versions of inputs
+        'fLS': 'z-fLS',
+        'mfDist': 'z-mfDist',
+        'mfAng_cos': 'mfAng_cos',
+        # 'fmAng_sin': 'fmAng_sin',
+    })
+    data_config['auxiliary_emission_labels'] = OrderedDict({
+        'wingFlickBin': 'wingFlickBin',
+        # 'wingFlickTheta': 'wingAngFlick',
+    })
+
+    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_MALE.pkl'
+    s = time.time()
+    data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
+    print("Saving at:", filename)
+    joblib.dump(data, f'../data/{filename}')
+    print("Saved at:", filename)
+    print(f"Done in {time.time() - s} seconds.")
+    return
+
+
 def extract(source):
 
     data_config = {}
 
     if source == 'wt':
         sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
-        fps = sessions_features.get('fps', 150)
+        datacls = WT_DATA
     elif source == 'ac_both':
         sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
-        fps = sessions_features.get('fps', 150)
+        datacls = AC_BOTH
     elif source == 'wt_fred':
         sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_may30.pkl')
-        fps = sessions_features.get('fps', 60)
+        datacls = FREDCLEANED_DATA
     else:
         raise Exception('Wrong data source.')
 
+    fps = sessions_features.get('fps', datacls.fps)
     data_config['source'] = source
     data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
@@ -433,16 +626,16 @@ def extract(source):
         'mLS': 'z-mLS',
         'mfDist': 'z-mfDist',
 
-        'fmAng_sin': 'maleLR',
+        # 'fmAng_sin': 'maleLR',
         'fmAng_cos': 'front_back',
 
         'wingAlign': 'z-wingAlign',
-        'pfast_i': 'pulse',
-        'sine_i': 'sine',
+        'pfast_i': 'z-pulse',
+        'sine_i': 'z-sine',
         'pfast_i_directed': 'pulseLR',
         'sine_i_directed': 'sineLR',
 
-        'tap2': 'tap2',
+        'tap2': 'z-tap2',
         'tap2_directed': 'tap2LR',
 
         # 'fDistWall': 'distWall',
@@ -457,24 +650,28 @@ def extract(source):
         'mFV': 'z-mFV',     # we basically need full series as well as windowed-versions of inputs
         'mLS': 'z-mLS',
         'mfDist': 'z-mfDist',
-        'pfast_i': 'pulse',
-        'sine_i': 'sine',
-        'tap2': 'tap2',
+        'pfast_i': 'z-pulse',
+        'sine_i': 'z-sine',
+        'tap2': 'z-tap2',
+        'fmAng_cos': 'fmAng_cos',
+        # 'fmAng_sin': 'fmAng_sin',
     })
     data_config['auxiliary_emission_labels'] = OrderedDict({
-        'wingFlick': 'wing_flick',
+        'wingFlickBin': 'wingFlickBin',
         # 'wingFlickTheta': 'wingAngFlick',
-        # 'wingFlickBin': 'wingFlickBin',
     })
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
                f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem.pkl'
-    data = get_x_and_y_data(sessions_features, data_config, display=False)
+    s = time.time()
+    data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     print("Saving at:", filename)
     joblib.dump(data, f'../data/{filename}')
     print("Saved at:", filename)
+    print(f"Done in {time.time() - s} seconds.")
+    return
 
 
 if __name__ == '__main__':
-    src = 'wt'
+    src = 'wt_fred'
     extract(src)
