@@ -253,6 +253,32 @@ class BaseFemaleFly:
         # print("r2_z_o_by_fly soft", r2_z_o_by_fly)
         return r2_z_o_by_fly
 
+    def pearson(self, emissions, y_preds):
+        pearson_o = self.pearson_by_o(emissions, y_preds)
+        return np.mean([pearson_o[o] for o in range(self.data_config["emission_dim"])])    # equivalent to multioutput="uniform_average" in r2_score
+
+    def pearson_by_fly(self, emissions, y_preds):
+        pearson_o_fly = self.pearson_by_o_by_fly(emissions, y_preds)
+        return np.mean(np.vstack([pearson_o_fly[o] for o in range(self.data_config["emission_dim"])]), axis=0)    # equivalent to multioutput="uniform_average" in r2_score
+
+    def pearson_by_z(self, emissions, y_preds_per_state, z_probs):
+        pearson_z_o = self.pearson_by_z_by_o(emissions, y_preds_per_state, z_probs)
+        pearson_z = {}
+        for z in pearson_z_o:
+            print("pearson_z_o[z]", pearson_z_o[z])
+            pearson_z[z] = np.mean([pearson_z_o[z][o] for o in range(self.data_config["emission_dim"])])  # equivalent to multioutput="uniform_average" in r2_score
+        print("pearson_z", pearson_z)
+        return pearson_z
+
+    def pearson_by_z_by_fly(self, emissions, y_preds_per_state, z_probs):
+        pearson_z_o_fly = self.pearson_by_z_and_o_by_fly(emissions, y_preds_per_state, z_probs)
+        pearson_z_fly = {}
+        for z in pearson_z_o_fly:
+            print("pearson_z_o_fly[z]", pearson_z_o_fly[z])
+            pearson_z_fly[z] = np.mean(np.vstack([pearson_z_o_fly[z][o] for o in range(self.data_config["emission_dim"])]), axis=0)  # equivalent to multioutput="uniform_average" in r2_score
+        print("pearson_z_fly", pearson_z_fly)
+        return pearson_z_fly
+
     def pearson_by_o(self, emissions, y_preds):
         y_preds = np.concatenate(y_preds, axis=0)
         emissions = np.concatenate(emissions, axis=0)
@@ -305,7 +331,7 @@ class BaseFemaleFly:
         for i in range(len(emissions)):
             for o in range(self.data_config["emission_dim"]):
                 pro = pearsonr_custom(emissions[i][:, o], y_preds_per_state[i][..., o], z_probs[i])  # pearson for emission o in each state
-                print("flyi", i, "o", o, pro)
+                # print("flyi", i, "o", o, pro)
                 for z in range(self.num_states):
                     pearson_z_o_by_fly[z][o].append(pro[z])
 

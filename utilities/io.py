@@ -206,7 +206,7 @@ def calc_dwell_times_by_z(z_seqs, num_states):
     return dwell_times_z
 
 
-def get_state_indices(z_seq, z, min_length=5, max_clips=5):
+def get_state_indices(z_seq, z, min_length=5, max_length=None, max_clips=5):
     state_sequence = np.array(z_seq)
     is_target = (state_sequence == z).astype(int)
     diff = np.diff(is_target, prepend=0, append=0)
@@ -215,6 +215,8 @@ def get_state_indices(z_seq, z, min_length=5, max_clips=5):
     ends = np.where(diff == -1)[0] - 1
     lengths = ends - starts + 1
     keep = (lengths >= min_length)
+    if max_length:
+        keep = (lengths >= min_length) & (lengths <= max_length)
     clips = np.stack([starts[keep], ends[keep]], axis=1)
 
     if len(clips) > max_clips:
