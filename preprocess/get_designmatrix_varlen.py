@@ -151,38 +151,32 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
     if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist', 'fFV', 'fFS', 'fLS', 'fLV']:
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
+        mn = ts.mean()
+        std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
     elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2']:
         ts = sf[f_name]
-        # feat = (np.sum(ts[aux_windows], axis=1) >= 1).astype(float)
+        mn = ts.mean()
+        std = ts.std()
         feat = np.mean(safe_zscore(ts)[aux_windows], axis=1)
     elif f_name in ['fmAng_cos']:
         ts_abs = np.abs(sf['fmAng'])
         ts_rad = np.radians(ts_abs)
         ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
-        ts_cos = np.cos(ts_smoothed)  # cos: front (180deg) to back (0deg)
-        # print("cos: mean std", np.mean(ts_cos), np.std(ts_cos))
-
-        # fig, ax  = plt.subplots(3, 1, sharex=True)
-        # ax[0].plot(ts_abs)
-        # ax[1].plot(ts_cos)
-        # ax[2].plot(ts_z, label=f'mean {np.mean(ts_z)}')
-        # ax[2].axhline(0, lw=1, ls=':', c='k')
-        # ax[2].legend()
-        # plt.tight_layout()
-        # plt.show()
-
-        feat = np.mean(zscore(ts_cos)[aux_windows], axis=1)
+        ts = np.cos(ts_smoothed)  # cos: front (180deg) to back (0deg)
+        mn = ts.mean()
+        std = ts.std()
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
     elif f_name in ['fmAng_sin']:
         ts_rad = np.radians(sf['fmAng'])
         ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
-        ts_cos = np.sin(ts_smoothed)  # sin: left <-> right
-        # print("sin: mean std", np.mean(ts_cos), np.std(ts_cos))
-
-        feat = np.mean(zscore(ts_cos)[aux_windows], axis=1)
+        ts = np.sin(ts_smoothed)  # sin: left <-> right
+        mn = ts.mean()
+        std = ts.std()
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
     else:
         raise Exception(f'unsupported {f_name} aux feature.')
-    return feat
+    return feat, mn, std
 
 
 def wavelet_denoise(signal):
@@ -380,6 +374,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     aux_data = []
     aux_emissions = []
     output_mn_std = []
+    aux_mn_std = []
+    auxem_mn_std = []
     start_frames = []
     end_frames = []
     downsampled_indices = []
@@ -442,18 +438,24 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
         # AUXILIARY EMISSIONS
         ay_feats = []
+        ay_mn_std = []
         for _ in ay_labels:
-            f, _, _ = get_output_feat(sessions_features, s, _, s_output_windows)
+            f, mn, std = get_output_feat(sessions_features, s, _, s_output_windows)
             ay_feats.append(f)
+            ay_mn_std.append([mn, std])
         s_aux_emissions = np.vstack(ay_feats).T
+        s_ay_mn_std = np.vstack(ay_mn_std)
         print(f"session {s_i} auxem processed")
 
         # AUXILIARY DAta
         a_feats = []
+        a_mn_std = []
         for _ in a_labels:
-            f = get_aux_feat(sessions_features, s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
+            f, mn, std = get_aux_feat(sessions_features, s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
             a_feats.append(f)
+            a_mn_std.append([mn, std])
         s_aux_data = np.vstack(a_feats).T
+        s_a_mn_std = np.vstack(a_mn_std)
         print(f"session {s_i} aux processed")
         print(f"session {s_i} processed")
 
@@ -462,6 +464,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         aux_data.append(s_aux_data)
         aux_emissions.append(s_aux_emissions)
         output_mn_std.append(s_o_mn_std)
+        aux_mn_std.append(s_a_mn_std)
+        auxem_mn_std.append(s_ay_mn_std)
         start_frames.append(s_start_frame)
         end_frames.append(s_end_frame)
         downsampled_indices.append(s_downsampled_indices)
@@ -480,6 +484,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     downsampled_indices = np.array(downsampled_indices, dtype=object)
     upsampled_indices = np.array(upsampled_indices, dtype=object)
     output_mn_std = np.array(output_mn_std)
+    aux_mn_std = np.array(aux_mn_std)
+    auxem_mn_std = np.array(auxem_mn_std)
 
     print("Basis transforming now..")
     print(len(inputs_raw))
@@ -517,6 +523,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         'aux_data': aux_data,
         'aux_emissions': aux_emissions,
         'output_mn_std': np.array(output_mn_std),
+        'aux_mn_std': np.array(aux_mn_std),
+        'auxem_mn_std': np.array(auxem_mn_std),
         'start_frames': np.array(start_frames),
         'end_frames': np.array(end_frames),
         'downsampled_indices': downsampled_indices,
@@ -595,7 +603,7 @@ def extract_male(source):
     return
 
 
-def extract(source):
+def extract_female(source):
 
     data_config = {}
 
@@ -673,5 +681,6 @@ def extract(source):
 
 
 if __name__ == '__main__':
-    src = 'wt_fred'
-    extract(src)
+    src = 'wt'
+    extract_female(src)
+    # extract_male(src)
