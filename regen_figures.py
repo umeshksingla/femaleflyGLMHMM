@@ -12,10 +12,19 @@ from utilities import utils
 
 if __name__  == '__main__':
 
-    model_pkl_path = f'models/general_wt/GLM-HMM_2_cv/20250624_020336_revitalisation'
+    model_pkl_path = f'models/general_wt_lrauxem/glm-hmm_5_cv/20250704_234515_operating'
+    # model_pkl_path = f'models/general_wt_male_lrauxem/glm-hmm_4_cv/20250705_002844_fog'
+    # model_pkl_path = f'models/general_wt_lrauxem/glm-hmm_5_cv/20250627_162711_tone'
+    # model_pkl_path = f'models/general_wt_fred_lrauxem/glm-hmm_4_cv/20250625_081249_instance'
+    # model_pkl_path = f'models/general_wt_lrauxem/glm-hmm_2_cv/20250625_144548_promise'
+    # model_pkl_path = f'models/general_wt_lrauxem/lr_1_cv/20250704_134106_instinctive'
     # utils.enhance(model_pkl_path)
     utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
-    utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+    # utils.generate_state_traces(model_pkl_path, savefig=1, display=0)
+
+    # utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
+    # utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+    # utils.generate_TAs(model_pkl_path, savefig=1, display=0)
     # utils.generate_videos(model_pkl_path, override_vid_dir=True)
 
     # model_dir = 'models/general_cop/lrhmmci2_4/20250508_185109_fragrance'

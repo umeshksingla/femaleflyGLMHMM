@@ -256,8 +256,8 @@ def enhance(output_dir=None, model_ckp=None):
         #         plt.close()
 
         # model_ckp[data_key][f'{prefix}_predictions'] = emission_predictions
-        model_ckp[data_key][f'{prefix}_lp_again'] = model.get_data_logprob(emissions, inputs)
-        model_ckp[data_key][f'{prefix}_lp_by_fly_again'] = model.get_data_logprob_by_fly(emissions, inputs)
+        # model_ckp[data_key][f'{prefix}_lp_again'] = model.get_data_logprob(emissions, inputs)
+        # model_ckp[data_key][f'{prefix}_lp_by_fly_again'] = model.get_data_logprob_by_fly(emissions, inputs)
         model_ckp[data_key][f'{prefix}_soft_predictions'] = soft_emission_predictions
         model_ckp[data_key][f'{prefix}_soft_predictions_per_state'] = soft_emission_predictions_per_state
         model_ckp[data_key][f'{prefix}_stateseq'] = z_seqs
@@ -319,7 +319,7 @@ def update_labels(data_config):
         'fmAng_sin': 'side',
         'fmAng_cos': 'front_back',
 
-        'wingAlign': 'wing_align',
+        'wingAlign': 'wingAng',
         'pfast_i': 'pulse',
         'sine_i': 'sine',
         'pfast_i_directed': 'pulse x side',
@@ -329,6 +329,26 @@ def update_labels(data_config):
         'tap2_directed': 'tap x side',
 
         # 'fDistWall': 'distWall',
+    })
+    input_labels_jr_text = OrderedDict({
+        'mFV': 'mFV',
+        'mLS': 'mLS',
+        'fFV': 'fFV',
+        'fLS': 'fLS',
+        'mfDist': 'mfDist',
+
+        'fmAng_sin': 'side',
+        'fmAng_cos': 'fmAng',
+
+        'wingAlign': 'wingAng',
+        'pfast_i': 'pulse',
+        'sine_i': 'sine',
+        'pfast_i_directed': 'pulse (s)',
+        'sine_i_directed': 'sine (s)',
+
+        'tap2': 'tap',
+        'tap2_directed': 'tap (s)',
+
     })
     emission_labels_text = OrderedDict({
         'fFV': 'forward velocity',
@@ -353,12 +373,12 @@ def update_labels(data_config):
         # 'wingFlickBin': 'wingFlickBin',
     })
     emission_labels_jr_jr_text = OrderedDict({
-        'fFV': 'fFV',
-        'fLV': 'fLV',
-        'dfTheta': 'fAV',
-        'mFV': 'mFV',
-        'mLV': 'mLV',
-        'dmTheta': 'mAV',
+        'fFV': 'forward',
+        'fLV': 'lateral',
+        'dfTheta': 'angular',
+        'mFV': 'forward',
+        'mLV': 'lateral',
+        'dmTheta': 'angular',
         # 'dfmAng': 'z-dfmAng',
         # 'wingFlickTheta': 'wingAngFlick',
         # 'wingFlickBin': 'wingFlickBin',
@@ -409,15 +429,16 @@ def update_labels(data_config):
         'fmAng_cos': 'male positioned behind',
         'fmAng_sin': 'male lateral position',
     })
-    auxiliary_labels_zscored_text = OrderedDict({
-        'mFV': 'mFV\n(zscored)',
-        'mLS': 'mLS\n(zscored)',
-        'fFV': 'fFV\n(zscored)',
-        'fLS': 'fLS\n(zscored)',
-        'mfDist': 'mfDist\n(zscored)',
+    auxiliary_labels_jr_text = OrderedDict({
+        'mFV': 'mFV',
+        'mLS': 'mLS',
+        'fFV': 'fFV',
+        'fLS': 'fLS',
+        'mfDist': 'mfDist',
         'pfast_i': 'pulse',
         'sine_i': 'sine',
         'tap2': 'tap',
+        'fmAng_cos': 'fmAng',
     })
     auxiliary_emission_labels_text = OrderedDict({
         'wingFlickBin': 'wing_flick',
@@ -432,18 +453,20 @@ def update_labels(data_config):
     })
 
     # replace labels
+    data_config['input_labels_jr'] = data_config['input_labels'].copy()
     data_config['emission_labels_units'] = data_config['emission_labels'].copy()
     data_config['emission_labels_zscored'] = data_config['emission_labels'].copy()
     data_config['emission_labels_jr'] = data_config['emission_labels'].copy()
     data_config['emission_labels_jr_jr'] = data_config['emission_labels'].copy()
-    data_config['auxiliary_labels_zscored'] = data_config['auxiliary_labels'].copy()
+    data_config['auxiliary_labels_jr'] = data_config['auxiliary_labels'].copy()
     data_config['auxiliary_labels_full'] = data_config['auxiliary_labels'].copy()
     data_config['input_labels'].update({k: v for k, v in input_labels_text.items() if k in data_config['input_labels']})
+    data_config['input_labels_jr'].update({k: v for k, v in input_labels_jr_text.items() if k in data_config['input_labels_jr']})
     data_config['emission_labels'].update({k: v for k, v in emission_labels_text.items() if k in data_config['emission_labels']})
     data_config['emission_labels_jr'].update({k: v for k, v in emission_labels_jr_text.items() if k in data_config['emission_labels_jr']})
     data_config['emission_labels_jr_jr'].update({k: v for k, v in emission_labels_jr_jr_text.items() if k in data_config['emission_labels_jr_jr']})
     data_config['auxiliary_labels'].update({k: v for k, v in auxiliary_labels_text.items() if k in data_config['auxiliary_labels']})
-    data_config['auxiliary_labels_zscored'].update({k: v for k, v in auxiliary_labels_zscored_text.items() if k in data_config['auxiliary_labels_zscored']})
+    data_config['auxiliary_labels_jr'].update({k: v for k, v in auxiliary_labels_jr_text.items() if k in data_config['auxiliary_labels_jr']})
     data_config['auxiliary_labels_full'].update({k: v for k, v in auxiliary_labels_full_text.items() if k in data_config['auxiliary_labels_full']})
     data_config['auxiliary_emission_labels'].update({k: v for k, v in auxiliary_emission_labels_text.items() if k in data_config['auxiliary_emission_labels']})
     data_config['emission_labels_units'].update({k: v for k, v in emission_labels_units_text.items() if k in data_config['emission_labels_units']})
@@ -471,12 +494,13 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
     print("emission_labels", emission_labels)
+    input_labels_jr = data_config['input_labels_jr']
     emission_labels_jr = data_config['emission_labels_jr']
     emission_labels_jr_jr = data_config['emission_labels_jr_jr']
     emission_labels_units = data_config['emission_labels_units']
     emission_labels_zscored = data_config['emission_labels_zscored']
     auxiliary_labels = data_config['auxiliary_labels']
-    auxiliary_labels_zscored = data_config['auxiliary_labels_zscored']
+    auxiliary_labels_jr = data_config['auxiliary_labels_jr']
     auxiliary_labels_full = data_config['auxiliary_labels_full']
     auxiliary_emission_labels = data_config['auxiliary_emission_labels']
     directional_variables = data_config['directional_variables']
@@ -496,10 +520,10 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                             savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_transition_matrix(learned_params.transitions.transition_matrix,
                                      savefig=savefig, fig_dir=fig_dir, display=display)
-        # plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.005,
-        #                               savefig=savefig, fig_dir=fig_dir, display=display)
-        # plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,
-        #                               savefig=savefig, fig_dir=fig_dir, display=display)
+            # plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.005,
+            #                               savefig=savefig, fig_dir=fig_dir, display=display)
+            # plots.plot_ethogram_community(learned_params.transitions.transition_matrix, threshold=0.002,
+            #                               savefig=savefig, fig_dir=fig_dir, display=display)
 
     if 'hmm' in model_prefix or 'HMM' in model_prefix:
         weights = learned_params.emissions.weights
@@ -553,39 +577,64 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         plots.plot_auxem_acc_by_z_o(model_ckp[data_key][f'{prefix}_auxem_acc_scores_z_and_o'], auxiliary_emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_auxem_fraction_by_z_o(model_ckp[data_key][f'{prefix}_auxem_eventcounts_z_and_o'], auxiliary_emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
 
-        plots.plot_state_mean_outputs_by_o_dists(
-            get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
-            emission_labels_zscored, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
-        plots.plot_state_mean_outputs_by_o_dists(
-            get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True, effective_fps=effective_fps),
-            emission_labels_units, title=f'{prefix} data (rescaled)', savefig=savefig, fig_dir=supp_fig_dir, display=False)
-        plots.plot_state_aux_dists(
-            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
-            auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
-            # plots.plot_state_aux_dists_hist(
-            #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
-            #     auxiliary_labels_zscored, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
-            # plots.plot_state_zscored_mean_aux(
-            #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),
-            #     auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
-        plots.plot_state_zscored_mean_aux_odists(
-            get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),
-            get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
-            auxiliary_labels, emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
+        # plots.plot_state_mean_outputs_by_o_dists(
+        #     get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
+        #     emission_labels_zscored, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
+        # plots.plot_state_mean_outputs_by_o_dists(
+        #     get_emissions_by_state(emissions, stateseq, num_states, output_mn_std, rescaled=True, effective_fps=effective_fps),
+        #     emission_labels_units, title=f'{prefix} data (rescaled)', savefig=savefig, fig_dir=supp_fig_dir, display=False)
+        # plots.plot_state_aux_dists(
+        #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
+        #     auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
+        #     # plots.plot_state_aux_dists_hist(
+        #     #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),         # reusing get_emissions_by_state func is okay here
+        #     #     auxiliary_labels_zscored, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
+        #     # plots.plot_state_zscored_mean_aux(
+        #     #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),
+        #     #     auxiliary_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
+        # plots.plot_state_zscored_mean_aux_odists(
+        #     get_emissions_by_state(aux_data, stateseq, num_states, rescaled=False),
+        #     get_emissions_by_state(emissions, stateseq, num_states, rescaled=False),
+        #     auxiliary_labels, emission_labels, title=f'{prefix} data', savefig=savefig, fig_dir=supp_fig_dir, display=display)
 
         return
 
     # # plots common to train and test
+    plots.plot_legends(num_states, data_config, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    # plot filters for regular emissions
+    # plots.plot_filters_individual(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0], savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0], sharey='row', saveindividual=True, savefig=savefig, fig_dir=fig_dir, display=display)
+    return
+
+    # plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', only_plot_inputs=['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i_directed', 'sine_i_directed', 'tap2_directed'], savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[1, 2, 3, 4], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[1, 2, 3, 4], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 2, 3, 4], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 2, 3, 4], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 1, 3, 4], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 1, 3, 4], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 1, 2, 4], sharey='row', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=[0, 1, 2, 4], sharey=False, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    plots.plot_filter_amplitudes(weights, data_config['basis'], input_labels_jr, emission_labels, prefix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(weights, data_config['basis'], input_labels_jr, emission_labels, prefix='emissions', plot_top_k=min(5, len(auxiliary_labels)), savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(weights, data_config['basis'], input_labels_jr, emission_labels, prefix='emissions', skip_states=[0], plot_top_k=min(5, len(auxiliary_labels)), savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters_statewise(weights, data_config, emission_labels, prefix='emissions', skip_states=[], only_plot_inputs=['mFV', 'pfast_i_directed', 'sine_i_directed', 'tap2_directed'], savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters_statewise(weights, data_config, emission_labels, prefix='emissions', skip_states=[0], only_plot_inputs=['mFV', 'pfast_i_directed', 'sine_i_directed', 'tap2_directed'], savefig=savefig, fig_dir=fig_dir, display=display)
+
+    # plot filters for other emissions
     auxem_filters = model_ckp['logreg_params']['w']
     plots.plot_filters(auxem_filters, data_config, auxiliary_emission_labels, filesuffix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filters_statewise(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filter_amplitudes(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filter_amplitudes(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', plot_top_k=min(5, len(auxiliary_emission_labels)), savefig=savefig, fig_dir=fig_dir, display=display)
-
-    plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filter_amplitudes(weights, data_config, emission_labels, prefix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filter_amplitudes(weights, data_config, emission_labels, prefix='emissions', plot_top_k=min(5, len(emission_labels)), savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_filters_statewise(weights, data_config, emission_labels, prefix='emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(auxem_filters, data_config['basis'], input_labels_jr, auxiliary_emission_labels, prefix='aux_emissions', savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filter_amplitudes(auxem_filters, data_config['basis'], input_labels_jr, auxiliary_emission_labels, prefix='aux_emissions', plot_top_k=min(5, len(auxiliary_emission_labels)), savefig=savefig, fig_dir=fig_dir, display=display)
+    plots.plot_filters_statewise(auxem_filters, data_config, auxiliary_emission_labels, prefix='aux_emissions', only_plot_inputs=['mFV', 'pfast_i_directed', 'sine_i_directed', 'tap2_directed'], savefig=savefig, fig_dir=fig_dir, display=display)
+    return
 
     plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'], savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_pearson(model_ckp['train_data']['train_pearson'], model_ckp['test_data']['test_pearson'], savefig=savefig, fig_dir=fig_dir, display=display)
@@ -629,7 +678,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_state_zscored_mean_aux_odists(
         get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-        auxiliary_labels, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
+        auxiliary_labels_jr, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_state_zscored_mean_aux_odists_sorted(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
         auxiliary_labels_full, emission_labels, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
@@ -638,13 +687,13 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         auxiliary_labels_full, emission_labels, directional_variables, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_state_zscored_mean_aux_fullodists_sorted(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-        auxiliary_labels_full, emission_labels_jr, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
+        auxiliary_labels_full, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plot_func('train')
     plot_func('test')
     return
 
 
-def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, probs_dir, suffix='', savefig=True, display=False, gen_corr_video=False):
+def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='', savefig=True, display=False, gen_corr_video=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
@@ -663,10 +712,12 @@ def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, probs_dir, suffix='
         xlim = (int(xlim_[0]), int(xlim_[1]))
         len_traj = xlim[1] - xlim[0]
         xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
-        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
-        plots.plot_trajectories(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        # plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+            # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
+        # plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_trajectories2D(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs2d_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        # plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
 
         if gen_corr_video:
             clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")), xlim_orig, output_path=f'{trajs_dir}/{prefix}{batch}_xlim_orig={xlim_orig}_xlim={xlim}{suffix}.mp4')
@@ -732,15 +783,15 @@ def generate_state_traces(model_dir, savefig=True, display=False):
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
         dwnsmpl_key = f'{prefix}_downsampled_indices'
 
-        for batch in np.random.choice(n_sessions, size=min(20, n_sessions)):
+        for batch in np.random.choice(n_sessions, size=min(30, n_sessions)):
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
             stateseq = model_ckp[data_key][f'{prefix}_stateseq'][batch]
             print("batch", batch, "key_b", key_b)
 
             for z in range(model_config['num_states']):
-                windows = get_state_indices(stateseq, z, min_length=10, max_length=20, max_clips=16)
+                windows = get_state_indices(stateseq, z, min_length=10, max_length=20, max_clips=9)
 
-                if len(windows) < 16:
+                if len(windows) < 9:
                     print(f"{batch}: {key_b}, not enough state {z+1} clips.")
                     continue
 
@@ -772,6 +823,7 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
 
     fig_dir = os.path.join(model_dir, 'figures')
     trajs_dir = os.path.join(fig_dir, 'trajs')
+    trajs2d_dir = os.path.join(fig_dir, 'trajs2d')
     probs_dir = os.path.join(fig_dir, 'probs')
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(trajs_dir, exist_ok=True)
@@ -782,23 +834,37 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
         data_key = f'{prefix}_data'
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
-        for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
-            # batch = 31 if prefix == 'train' else batch
+        for batch in np.random.choice(n_sessions, size=min(10, n_sessions)):
+            batch = 24 if prefix == 'train' else batch
             # batch = 10 if prefix == 'test' else batch
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
             num_timestamps = model_ckp[data_key][f'{prefix}_stateseq'][batch].shape[0]
             print("batch", batch, "key_b", key_b, "num_timestamps", num_timestamps)
             windows = get_windows_to_plot(effective_fps, num_timestamps)
             # print("windows", windows)
-            plot_xlims(model_dir, windows, batch, prefix, trajs_dir, probs_dir, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             lastwindows = get_cop_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, lastwindows, batch, prefix, trajs_dir, probs_dir, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, lastwindows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             fullwindows = get_full_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, fullwindows, batch, prefix, trajs_dir, probs_dir, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
-            # break
+            plot_xlims(model_dir, fullwindows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
     f('train')
     f('test')
     return
+
+
+def generate_TAs(model_dir, savefig=True, display=False):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if model_ckp is None:
+        return
+    print(data_config['auxiliary_labels'])
+    update_labels(data_config)
+
+    plots.plot_STAs(model_ckp, model_config, data_config, prefix='train', savefig=savefig, display=display)
+    plots.plot_STAs(model_ckp, model_config, data_config, prefix='test', savefig=savefig, display=display)
+    plots.plot_ETAs(model_ckp, model_config, data_config, savefig=savefig, display=display)
+    return
+
 
 
 # def generate_videos(model_dir, override_vid_dir=True):

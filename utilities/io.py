@@ -156,9 +156,10 @@ def get_windows_to_plot(effective_fps, num_timestamps):
     window_size = effective_fps * 1  # 1 second windows
     windows1 = make_windows(window_size * 60, n_windows=10)  # 1 min
     windows2 = make_windows(window_size * 60 * 5, n_windows=5)  # 5 min
-    windows3 = make_windows(window_size, n_windows=5)  # 1 sec
+    windows3 = make_windows(window_size, n_windows=200)  # 1 sec
+    windows4 = make_windows(window_size * 30, n_windows=50)  # 30 sec
 
-    windows = np.vstack((windows1, windows2, windows3)).astype(int)
+    windows = np.vstack((windows1, windows2, windows3, windows4)).astype(int)
 
     return windows
 
@@ -177,7 +178,9 @@ def get_cop_window_to_plot(effective_fps, num_timestamps):
 
 def get_full_window_to_plot(effective_fps, num_timestamps):
     full_session_window = np.array([[0, num_timestamps - 1]])  # Full session window
-    windows = np.vstack((full_session_window)).astype(int)
+    half_session_window1 = np.array([[0, num_timestamps//2 - 1]])  # Full session window
+    half_session_window2 = np.array([[num_timestamps//2, num_timestamps - 1]])  # Full session window
+    windows = np.vstack((full_session_window, half_session_window1, half_session_window2)).astype(int)
     return windows
 
 
