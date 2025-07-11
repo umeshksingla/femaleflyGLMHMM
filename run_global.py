@@ -126,6 +126,7 @@ def run(mc, enhance=False, genfig=False):
             print(">> Done with trajectories.\n")
 
             print(">> Generating videos:")
+            utils.generate_state_traces(dump_filepath, savefig=True, display=False)
             utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
             print(">> Done with videos.\n")
 
