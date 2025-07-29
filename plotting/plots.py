@@ -16,7 +16,9 @@ import numpy as np
 from dynamax.utils.plotting import CMAP, COLORS
 from scipy.ndimage import uniform_filter1d
 from glm_utils.preprocessing import BasisProjection
+from sklearn.metrics import log_loss, balanced_accuracy_score, f1_score, recall_score, precision_score
 from preprocess.colors import *
+from utilities.io import get_feat_windows, get_event_onsets, basis_invtransform_one_by_one
 
 # -- Fonts --
 mpl.rcParams['font.size'] = 18  # Panel label
@@ -90,9 +92,9 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
     plt.close()
 
     fig, ax = plt.subplots(figsize=(2.25, 1.25))
-    ax.plot([0, 1], [0, 0], c=EC, linewidth=4)
+    ax.plot([0, 1], [0, 0], c=EC, linewidth=6)
     ax.text(1.2, 0, f'female', va='center', fontsize='medium')
-    ax.plot([0, 1], [1, 1], c=IC, linewidth=4)
+    ax.plot([0, 1], [1, 1], c=IC, linewidth=6)
     ax.text(1.2, 1, f'male', va='center', fontsize='medium')
     # ax.set_ylim([0.5, -num_states-0.5])
     ax.axis('off')
@@ -104,9 +106,9 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
     plt.close()
 
     fig, ax = plt.subplots(figsize=(2.75, 1.25))
-    ax.plot([0, 1], [1, 1], c='gray', linewidth=4)
+    ax.plot([0, 1], [1, 1], c='gray', linewidth=6)
     ax.text(1.2, 1, f'Data', va='center', fontsize='medium')
-    ax.plot([0, 1], [0, 0], c=EC, linewidth=4)
+    ax.plot([0, 1], [0, 0], c=EC, linewidth=6)
     ax.text(1.2, 0, f'GLM-HMM', va='center', fontsize='medium')
     # ax.set_ylim([0.5, -num_states-0.5])
     ax.axis('off')
@@ -118,11 +120,12 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
     plt.close()
 
     fig, ax = plt.subplots(figsize=(2.25, 2))
-    feats = ['mFV', 'pfast_i_directed', 'sine_i_directed', 'tap2_directed']
+    feats = ['mFV', 'pfast_i_directedlr', 'sine_i_directedlr', 'tap2_directedlr']
     i_labels = data_config['input_labels_jr']
     for i, f in enumerate(feats):
-        ax.plot([0, 1], [-i, -i], c=input_label_colors[f], linewidth=4)
-        ax.text(1.2, -i, i_labels[f], va='center', fontsize='small')
+        if f in i_labels:
+            ax.plot([0, 1], [-i, -i], c=input_label_colors[f], linewidth=4)
+            ax.text(1.2, -i, i_labels[f], va='center', fontsize='small')
 
     ax.set_ylim([-len(feats), 0.5])
     ax.axis('off')
@@ -133,8 +136,24 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
         plt.show()
     plt.close()
 
+    fig, ax = plt.subplots(figsize=(2.25, 2))
+    feats = ['mFV', 'pfast_i', 'sine_i', 'tap2']
+    i_labels = data_config['input_labels_jr']
+    for i, f in enumerate(feats):
+        if f in i_labels:
+            ax.plot([0, 1], [-i, -i], c=input_label_colors[f], linewidth=4)
+            ax.text(1.2, -i, i_labels[f], va='center', fontsize='small')
 
+    ax.set_ylim([-len(feats), 0.5])
+    ax.axis('off')
+    plt.tight_layout()
+    if savefig:
+        plt.savefig(f'{fig_dir}/legend_inputs0.pdf', dpi=300, transparent=True, bbox_inches='tight')
+    if display:
+        plt.show()
+    plt.close()
     return
+
 
 def plot_hmm_data(emissions, states, extra_data=None, xlim=None, y_labels=None, extra_data_labels=None, title=None):
     """Plot emissions vs. time with background colored by true state"""
@@ -303,7 +322,7 @@ def plot_hmm_data_whole_session_with_states(predicted_emissions, true_emissions,
 def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emissions, predicted_states, config, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
 
     emission_dim = predicted_emissions.shape[-1]
-    fig, axs = plt.subplots(emission_dim+1, 1, figsize=(12, 5), sharex=True, gridspec_kw={'height_ratios': [0.25] + [1]*emission_dim })
+    fig, axs = plt.subplots(emission_dim+1, 1, figsize=(12, 1.65*emission_dim+0.1), sharex=True, gridspec_kw={'height_ratios': [0.25] + [1]*emission_dim })
 
     xlim_ = np.r_[xlim[0]:xlim[1] + 1].astype(int)
 
@@ -314,10 +333,10 @@ def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emi
 
     d = 0
     for _ in y_labels:
-        ax = axs[d+1] if emission_dim > 1 else axs
+        ax = axs[d+1]
         ax.plot(xlim_, true_emissions[xlim_, d], '-', color="gray", label='Data')
         ax.plot(xlim_, predicted_emissions[xlim_, d], '-', color=EC, linewidth=2, label=f'{model_label}')
-        # ax.set_ylabel(y_labels[_], c=EC)
+        ax.set_ylabel(y_labels[_], c=EC)
         # ax.margins(y=0.05)
         d += 1
 
@@ -332,6 +351,58 @@ def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emi
     # ax.legend(loc='upper right')
     # plt.suptitle(title)
     fig.align_ylabels()
+    plt.tight_layout()
+
+    if savefig: plt.savefig(fig_path, dpi=300, bbox_inches='tight', transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_hmm_data_whole_session_perstate_states_on_top(predicted_emissions, predicted_emissions_per_state, true_emissions, predicted_states, config, model_config, o_index=0, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
+
+    num_states = model_config['num_states']
+
+    fig, axs = plt.subplots(num_states+2, 1, figsize=(12, 1.5*num_states+0.1), sharex=True,
+                            # sharey=True,
+                            gridspec_kw={'height_ratios': [0.25] + [1]*(num_states+1)}
+                            )
+
+    xlim_ = np.r_[xlim[0]:xlim[1] + 1].astype(int)
+
+    ax = axs[0]
+    ax.imshow(predicted_states[xlim_][None, :], aspect="auto", interpolation="none", cmap=CMAP, vmin=0,
+              vmax=len(COLORS) - 1,
+              extent=(xlim_[0], xlim_[-1], 0, 0.1), alpha=0.7)
+
+    ax = axs[1]
+    ax.plot(xlim_, true_emissions[xlim_, o_index], '-', color="gray", label='Data')   # plotting only fFV
+    ax.plot(xlim_, predicted_emissions[xlim_, o_index], '-', color=EC, linewidth=2, label=f'{model_label}')
+    ax.set_ylabel(f'{num_states}-state\n{model_label}', rotation=360, ha='left', va='center')
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+
+    for z in range(num_states):
+        ax = axs[z+2]
+        ax.plot(xlim_, true_emissions[xlim_, o_index], '-', color="gray", label='Data')
+        ax.plot(xlim_, predicted_emissions_per_state[xlim_, z, o_index], '-', color=COLORS[z], linewidth=2, label=f'{model_label}')
+        ax.set_ylabel(f'State {z+1}', color=COLORS[z], rotation=360, ha='left', va='center')
+        ax.sharey(axs[1])
+        ax.yaxis.tick_right()
+        ax.yaxis.set_label_position("right")
+
+    for ax in axs:
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.set_yticks([])
+        ax.set_xticks([])
+
+    # plt.xlabel("Time (s)")
+    # ax = axs[1]
+    # ax.legend(loc='upper right')
+    # plt.suptitle(title)
+    # fig.align_ylabels()
+    fig.supylabel(list(y_labels.values())[o_index].replace('\n', ' '), ha='center', va='center')
     plt.tight_layout()
 
     if savefig: plt.savefig(fig_path, dpi=300, bbox_inches='tight', transparent=True)
@@ -412,106 +483,107 @@ def plot_hmm_data_whole_session_with_aux_with_states(predicted_emissions, true_e
     return
 
 
-def plot_filters_statewise(weights, data_config, y_labels, prefix, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
+def plot_filters_statewise(orig_weights, data_config, prefix, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
-    num_states = weights.shape[0]
-    emission_dim = weights.shape[1]
-    filter_len = weights.shape[-1]
+    num_states = orig_weights.shape[0]
+    emission_dim = orig_weights.shape[1]
+    # filter_len = orig_weights.shape[-1]
+    input_labels_list = data_config['input_labels_list']
     input_labels = data_config['input_labels']
-    n_inputs = len(input_labels)
+    y_labels = data_config['emission_labels']
+    directional_y_variables = data_config['directional_variables']
+    n_inputs = len(input_labels_list)
     basis = data_config['basis']
 
     if not only_plot_inputs:
-        only_plot_inputs = list(input_labels.keys())
+        only_plot_inputs = input_labels_list
 
-    if basis is not None:
-        weights = BasisProjection(basis).inverse_transform(weights.reshape(-1, filter_len)).reshape(num_states, emission_dim, -1)
-    weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
-    # weights = weights/np.linalg.norm(weights)
+    print(orig_weights.shape)
+    weights = basis_invtransform_one_by_one(orig_weights, basis, n_inputs)  # shape
+    print(weights.shape)
 
-    fig, axs = plt.subplots(emission_dim, num_states - len(skip_states), figsize=(2.25 * num_states, 2.4 * len(y_labels)), sharey='row')
-    d = 0
-    for _ in y_labels:
+    eff_num_states = num_states - len(skip_states)
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(2.25 * eff_num_states + 3, 2.4 * len(y_labels)), sharey='row')
+
+    n_feats = 0
+    for d, _ in enumerate(y_labels):
+        # print(d, _)
         w = weights[:, d]
         # w = w / np.linalg.norm(w)   # normalize across states
+        base_idx = n_feats
         s = 0
         for z in range(num_states):
             if z in skip_states:
                 continue
             # if z == 0 and num_states > 1: continue
 
-            if emission_dim > 1 and num_states > 1:
+            if emission_dim > 1 and eff_num_states > 1:
                 ax = axs[d, s]
-            elif emission_dim > 1 and num_states == 1:
+            elif emission_dim > 1 and eff_num_states == 1:
                 ax = axs[d]
-            elif emission_dim == 1 and num_states > 1:
+            elif emission_dim == 1 and eff_num_states > 1:
                 ax = axs[s]
             else:
                 ax = axs
 
-            if ax.get_subplotspec().is_first_row():
+            if ax.get_subplotspec().is_first_row() and prefix != 'aux_emissions':
                 ax.set_title(f'State {z + 1}', color=COLORS[z])
             # if ax.get_subplotspec().is_first_col():
             #     ax.set_ylabel(f'{y_labels[_]}', color=EC)
 
-            stim = 0
-            for __ in input_labels:
-                # if __ not in ['mFV', 'mfDist', 'pfast_i', 'tap2']:
-                if __ not in only_plot_inputs:
-                    stim += 1
-                    continue
+            for __ in only_plot_inputs:
+                if _ in directional_y_variables:
+                    __ = __ + '_directedlr'
+                stim = base_idx + input_labels_list[base_idx:].index(__)    # need base_idx to skip to where stim for this y start (since we have overlapping stim names for different y's)
+                # print(__, "stim idx", stim, "base_idx", base_idx)
                 ax.plot(np.arange(-w[z, stim].shape[-1], 0)/data_config['orig_fps'], w[z, stim], linewidth=3, label=input_labels[__], color=input_label_colors[__])
                 ax.axhline(0, ls=':', c='k', lw=0.5)
                 ax.set_xticks([-w[0, stim].shape[-1]//data_config['orig_fps'], 0])
                 ax.margins(y=0.05)
                 if ax.get_subplotspec().is_last_row():
                     ax.set_xlabel('Time (s)')
-                stim += 1
+
+            if ax.get_subplotspec().is_last_col():
+                ax.legend(loc='upper right', bbox_to_anchor=(3, 1), borderaxespad=0.)
             s += 1
+        n_feats += len(y_labels[_])
 
-        d += 1
-
-    if emission_dim > 1 and num_states > 1:
+    if emission_dim > 1 and eff_num_states > 1:
         fig.align_ylabels(axs[:, 0])
-    elif emission_dim > 1 and num_states == 1:
+    elif emission_dim > 1 and eff_num_states == 1:
         fig.align_ylabels(axs[:])
-    fig.supylabel('Filter amplitude (a.u.)')
+    # fig.supylabel('Filter amplitude (a.u.)')
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filters_statewise_skip_states={skip_states}_.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filters_statewise_skip_states={skip_states}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig
 
 
-def plot_filters(weights, data_config, y_labels, filesuffix, skip_states=[], only_plot_inputs=None, sharey=False, saveindividual=False, savefig=False, fig_dir=None, display=True):
-    # print(weights.shape)
+def plot_filters(orig_weights, data_config, y_labels, filesuffix, skip_states=[], sharey=False, savefig=False, fig_dir=None, display=True):
 
-    num_states = weights.shape[0]
-    emission_dim = weights.shape[1]
-    filter_len = weights.shape[-1]
-    input_labels = data_config.get('input_labels', data_config['input_labels'])
-    n_inputs = len(input_labels)
+    num_states = orig_weights.shape[0]
+    emission_dim = orig_weights.shape[1]
+    filter_len = orig_weights.shape[-1]
+
+    input_labels_list = data_config['input_labels_list']
+    input_labels = data_config['input_labels']
+    n_inputs = len(input_labels_list)
+    assert data_config['ncos'] == filter_len // n_inputs
     basis = data_config['basis']
+    print(">>>> obtained weights", orig_weights)
 
-    if basis is not None:
-        weights = BasisProjection(basis).inverse_transform(weights.reshape(-1, filter_len)).reshape(num_states, emission_dim, -1)
-    weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
-    # weights = weights/np.linalg.norm(weights)
+    print(orig_weights.shape)
+    weights = basis_invtransform_one_by_one(orig_weights, basis, n_inputs)     # shape
+    print(weights.shape)
 
-    if not only_plot_inputs:
-        only_plot_inputs = list(input_labels.keys())
-    fig, axs = plt.subplots(emission_dim, n_inputs, figsize=(3 * len(input_labels), 2.8 * len(y_labels)), sharey=sharey)
+    fig, axs = plt.subplots(emission_dim, n_inputs, figsize=(3 * len(input_labels_list), 2.8 * len(y_labels)), sharey=sharey)
     d = 0
     for _ in y_labels:
         w = weights[:, d]
-        # w = w / np.linalg.norm(w)
         stim = 0
-        for __ in input_labels:
-
-            if __ not in only_plot_inputs:
-                stim += 1
-                continue
+        for __ in input_labels_list:
 
             ax = axs[d, stim] if emission_dim > 1 else axs[stim]
 
@@ -520,8 +592,7 @@ def plot_filters(weights, data_config, y_labels, filesuffix, skip_states=[], onl
                     continue
                 ax.plot(np.arange(-w[z, stim].shape[-1], 0)/data_config['orig_fps'], w[z, stim], color=COLORS[z], linewidth=3, label=f'State {z+1}')
 
-            if d == 0 or saveindividual:
-                ax.set_title(f'{input_labels[__]}')
+            ax.set_title(input_labels[__])
             # if stim == 0:
             #     ax.set_ylabel(f'{y_labels[_]}\nfilter amplitude (a.u.)', fontsize='x-small', color=EC)
 
@@ -529,10 +600,7 @@ def plot_filters(weights, data_config, y_labels, filesuffix, skip_states=[], onl
             maxtime = w[0, stim].shape[-1]//data_config['orig_fps']
             ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime+1), labels=[-maxtime] + ['']*(maxtime-1) + [0])
             ax.margins(y=0.05)
-            # ax.set_ylim(-0.1, 0.1)
-            if saveindividual:
-                ax.yaxis.set_tick_params(labelleft=True)  # ensure ytick labels are shown
-            if ax.get_subplotspec().is_last_row() or saveindividual:
+            if ax.get_subplotspec().is_last_row():
                 ax.set_xlabel('Time (s)')
             stim += 1
         d += 1
@@ -540,72 +608,147 @@ def plot_filters(weights, data_config, y_labels, filesuffix, skip_states=[], onl
     # ax = axs[0, 0] if emission_dim > 1 else axs[0]
     # ax.legend(loc='upper left')
     # fig.supxlabel("Time relative to prediction (s)")
-    fig.supylabel('Filter amplitude (a.u.)')
+    # fig.supylabel('Filter amplitude (a.u.)')
     if emission_dim > 1: fig.align_ylabels(axs[:, 0])
     plt.margins(0.02)
     plt.tight_layout()
     fig.canvas.draw()
 
     if savefig:
-        fig.savefig(os.path.join(fig_dir, f'{filesuffix}_filters_skip_states={skip_states}_sharey={sharey}_only_plot_some_inputs={len(only_plot_inputs)<len(input_labels)}_saveindividual={saveindividual}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-    if saveindividual:
-        # Save individual subplots
-        os.makedirs(os.path.join(fig_dir, 'individual_filters'), exist_ok=True)
-        d = 0
-        for _ in y_labels:
-            stim = 0
-            for __ in input_labels:
-                print(f"saving filter for {_} - {__}")
-                ax = axs[d, stim] if emission_dim > 1 else axs[stim]
-                extent = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
-                fig.savefig(os.path.join(fig_dir, 'individual_filters', f'subplot_{_}_{__}.pdf'), dpi=300, bbox_inches=extent, transparent=True)
-                stim += 1
-            d += 1
+        fig.savefig(os.path.join(fig_dir, f'{filesuffix}_filters_skip_states={skip_states}_sharey={sharey}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig
 
 
-def plot_filter_amplitudes(weights, basis, i_labels, o_labels, prefix, skip_states=[], plot_top_k=None, savefig=False, fig_dir=None, display=True):
+def plot_filters_separate_emissions(orig_weights, data_config, y_labels, filesuffix, skip_states=[], sharey=False, saveindividual=False, savefig=False, fig_dir=None, display=True):
+
+    num_states = orig_weights.shape[0]
+    emission_dim = orig_weights.shape[1]
+    filter_len = orig_weights.shape[-1]
+
+    input_labels_list = data_config['input_labels_list']
+    input_labels = data_config['input_labels']
+    # n_inputs = len(input_labels_list)
+    # assert data_config['ncos'] == filter_len // n_inputs
+    basis = data_config['basis']
+    print(">>>> obtained weights", orig_weights)
+
+    # print(orig_weights.shape)
+    # weights = basis_invtransform_one_by_one(orig_weights, basis, n_inputs)     # shape
+    # print(weights.shape)
+    input_mask_by_emission = data_config['input_mask_by_emission']
+
+    # xticklabels = np.array([input_labels[i] for i in y_labels[_]])
+
+    for d, _ in enumerate(y_labels):
+        print("y_labels[_]", _, y_labels[_])
+
+        n_inputs_d = len(y_labels[_])
+        e_mask = input_mask_by_emission[d]
+        weights_d = orig_weights[:, [d]][..., e_mask == 1]
+        weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=n_inputs_d)[:, 0]
+        # weights_d = weights_d.reshape(num_states, n_inputs_d, -1)
+
+        fig, axs = plt.subplots(1, n_inputs_d, figsize=(3 * n_inputs_d, 3), sharey=sharey)
+
+        stim = 0
+        for __ in y_labels[_]:
+            ax = axs[stim]
+
+            for z in range(num_states):
+                if z in skip_states:
+                    continue
+                ax.plot(np.arange(-weights_d[z, stim].shape[-1], 0)/data_config['orig_fps'], weights_d[z, stim], color=COLORS[z], linewidth=3, label=f'State {z+1}')
+
+            ax.set_title(input_labels[__])
+
+            ax.axhline(0, ls=':', c='k', lw=0.5)
+            maxtime = weights_d[0, stim].shape[-1]//data_config['orig_fps']
+            ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime+1), labels=[-maxtime] + ['']*(maxtime-1) + [0])
+            ax.margins(y=0.05)
+            if saveindividual:
+                ax.yaxis.set_tick_params(labelleft=True)  # ensure ytick labels are shown
+            if ax.get_subplotspec().is_last_row() or saveindividual:
+                ax.set_xlabel('Time (s)')
+            stim += 1
+
+        plt.margins(0.05)
+        plt.tight_layout()
+        fig.canvas.draw()
+
+        if savefig:
+            fig.savefig(os.path.join(fig_dir, f'{filesuffix}_filters_skip_states={skip_states}_sharey={sharey}_separate_emissions_{d}_{_}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+
+        if saveindividual:
+            # Save individual subplots
+            os.makedirs(os.path.join(fig_dir, f'{filesuffix}_individual_filters'), exist_ok=True)
+            stim = 0
+            for __ in y_labels[_]:
+                ax = axs[stim]
+                extent = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
+                fig.savefig(os.path.join(fig_dir, f'{filesuffix}_individual_filters', f'skip_states={skip_states}_subplot_{_}_{__}.pdf'), dpi=300, bbox_inches=extent, transparent=True)
+                stim += 1
+
+        if display: plt.show()
+        plt.close()
+
+    return fig
+
+
+def plot_filter_amplitudes(weights, data_config, prefix, skip_states=[], plot_top_k=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = weights.shape[0]
     emission_dim = weights.shape[1]
-    filter_len = weights.shape[-1]
-    n_inputs = len(i_labels)
+    # filter_len = weights.shape[-1]
+    # input_labels_list = data_config['input_labels_list']
+    input_labels = data_config['input_labels']
+    emission_labels_jr = data_config['emission_labels_jr']
+    y_labels = data_config['emission_labels']
+    # n_inputs = len(input_labels_list)
+    basis = data_config['basis']
 
-    if basis is not None:
-        weights = BasisProjection(basis).inverse_transform(weights.reshape(-1, filter_len)).reshape(num_states, emission_dim, -1)
-    weights = weights.reshape(num_states, emission_dim, n_inputs, -1)
-    weights = weights/np.linalg.norm(weights)
+    print(weights.shape)
+
+    # print(weights.shape)
+
+    input_mask_by_emission = data_config['input_mask_by_emission']
+
+    eff_num_states = num_states-len(skip_states)
 
     if plot_top_k:
-        fig_width = 14
+        fig_width = 2.8*eff_num_states + 0.5
     else:
-        fig_width = 30
-    fig, axs = plt.subplots(emission_dim, num_states-len(skip_states), figsize=(fig_width, 7), sharey=True)
-    xticklabels = np.array([_ for _ in list(i_labels.values())])
-    # print("weights.shape", weights.shape)
+        fig_width = 4*eff_num_states + 0.5
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(fig_width, 2.5*len(y_labels)), sharey=True)
 
-    d = 0
-    for _ in o_labels:
+    for d, _ in enumerate(y_labels):
+        e_mask = input_mask_by_emission[d]
+        print("y_labels[_]", _, y_labels[_])
+        xticklabels = np.array([input_labels[i] for i in y_labels[_]])
+        weights_d = weights[:, [d]][..., e_mask == 1]
+        print("weights_d", weights_d.shape)
+        weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=len(y_labels[_]))[:, 0]
+        print("weights_d", weights_d.shape)
         s = 0
         for z in range(num_states):
             if z in skip_states:
                 continue
-            w_l2 = np.linalg.norm(weights[z][d], axis=-1)
-            w_l2_scaled = (w_l2 - np.min(w_l2))/(np.max(w_l2) - np.min(w_l2) + 1e-5)
+            w_l2 = np.linalg.norm(weights_d[z], axis=-1)
+            w_l2_scaled = (w_l2 - np.min(w_l2))/(np.max(w_l2) - np.min(w_l2) + 1e-8)
             # print(w_l2_scaled, w_l2.shape, w_l2_scaled.shape)
             sorted_idxs = np.argsort(w_l2_scaled)
             if plot_top_k:
-                sorted_idxs = sorted_idxs[np.r_[-plot_top_k:0]]  # highest weighted inputs only
-            if (num_states > 1) and (emission_dim > 1):
+                k = min(5, len(sorted_idxs))
+                sorted_idxs = sorted_idxs[np.r_[-k:0]]  # highest weighted inputs only
+            if (eff_num_states > 1) and (emission_dim > 1):
                 ax = axs[d, s]
-            elif (num_states == 1) and (emission_dim > 1):
+            elif (eff_num_states == 1) and (emission_dim > 1):
                 ax = axs[d]
-            elif (num_states > 1) and (emission_dim == 1):
+            elif (eff_num_states > 1) and (emission_dim == 1):
                 ax = axs[s]
-            elif (num_states == 1) and (emission_dim == 1):
+            elif (eff_num_states == 1) and (emission_dim == 1):
                 ax = axs
             ax.plot(w_l2_scaled[sorted_idxs], 'k.', markersize=12)
             ax.set_xticks(range(len(sorted_idxs)), xticklabels[sorted_idxs], rotation=45, ha='right', rotation_mode='anchor')
@@ -615,22 +758,21 @@ def plot_filter_amplitudes(weights, basis, i_labels, o_labels, prefix, skip_stat
             ax.spines['top'].set_visible(True)
             ax.spines['right'].set_visible(True)
             ax.tick_params(axis='both', direction='in', top=True, right=True)
-            if ax.get_subplotspec().is_first_row():
+            if ax.get_subplotspec().is_first_row() and prefix != 'aux_emissions':
                 ax.set_title(f'State {z + 1}', color=COLORS[z])
             # if ax.get_subplotspec().is_first_col():
-            #     ax.set_ylabel(o_labels[_], color=EC)
+            #     ax.set_ylabel(emission_labels_jr[_], color=EC)
             s += 1
-        d += 1
 
-    fig.supylabel('Relative filter amplitude')
+    # fig.supylabel('Relative filter amplitude')
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filter_amplitudes_plot_top_k={plot_top_k}_.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filter_amplitudes_skip_states={skip_states}_plot_top_k={plot_top_k}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
 
 
-def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_state_o_dists(emissions_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(1, len(o_labels), figsize=(16, 5))
 
@@ -674,6 +816,103 @@ def plot_state_mean_outputs_by_o_dists(emissions_z, o_labels, title=None, savefi
     return
 
 
+def plot_state_o_dists_reformatted(emissions_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+
+    fig, axes = plt.subplots(1, len(o_labels), figsize=(16, 5))
+
+    def reformat(f_name, dt):
+        if f_name in ['fFV', 'mFV']:
+            t = dt
+            xlim = (-1.5, 4.5)
+            ylim = (0, 2)
+        elif f_name in ['fLV', 'mLV']:
+            t = dt
+            xlim = (-2.5, 2.5)
+            ylim = (0, 2)
+        elif f_name in ['fAV', 'mAV']:
+            t = dt
+            xlim = (-110, 110)
+            ylim = (0, 0.1)
+        else:
+            raise Exception(f'Unsupported o feat: {f_name}.')
+        return t, xlim, ylim
+
+    for o, ol in enumerate(o_labels):
+        ax = axes[o] if len(o_labels) > 1 else axes
+        for z in list(emissions_z.keys()):
+            data_z = emissions_z[z][:, o]
+            data_z_reformatted, xlim, ylim = reformat(ol, data_z)
+            samples = np.random.choice(np.round(data_z_reformatted, decimals=3), min(10000, len(data_z_reformatted)), replace=False)
+            sns.kdeplot(samples, color=COLORS[z], ax=ax,
+                        common_norm=True,
+                        label=f'State {z+1}',
+                        alpha=1,
+                        cut=0,
+                        linewidth=2,
+                        bw_adjust=2,
+                        )
+        # ax.axvline(0, lw=0.5, c='gray', ls=':', alpha=0.7)
+        ax.set_xlabel(o_labels[ol], color=EC)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+    # ax.legend(loc='upper right')
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_outputs_by_o_dists_reformatted.pdf'),
+                            bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_state_o_dists_otherfilters(all_soft_predictions_per_state, all_stateseq, num_states, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+    emission_dim = len(o_labels)
+    n_batches = len(all_soft_predictions_per_state)
+
+    fig, axes = plt.subplots(emission_dim, num_states, figsize=(3*num_states+0.5, 3*emission_dim), sharex=True, sharey='row')
+
+    emissions_using_z_in_z_ = {}
+    for z_ in range(num_states):        # In state z_
+        state_masks_z_ = [all_stateseq[btch] == z_ for btch in range(n_batches)]   # get mask for each session where state == z_
+        print(f"In state {z_}:")
+
+        emissions_using_z_in_z_[z_] = {}
+        for z in range(num_states):     # using filters from z
+            emissions_using_z_in_z_[z_][z] = np.vstack([all_soft_predictions_per_state[btch][state_masks_z_[btch], z, :] for btch in range(n_batches)])  # get predictions using z when state == z_
+            print(f"using filters from {z}:", np.mean(emissions_using_z_in_z_[z_][z], axis=0))
+
+    for z_ in range(num_states):
+        for o, ol in enumerate(o_labels):
+            ax = axes[o, z_]
+            for z in range(num_states):
+                data = emissions_using_z_in_z_[z_][z][:, o]
+                print(z_, ol, np.mean(data), np.median(data))
+
+                min_x, max_x = np.percentile(data, 2), np.percentile(data, 98)
+                data_filtered = data[(data >= min_x) & (data <= max_x)]
+                data_filtered = np.random.choice(data_filtered, size=min(100000, len(data_filtered)), replace=False)
+                sns.violinplot(x=z, y=data_filtered, ax=ax, color=COLORS[z],
+                               fill=False,
+                               inner='quartile',  # shows IQR only (no scatter/sticks)
+                               cut=0,  # do not extend beyond min/max of data
+                               density_norm='area',  # makes violins comparable
+                               linewidth=2  # remove outline
+                               # common_norm=True,
+                               )
+            ax.set_xticks(range(num_states), [f'State {s+1}' for s in range(num_states)], rotation=45, ha='right', rotation_mode='anchor')
+            if ax.get_subplotspec().is_first_col():
+                ax.set_ylabel(o_labels[ol])
+            if ax.get_subplotspec().is_first_row():
+                ax.set_title(f'State {z_+1}', color=COLORS[z_])
+    fig.supylabel('Density')
+    fig.align_ylabels(axes[:, 0])
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_odists_otherfilters.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
 def plot_state_aux_dists(aux_z, a_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, ax = plt.subplots(1, len(a_labels), figsize=(25, 4))
@@ -710,6 +949,97 @@ def plot_state_aux_dists(aux_z, a_labels, title=None, savefig=False, fig_dir=Non
     # fig.suptitle(f'Sensory inputs by state')
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_aux_dists.pdf'),
+                            bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_state_aux_dists_reformatted(aux_z, a_labels, config, title=None, savefig=False, fig_dir=None, display=True):
+
+    fig, ax = plt.subplots(1, len(a_labels), figsize=(3 * len(a_labels), 4))
+
+    def reformat(f_name, dt):
+        print(f_name)
+        axtitle = None
+        if f_name in ['mFV', 'mFS', 'fFV', 'fFS']:
+            t = dt * config['effective_fps']
+            cut = 0
+            xlabel = '(mm/s)'
+            ylabel = 'Density'
+            xlim = (-0.25, 1.25)
+            xticks = [0, 0.5, 1,]
+        elif f_name in ['mLS', 'fLS']:
+            t = dt * config['effective_fps']
+            cut = 0
+            xlabel = '(mm/s)'
+            ylabel = 'Density'
+            xlim = (-0.03, 1.25)
+            xticks = [0, 0.5, 1,]
+        elif f_name in ['mfDist']:
+            t = dt
+            cut = 1
+            xlabel = '(mm)'
+            ylabel = 'Density'
+            xlim = (0, 10)
+            xticks = [0, 5, 10]
+        elif f_name in ['fmAng_cos']:
+            t = np.rad2deg(np.arccos(dt))
+            cut = 0
+            xlabel = '(deg)'
+            ylabel = 'Density'
+            xlim = (-2, 182)
+            xticks = [0, 90, 180]
+            axtitle = 'male position'
+        elif f_name in ['fmAng_sin']:
+            t = np.rad2deg(np.arcsin(dt))
+            cut = 0
+            xlabel = '(deg)'
+            ylabel = 'Density'
+            xlim = (-92, 92)
+            xticks = [-90, 0, 90]
+            axtitle = 'male lat position'
+        elif f_name in ['pfast_i', 'sine_i', 'tap2']:
+            feat = (dt > 0).astype(int)
+            t = np.sum(feat) / len(feat)
+            cut = None
+            xlabel = None
+            ylabel = f'P({a_labels[f_name]}=1 | state)'
+            xlim = None
+            xticks = []
+        else:
+            raise Exception(f'Unsupported aux feature: {f_name}.')
+        return t, cut, xlabel, ylabel, xlim, xticks, axtitle
+
+    for a, al in enumerate(a_labels):
+        x99 = 0
+        x0 = 0
+        for z in list(aux_z.keys()):
+            data_z = aux_z[z][:, a]
+            data_z_reformatted, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z)
+
+            if al in ['pfast_i', 'sine_i', 'tap2']:
+                ax[a].bar(z/2, data_z_reformatted, color=COLORS[z], alpha=0.9, width=0.3)
+            else:
+                samples = np.random.choice(data_z_reformatted, min(10000, len(data_z)), replace=False)
+                sns.kdeplot(samples, color=COLORS[z], ax=ax[a],
+                            label=f'State {z+1}',
+                            alpha=1,
+                            cut=cut,
+                            linewidth=2,
+                            )
+
+        # ax[a].axvline(0, lw=0.5, c='gray', ls=':', alpha=0.7)
+        ax[a].set_title(axtitle if axtitle else a_labels[al])
+        ax[a].set_xlabel(xlabel)
+        ax[a].set_ylabel(ylabel)
+        ax[a].set_xlim(xlim)
+        ax[a].set_xticks(xticks)
+        ax[a].margins(y=0.1,x=0.1)
+        # ax[a].title.set_position([.5, 10.05])
+    fig.align_xlabels()
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_aux_dists_reformatted.pdf'),
                             bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
@@ -819,7 +1149,7 @@ def plot_state_zscored_mean_aux(aux_z, a_labels, title=None, savefig=False, fig_
     return
 
 
-def plot_state_zscored_mean_aux_odists(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_state_aux_o_mean(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(2, len(aux_z.keys())*2, figsize=(25, 8), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
 
@@ -916,7 +1246,7 @@ def plot_state_zscored_mean_aux_odists(aux_z, emissions_z, a_labels, o_labels, t
     return
 
 
-def plot_state_zscored_mean_aux_odists_sorted(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_state_aux_sorted_mean_o(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(1, len(aux_z.keys())*2, figsize=(25, 10), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
 
@@ -939,7 +1269,7 @@ def plot_state_zscored_mean_aux_odists_sorted(aux_z, emissions_z, a_labels, o_la
         sorted_by = np.argsort(np.abs(v))[::-1]
         values = v[sorted_by]
         ax.plot([-1, len(values)], [0, 0], color='k', lw=1)
-        ax.bar(range(len(values)), values, color='gray', alpha=0.5)
+        ax.bar(range(len(values)), values, color=COLORS[z], alpha=0.6)
         # ax.axhline(0, c='r', linewidth=2, ls='-')
         # ax.set_xticks(range(len(values)))
         # ax.set_xticklabels(np.array(list(a_labels.values()))[sorted_by], rotation=90)
@@ -988,20 +1318,14 @@ def plot_state_zscored_mean_aux_odists_sorted(aux_z, emissions_z, a_labels, o_la
     return
 
 
-def plot_state_zscored_mean_aux_fullodists_sorted(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_state_aux_sorted_odists(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
-    fig, axes = plt.subplots(1, len(aux_z.keys())*2, figsize=(25, 9), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
-
-    max_y = 0
+    fig, axes = plt.subplots(1, len(aux_z.keys())*2, figsize=(len(aux_z.keys())*5+0.1, 10), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
 
     for z in list(aux_z.keys()):
         aux_means = np.mean(aux_z[z], axis=0)
-        o_means = np.mean(emissions_z[z], axis=0)
-        print("aux", z, aux_means.shape, np.mean(aux_z[z], axis=0), np.median(aux_z[z], axis=0))
-        print("out", z, o_means.shape, np.mean(emissions_z[z], axis=0), np.median(emissions_z[z], axis=0))
-        print(emissions_z[z].shape)
-
-        max_y = np.max([max_y, np.max([*np.abs(aux_means), *np.abs(o_means)]) + 0.1])
+        # max_y = np.max([max_y, np.max([*np.abs(aux_means), *np.abs(o_means)]) + 0.1])
+        max_y = np.max(np.abs(aux_means)) + 0.1
         print("max_y", max_y)
 
         ax_col1, ax_col2 = 2*z, 2*z+1
@@ -1011,15 +1335,11 @@ def plot_state_zscored_mean_aux_fullodists_sorted(aux_z, emissions_z, a_labels, 
         sorted_by = np.argsort(np.abs(v))[::-1]
         values = v[sorted_by]
         ax.plot([-1, len(values)], [0, 0], color='k', lw=1)
-        ax.bar(range(len(values)), values, color='gray', alpha=0.5)
-        # ax.axhline(0, c='r', linewidth=2, ls='-')
-        # ax.set_xticks(range(len(values)))
-        # ax.set_xticklabels(np.array(list(a_labels.values()))[sorted_by], rotation=90)
-        # ax.set_ylabel("Relative z-scores")
+        ax.bar(range(len(values)), values, color=COLORS[z], alpha=0.6)
         ax.margins(0.1)
-        ax.set_title(f'State {z+1}', color=COLORS[z], loc='right')
+        ax.set_title(f'State {z+1}\n\n', color=COLORS[z], loc='right')
         ax.axis('off')
-        arrow_max = 3*max_y/4
+        arrow_max = max_y
         ax.plot([-1, -1], [-arrow_max, arrow_max], color='k', lw=3)
         ax.add_patch(FancyArrowPatch((-1, arrow_max), (-1, arrow_max+0.05), arrowstyle="->", mutation_scale=35, linewidth=3, color='k'))
         ax.add_patch(FancyArrowPatch((-1, -arrow_max), (-1, -arrow_max-0.05), arrowstyle="->", mutation_scale=35, linewidth=3, color='k'))
@@ -1028,9 +1348,10 @@ def plot_state_zscored_mean_aux_fullodists_sorted(aux_z, emissions_z, a_labels, 
                 ax.text(x, 0.01, label, ha='center', va='bottom', rotation=90, fontsize=16)
             else:
                 ax.text(x, -0.01, label, ha='center', va='top', rotation=90, fontsize=16)
-        ax.text(-1.7, arrow_max-0.05, 'More', ha='center', va='bottom', rotation=90, fontsize=14)
-        ax.text(-1.7, -arrow_max+0.05, 'Less', ha='center', va='bottom', rotation=90, fontsize=14)
+        ax.text(-1.7, arrow_max-arrow_max*0.1, 'More', ha='center', va='bottom', rotation=90, fontsize=14)
+        ax.text(-1.7, -arrow_max+arrow_max*0.1, 'Less', ha='center', va='bottom', rotation=90, fontsize=14)
         ax.text(-1.7, 0, 'Relative z-scores', ha='center', va='center', rotation=90, fontsize=14)
+        print("state", z, "setting ylim", max_y)
         ax.set_ylim(-max_y-0.05, max_y+0.05)
 
         ax = axes[ax_col2]
@@ -1053,35 +1374,12 @@ def plot_state_zscored_mean_aux_fullodists_sorted(aux_z, emissions_z, a_labels, 
         ax.axhline(0, c='k', linewidth=1, ls='-')
         ax.set_xticks(range(len(o_labels)))
         ax.set_xticklabels(np.array(list(o_labels.values())), rotation=90, color=EC)
-        # ax.set_ylabel("z-scored value")
-        # ax.set_ylim(-1, 1)
         ymin, ymax = ax.get_ylim()
-        max_abs = max(abs(ymin), abs(ymax))
+        max_abs = max(abs(ymin), abs(ymax)) + 0.05
         max_abs = np.round(max_abs) if max_abs > 1 else np.round(max_abs, 1)
         ax.set_ylim(-max_abs, max_abs)
         print(ymin, ymax)
         ax.set_yticks([-max_abs, 0, max_abs])
-
-        # ticks = ax.get_yticks()
-        # ax.set_yticklabels([t if i in (0, len(ticks)-1) else "" for i, t in enumerate(ticks)])
-        # ax.margins(0.1)
-
-        # values = o_means
-        # print("values o_means", o_means)
-        # ax.plot([-1, len(values)], [0, 0], color='k', lw=1)
-        # ax.bar(range(len(values)), values, color='magenta', alpha=0.7)
-        # # ax.axhline(0, c='k', linewidth=0.8, ls='-')
-        # ax.set_xticks(range(len(values)))
-        # ax.set_xticklabels(np.array(list(o_labels.keys())), rotation=90)
-        # ax.set_ylabel("z-scored value")
-        # ax.margins(0.1)
-        # ax.axis('off')
-        # ax.set_ylim(-max_y-0.05, max_y+0.05)
-        # for x, label in zip(range(len(values)), np.array(list(o_labels.values()))):
-        #     if np.sign(values[x]) >= 0:
-        #         ax.text(x, 0.01, label, ha='center', va='bottom', rotation=90)
-        #     else:
-        #         ax.text(x, -0.01, label, ha='center', va='top', rotation=90)
 
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_zscored_mean_aux_fullodists_sorted.pdf'),
@@ -1091,7 +1389,7 @@ def plot_state_zscored_mean_aux_fullodists_sorted(aux_z, emissions_z, a_labels, 
     return
 
 
-def plot_state_zscored_mean_aux_odists_sorted_abs_directional(aux_z, emissions_z, a_labels_, o_labels_, directional_vars, title=None, savefig=False, fig_dir=None, display=True):
+def plot_state_aux_sorted_o_mean_directional(aux_z, emissions_z, a_labels_, o_labels_, directional_vars, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(1, len(aux_z.keys())*2, figsize=(25, 10), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
 
@@ -1131,7 +1429,7 @@ def plot_state_zscored_mean_aux_odists_sorted_abs_directional(aux_z, emissions_z
         sorted_by = np.argsort(np.abs(v))[::-1]
         values = v[sorted_by]
         ax.plot([-1, len(values)], [0, 0], color='k', lw=1)
-        ax.bar(range(len(values)), values, color='gray', alpha=0.5)
+        ax.bar(range(len(values)), values, color=COLORS[z], alpha=0.6)
         # ax.axhline(0, c='r', linewidth=2, ls='-')
         # ax.set_xticks(range(len(values)))
         # ax.set_xticklabels(np.array(list(a_labels.values()))[sorted_by], rotation=90)
@@ -1490,7 +1788,7 @@ def plot_empirical_occupancy(state_seqs, config, title=None, savefig=False, fig_
     plt.margins(0.1)
     pmax = np.round(pmax, 1) + 0.2
     plt.ylim(0, pmax)
-    plt.yticks([0, pmax / 2, pmax])
+    plt.yticks([0, pmax / 3, 2*pmax/3, pmax])
     plt.xticks(range(1, 1 + len(ps_z)))
     plt.xlabel('State')
     # plt.title(f'Empirical state occupancy')
@@ -2028,7 +2326,8 @@ def plot_var_explained_by_z_o(r2_z_o, o_labels, title=None, savefig=False, fig_d
     """
     Plot r2 scores in each state for each emission dimension separately
     """
-    fig, ax = plt.subplots(1, len(r2_z_o), figsize=(15, 7), sharey=True, layout='constrained')
+    figwidth = 3*len(r2_z_o) + 0.5
+    fig, ax = plt.subplots(1, len(r2_z_o), figsize=(figwidth, 7), sharey=True, layout='constrained')
     for z in r2_z_o:
         axes = ax[z] if len(r2_z_o) > 1 else ax
         for o in r2_z_o[z]:
@@ -2052,7 +2351,8 @@ def plot_pearson_by_z_o(pearson_z_o, o_labels, title=None, savefig=False, fig_di
     """
     Plot pearsonr in each state for each emission dimension separately
     """
-    fig, ax = plt.subplots(1, len(pearson_z_o), figsize=(15, 7), sharey=True, layout='constrained')
+    figwidth = 3*len(pearson_z_o) + 0.5
+    fig, ax = plt.subplots(1, len(pearson_z_o), figsize=(figwidth, 7), sharey=True, layout='constrained')
     for z in pearson_z_o:
         axes = ax[z] if len(pearson_z_o) > 1 else ax
         for o in pearson_z_o[z]:
@@ -2072,54 +2372,91 @@ def plot_pearson_by_z_o(pearson_z_o, o_labels, title=None, savefig=False, fig_di
     return fig
 
 
-def plot_auxem_acc_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_auxem_acc_by_z_o(stateseq, aux_emissions, probs_z_o, config, ay_labels, skip_states=[], title=None, savefig=False, fig_dir=None, display=True):
     """
     Plot accuracy scores in each state for each auxiliary emission dimension separately
     """
-    fig, ax = plt.subplots(1, len(acc_z_o), figsize=(7, 4), sharey=True, layout='constrained')
-    for z in acc_z_o:
-        axes = ax[z] if len(acc_z_o) > 1 else ax
-        for o in acc_z_o[z]:
-            axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
-        axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
-        axes.set_title(f'State {z+1}', color=COLORS[z])
-        axes.axhline(0, c='k', ls=':', lw=2)
-        axes.margins(0.1)
+    from sklearn.metrics import classification_report, confusion_matrix
 
-    axes = ax[0] if len(acc_z_o) > 1 else ax
-    axes.set_ylabel('Balanced accuracy (%)')
-    # plt.suptitle(title)
-    plt.ylim(0, 100)
+    num_states = config['num_states']
+    aux_emission_dim = len(ay_labels)
+    aux_emissions_ = np.concatenate(aux_emissions, axis=0)
+    z_seq_ = np.concatenate(stateseq, axis=0)
+
+    acc_z_o = {}
+    counts_z_o = {}
+    for z in range(num_states):
+        acc_z_o[z] = {}
+        counts_z_o[z] = {}
+        z_mask = (z_seq_ == z)
+        for o in range(aux_emission_dim):
+            y_true = aux_emissions_[z_mask][:, o]
+            counts_z_o[z][o] = np.sum(y_true) / len(y_true)
+            y_pred = probs_z_o[z][o] >= 0.65
+            acc_z_o[z][o] = f1_score(y_true, y_pred)
+            if not np.sum(y_pred):
+                print(f"z {z}", classification_report(y_true, y_pred))
+                print(f"z {z}", confusion_matrix(y_true, y_pred))
+
+    print("acc_z_o", acc_z_o)
+    plt.figure(figsize=(5, 4))
+    xt = []
+    for z in acc_z_o:
+        if z in skip_states: continue
+        plt.bar(z, acc_z_o[z][0], color=COLORS[z])
+        xt.append(z)
+    xt = np.array(xt)
+    plt.ylim(0, 1)
+    plt.ylabel('F1 score')
+    plt.xlabel('State')
+    plt.xticks(xt, xt+1)
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_acc_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: plt.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_acc_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
-    return fig
 
-
-def plot_auxem_fraction_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
-    """
-    Plot aux em event fractions in each state for each auxiliary emission dimension separately
-    """
-    fig, ax = plt.subplots(1, len(acc_z_o), figsize=(7, 4), sharey=True, layout='constrained')
-    for z in acc_z_o:
-        axes = ax[z] if len(acc_z_o) > 1 else ax
-        for o in acc_z_o[z]:
-            axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
-        axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
-        axes.set_title(f'State {z+1}', color=COLORS[z])
-        axes.axhline(0, c='k', ls=':', lw=2)
-        axes.margins(0.1)
-
-    axes = ax[0] if len(acc_z_o) > 1 else ax
-    axes.set_ylabel('Fraction of behavior (%)')
-    # plt.suptitle(title)
-    plt.ylim(0, 100)
+    print("counts", counts_z_o)
+    plt.figure(figsize=(5, 4))
+    xt = []
+    for z in counts_z_o:
+        if z in skip_states: continue
+        plt.bar(z, counts_z_o[z][0], color=COLORS[z])
+        xt.append(z)
+    xt = np.array(xt)
+    plt.ylim(0, 1)
+    plt.ylabel('Fraction of behavior')
+    plt.xlabel('State')
+    plt.xticks(xt, xt+1)
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: plt.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
-    return fig
+    return
+
+
+# def plot_auxem_fraction_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
+#     """
+#     Plot aux em event fractions in each state for each auxiliary emission dimension separately
+#     """
+#     fig, ax = plt.subplots(1, len(acc_z_o), figsize=(7, 4), sharey=True, layout='constrained')
+#     for z in acc_z_o:
+#         axes = ax[z] if len(acc_z_o) > 1 else ax
+#         for o in acc_z_o[z]:
+#             axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
+#         axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
+#         axes.set_title(f'State {z+1}', color=COLORS[z])
+#         axes.axhline(0, c='k', ls=':', lw=2)
+#         axes.margins(0.1)
+#
+#     axes = ax[0] if len(acc_z_o) > 1 else ax
+#     axes.set_ylabel('Fraction of behavior (%)')
+#     # plt.suptitle(title)
+#     plt.ylim(0, 100)
+#     plt.tight_layout()
+#     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+#     if display: plt.show()
+#     plt.close()
+#     return fig
 
 
 def plot_var_explained_by_z_o_by_fly(r2_z_o, o_labels, title=None, savefig=False, fig_dir=None, display=True):
@@ -2127,7 +2464,8 @@ def plot_var_explained_by_z_o_by_fly(r2_z_o, o_labels, title=None, savefig=False
     Plot r2 scores in each state for each emission dimension separately, by fly
     """
     # print("o_labels", o_labels)
-    fig, ax = plt.subplots(1, len(r2_z_o), figsize=(15, 7), sharey=True, layout='constrained')
+    figwidth = 3*len(r2_z_o)+0.5
+    fig, ax = plt.subplots(1, len(r2_z_o), figsize=(figwidth, 7), sharey=True, layout='constrained')
 
     sort_by = np.argsort(r2_z_o[0][0])[::-1]
     colors = np.linspace(0, 1, len(r2_z_o[0][0]))
@@ -2167,7 +2505,8 @@ def plot_pearson_by_z_o_by_fly(pearson_z_o, o_labels, title=None, savefig=False,
     Plot pearson in each state for each emission dimension separately, by fly
     """
     # print("o_labels", o_labels)
-    fig, ax = plt.subplots(1, len(pearson_z_o), figsize=(15, 7), sharey=True, layout='constrained')
+    fig_width = 3*len(pearson_z_o)+0.5
+    fig, ax = plt.subplots(1, len(pearson_z_o), figsize=(fig_width, 7), sharey=True, layout='constrained')
 
     sort_by = np.argsort(pearson_z_o[0][0])[::-1]
     colors = np.linspace(0, 1, len(pearson_z_o[0][0]))
@@ -2296,6 +2635,25 @@ def plot_trajectories(model_ckp, model_config, data_config, batch, prefix='', su
     return
 
 
+def plot_trajectories_statewise(model_ckp, model_config, data_config, batch, prefix='', suffix='', states_in_bgr=True, xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
+    # num_states = model_config['num_states']
+    model_label = model_ckp['prefix'].upper() #+ '_' + str(num_states)
+    # emission_labels = data_config['emission_labels_zs']
+    emission_labels_zscored = data_config['emission_labels_zscored']
+
+    emissions = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'][batch]
+    emissions_per_state = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions_per_state'][batch]
+    print("emissions_per_state", emissions_per_state.shape)
+    true_emissions = model_ckp[f'{prefix}_data'][f'{prefix}_emissions'][batch]
+    stateseq = model_ckp[f'{prefix}_data'][f'{prefix}_stateseq'][batch]
+
+    for o_index in range(emissions.shape[-1]):
+        plot_hmm_data_whole_session_perstate_states_on_top(
+            emissions, emissions_per_state, true_emissions, stateseq, data_config, model_config, o_index=o_index, model_label=model_label, y_labels=emission_labels_zscored, xlim=xlim, xlim_orig=xlim_orig,
+            savefig=savefig, fig_path=f'{fig_path}_o_index={str(o_index)}.pdf', display=display)
+    return
+
+
 def plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix='', suffix='', xlim=None, xlim_orig=None, savefig=False, fig_path=None, display=True):
 
     model_label = model_ckp['prefix'].upper()
@@ -2314,22 +2672,13 @@ def plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, pre
     return
 
 
-def plot_traces_session(expt_path, intervals, z, output_path=None, title=None, savefig=None, display=False):
+def plot_traces_session(fTrx, mTrx, intervals, z, output_path=None, title=None, savefig=None, display=False):
     from preprocess.leaprig import WT_DATA
     DATA = WT_DATA
 
     fly_nodes = DATA.get_fly_nodes()
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    ftracks = joblib.load('processed_ftracks.pkl')
-    mtracks = joblib.load('processed_mtracks.pkl')
-
-    if expt_path not in ftracks:
-        print("not processed.")
-        return
-
-    fTrx = ftracks[expt_path]
-    mTrx = mtracks[expt_path]
 
     grid_size = int(np.round(np.sqrt(len(intervals))))
     fig, axes = plt.subplots(grid_size, grid_size, figsize=(4.5, 4.5)
@@ -2420,7 +2769,6 @@ def plot_trajectories2D(model_ckp, model_config, data_config, batch, prefix='', 
         trajectory_x.append(x)
         trajectory_y.append(y)
 
-
     fFV = predicted_emissions[xlim_, 0]
     fLV = predicted_emissions[xlim_, 1]
     fRV = predicted_emissions[xlim_, 2]
@@ -2452,6 +2800,7 @@ def plot_trajectories2D(model_ckp, model_config, data_config, batch, prefix='', 
 
 
 def plot_STAs(model_ckp, model_config, data_config, prefix='', savefig=False, fig_path=None, display=True):
+    """state-triggered averages"""
 
     # predicted_emissions = np.concatenate(model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'], axis=0)
     true_emissions = np.concatenate(model_ckp[f'{prefix}_data'][f'{prefix}_emissions'], axis=0)
@@ -2566,7 +2915,8 @@ def plot_STAs(model_ckp, model_config, data_config, prefix='', savefig=False, fi
     return
 
 
-def plot_ETAs(model_ckp, model_config, data_config, savefig=False, fig_path=None, display=True):
+def plot_ETSPs(model_ckp, model_config, data_config, savefig=False, fig_path=None, display=True):
+    """event-triggered state probs"""
 
     aux_data = np.concatenate([*model_ckp[f'train_data'][f'train_aux_data'], *model_ckp[f'test_data'][f'test_aux_data']], axis=0)
     states = np.concatenate([*model_ckp[f'train_data'][f'train_stateseq'], *model_ckp[f'test_data'][f'test_stateseq']], axis=0)
@@ -2640,4 +2990,217 @@ def plot_ETAs(model_ckp, model_config, data_config, savefig=False, fig_path=None
     plt.tight_layout()
     plt.show()
 
+    return
+
+
+def rescale_aux_data(aux_data, aux_mn_std):
+    """
+    :param aux_data:
+    :param aux_mn_std:
+    :return:
+    """
+    aux_data_rescaled = []
+    for btch in range(len(aux_data)):
+        mn_std_btch = aux_mn_std[btch]
+        eez = aux_data[btch] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+        aux_data_rescaled.append(eez)
+    return aux_data_rescaled
+
+
+def rescale_o_data(o_data, output_mn_std):
+    """
+    :param o_data:
+    :param output_mn_std:
+    :return:
+    """
+    o_data_rescaled = []
+    for btch in range(len(o_data)):
+        mn_std_btch = output_mn_std[btch]
+        eez = o_data[btch] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+        o_data_rescaled.append(eez)
+    return o_data_rescaled
+
+
+def plot_ETAs(model_ckp, model_config, data_config, savefig=False, fig_dir=None, display=True):
+    """event-triggered averages"""
+
+    model_prefix = model_ckp['prefix']
+    all_aux_data = [*model_ckp[f'train_data'][f'train_aux_data'], *model_ckp[f'test_data'][f'test_aux_data']]
+    all_aux_mn_std = [*model_ckp['train_data']['train_aux_mn_std'], *model_ckp['test_data']['test_aux_mn_std']]
+    # print(len(all_aux_mn_std), len(all_aux_data), all_aux_data[0].shape, all_aux_data[0][:, -1])
+    all_aux_data_rescaled = rescale_aux_data(all_aux_data, all_aux_mn_std)
+    # print(len(all_aux_data_rescaled), all_aux_data_rescaled[0].shape, all_aux_data_rescaled[0][:, -1])
+    all_aux_data_rescaled = np.concatenate(all_aux_data_rescaled, axis=0)
+    true_emissions = np.concatenate([*model_ckp[f'train_data'][f'train_emissions'], *model_ckp[f'test_data'][f'test_emissions']], axis=0)
+    pred_emissions = np.concatenate([*model_ckp[f'train_data'][f'train_soft_predictions'], *model_ckp[f'test_data'][f'test_soft_predictions']], axis=0)
+
+    a_labels = data_config['auxiliary_labels_full']
+    a_labels_list = data_config['auxiliary_labels_list']
+    o_labels = data_config['emission_labels_zscored']
+
+    o_labels['fLV'] = 'lateral speed\n(zscored)'    # to use in ETAs where left and right data will otherwise cancel each other out.
+    o_labels['fAV'] = 'angular speed\n(zscored)'
+
+    # parameters
+    effective_fps = data_config['effective_fps']
+    window_s = 0.5  # window size (seconds) before and after switch
+    window_frames = int(window_s * effective_fps)
+
+    time_axis = np.linspace(-window_s, window_s, 2 * window_frames)
+    emission_dim = true_emissions.shape[-1]
+
+    for event_name in ['pfast_i', 'sine_i', 'tap2']:
+
+        # --- STEP 1: Find event onsets ---
+        event_ts = all_aux_data_rescaled[:, a_labels_list.index(event_name)]
+        # fmAng_sin_ts = all_aux_data_rescaled[:, a_labels_list.index('fmAng_sin')]
+        label = a_labels[event_name]
+        min_duration_s = 0.1 if event_name in ['pfast_i', 'sine_i'] else 0.1  # minimum event duration (seconds)
+        print(event_name, f"min_duration_s={min_duration_s}")
+        filtered_onsets = get_event_onsets(event_ts, min_duration=int(min_duration_s * effective_fps), lr_mask=None)
+
+        fig, axes = plt.subplots(1, emission_dim, figsize=(4.5*emission_dim+1+2, 5), sharex=True)
+        for o, ol in enumerate(o_labels):
+
+            true_feat_series = true_emissions[:, o]
+            pred_feat_series = pred_emissions[:, o]
+
+            if 'LV' in ol or 'AV' in ol:
+                true_feat_series = np.abs(true_feat_series)
+                pred_feat_series = np.abs(pred_feat_series)
+
+            ax = axes[o]
+
+            # --- STEP 2: Extract feat windows ---
+            true_feat_series_windows, pred_feat_series_windows = get_feat_windows(true_feat_series, pred_feat_series, filtered_onsets, window_frames)
+
+            # --- STEP 3: Compute averages ---
+            prob_mean = np.mean(true_feat_series_windows, axis=0)
+            prob_sem = np.std(true_feat_series_windows, axis=0) / np.sqrt(len(true_feat_series_windows))
+
+            prob_mean_p = np.mean(pred_feat_series_windows, axis=0)
+            prob_sem_p = np.std(pred_feat_series_windows, axis=0) / np.sqrt(len(pred_feat_series_windows))
+
+            ax.plot(time_axis, prob_mean, label=f'Data', color='gray', lw=2)
+            ax.fill_between(time_axis, prob_mean - prob_sem, prob_mean + prob_sem, alpha=0.2, color='gray')
+            ax.plot(time_axis, prob_mean_p, label=model_prefix.upper(), color=EC, lw=2)
+            ax.fill_between(time_axis, prob_mean_p - prob_sem_p, prob_mean_p + prob_sem_p, alpha=0.2, color=EC)
+            ax.axvline(0, color=input_label_colors[event_name], linestyle='--', lw=2, label=f'{label}\nonset')
+            ax.set_ylabel(o_labels[ol])
+            # ax.axvspan(0, min_duration_s, color=input_label_colors[event_name], alpha=0.3, label=f'{label}')
+            if ax.get_subplotspec().is_last_col():
+                ax.legend(loc='upper right', fontsize='small', bbox_to_anchor=(1.5, 1), borderaxespad=0.)
+            ax.margins(0.1)
+
+        fig.supxlabel('Time relative to event onset (s)', fontsize='large')
+        fig.suptitle(f'Female behavior around {label} onsets (n={len(true_feat_series_windows)})', fontsize='large')
+        plt.tight_layout()
+        if savefig: fig.savefig(os.path.join(fig_dir, f'ETAs_{event_name}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+        if display: plt.show()
+        plt.close()
+    return
+
+
+def plot_ETAs_all(model_ckp, data_config, savefig=False, fig_dir=None, display=True):
+
+    def construct_traces(fFV, fLV, fAV, dt):
+        """
+        Batched integration of N trajectories from body-centered velocities.
+        Inputs:
+            fwd (N, T): forward velocity
+            lat (N, T): lateral velocity
+            ang (N, T): angular velocity (radians/sec)
+            dt (float): time step size
+        Returns:
+            x, y, theta: arrays of shape (N, T+1)
+        """
+        N, T = fFV.shape
+        x = np.zeros((N, T + 1))
+        y = np.zeros((N, T + 1))
+        theta = np.zeros((N, T + 1))
+
+        x[:, 0] = 0.
+        y[:, 0] = 0.
+        theta[:, 0] = 0.
+
+        for t in range(T):
+            theta[:, t + 1] = theta[:, t] + fAV[:, t] * dt
+            dx = (fFV[:, t] * np.cos(theta[:, t]) - fLV[:, t] * np.sin(theta[:, t])) * dt
+            dy = (fFV[:, t] * np.sin(theta[:, t]) + fLV[:, t] * np.cos(theta[:, t])) * dt
+            x[:, t + 1] = x[:, t] + dx
+            y[:, t + 1] = y[:, t] + dy
+        traces = np.stack([x, y, theta], axis=-1)
+        return traces
+
+    def plot(masked_trajs_windows, dir=None):
+        color = LR[dir]
+        fig = plt.figure(figsize=(5, 5))
+        ax = plt.gca()
+        mean_traj = np.mean(masked_trajs_windows, axis=0)
+        print("mean_traj", mean_traj.shape, "masked_trajs_windows", mean_traj.shape)
+        r = np.random.choice(len(masked_trajs_windows), size=min(200, len(masked_trajs_windows)))
+        ax.plot(masked_trajs_windows[r, :, 0].T, masked_trajs_windows[r, :, 1].T, '-', alpha=0.1, color=color)
+        ax.plot(mean_traj[:, 0].T, mean_traj[:, 1].T, '-', alpha=1, lw=2, color=color)
+        ax.set_aspect('equal')
+        ax.axhline(0, lw=2, ls=':', c='k')
+        ax.set_xlim([-2, 2])
+        ax.set_ylim([-2, 2])
+        ax.axis('off')
+        plt.tight_layout()
+        if savefig: fig.savefig(os.path.join(fig_dir, f'ETAs_{event_name}_{dir}.pdf'), bbox_inches='tight', dpi=300,
+                                transparent=True)
+        if display: plt.show()
+        plt.close()
+        return
+
+    all_aux_data = [*model_ckp[f'train_data'][f'train_aux_data'], *model_ckp[f'test_data'][f'test_aux_data']]
+    all_aux_mn_std = [*model_ckp['train_data']['train_aux_mn_std'], *model_ckp['test_data']['test_aux_mn_std']]
+    all_aux_data_rescaled = rescale_aux_data(all_aux_data, all_aux_mn_std)
+    all_aux_data_rescaled = np.concatenate(all_aux_data_rescaled, axis=0)
+
+    all_outputs = [*model_ckp[f'train_data'][f'train_emissions'], *model_ckp[f'test_data'][f'test_emissions']]
+    all_output_mn_std = [*model_ckp['train_data']['train_output_mn_std'], *model_ckp['test_data']['test_output_mn_std']]
+    all_outputs_rescaled = rescale_o_data(all_outputs, all_output_mn_std)
+    all_outputs_rescaled = np.concatenate(all_outputs_rescaled, axis=0)
+
+    a_labels_list = data_config['auxiliary_labels_list']
+
+    # parameters
+    effective_fps = data_config['effective_fps']
+    window_s = 1  # window size (seconds) before and after switch
+    window_frames = int(window_s * effective_fps)
+
+    for event_name in ['pfast_i', 'sine_i']:
+
+        # --- STEP 1: Find event onsets ---
+        event_ts = all_aux_data_rescaled[:, a_labels_list.index(event_name)]
+        fmAng_sin_ts = all_aux_data_rescaled[:, a_labels_list.index('fmAng_sin')]
+
+        min_duration_s = 0.1 if event_name in ['pfast_i', 'sine_i'] else 0.01  # minimum event duration (seconds)
+        print(event_name, f"min_duration_s={min_duration_s}")
+        filtered_onsets = get_event_onsets(event_ts, min_duration=int(min_duration_s * effective_fps), lr_mask=None)
+
+        fmAng_sin_windows, _ = get_feat_windows(fmAng_sin_ts, fmAng_sin_ts, filtered_onsets, window_frames)
+        fFV_windows, _ = get_feat_windows(all_outputs_rescaled[:, 0], all_outputs_rescaled[:, 0], filtered_onsets, window_frames)
+        fLV_windows, _ = get_feat_windows(all_outputs_rescaled[:, 1], all_outputs_rescaled[:, 1], filtered_onsets, window_frames)
+        fAV_windows, _ = get_feat_windows(all_outputs_rescaled[:, 2], all_outputs_rescaled[:, 2], filtered_onsets, window_frames)
+
+        fmAng_sin_windows = fmAng_sin_windows[:, -window_frames:]  # remove the times before onset
+        fFV_windows = fFV_windows[:, -window_frames:]
+        fLV_windows = fLV_windows[:, -window_frames:]
+        fAV_windows = fAV_windows[:, -window_frames:]
+
+        traj_windows = construct_traces(fFV_windows, fLV_windows, np.deg2rad(fAV_windows), effective_fps)
+
+        fmAng_windows = np.rad2deg(np.arcsin(fmAng_sin_windows))
+        print(fmAng_sin_windows.shape, fmAng_windows.shape, fmAng_windows[0])
+        print(fFV_windows.shape, fFV_windows[0])
+        print("trajs_windows", traj_windows.shape)
+
+        # male on left
+        left_mask = ((fmAng_windows[:, 0] > 0) & (fmAng_windows[:, 0] < 30)).squeeze()
+        plot(traj_windows[left_mask], 'L')
+        # male on right
+        right_mask = ((fmAng_windows[:, 0] < 0) & (fmAng_windows[:, 0] > -30)).squeeze()
+        plot(traj_windows[right_mask], 'R')
     return

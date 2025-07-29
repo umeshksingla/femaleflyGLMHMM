@@ -8,14 +8,15 @@ from collections import OrderedDict
 from scipy.signal import savgol_filter
 from scipy.ndimage import uniform_filter1d, gaussian_filter1d
 import scipy.ndimage
+from scipy.linalg import block_diag
 import pywt
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
-from leaprig import WT_DATA, AC_BOTH
-from new16mic import FREDCLEANED_DATA
+from preprocess.leaprig import WT_DATA, AC_BOTH
+from preprocess.new16mic import FREDCLEANED_DATA
 
 
 # def smooth_moving_average(x, smooth_window):
@@ -126,20 +127,14 @@ def get_input_feat(sessions_features, s, f_name):
                        sf['wingRAristaLAlignAng']], axis=0)
         ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(ts)     # it is okay to zscore these alignment angles as if they are being treated linearly
-    elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
+    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pfast_i_directedlr', 'song_i_directedlr', 'tap_directedlr', 'tap2_directedlr']:
         f_name_ = f_name.split('_directed')[0]
         feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
-
-        # fig, ax = plt.subplots(2, 1, figsize=(20, 6), sharex=True)
-        # ax[0].plot(feat, label=f'{f_name}')
-        # ax[1].plot(safe_zscore(feat), label=f'z-{f_name}')
-        # ax[0].legend()
-        # ax[1].legend()
-        # plt.suptitle(s)
-        # plt.tight_layout()
-        # plt.show()
-
         feat = safe_zscore(feat)
+    elif f_name in ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'fFV_directedlr', 'fLS_directedlr']:
+        f_name_ = f_name.split('_directed')[0]
+        feat = zscore(sf[f_name_]) * zscore(np.sin(np.radians(sf['fmAng'])))
+        feat = zscore(feat)
     else:
         raise Exception(f'unsupported {f_name} input feature.')
     # print(f_name, "done.")
@@ -154,7 +149,7 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
-    elif f_name in ['pfast_i', 'sine_i', 'tap', 'tap2']:
+    elif f_name in ['pfast_i', 'sine_i', 'tap2']:
         ts = sf[f_name]
         mn = ts.mean()
         std = ts.std()
@@ -196,7 +191,7 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         mn = ts.mean()
         std = ts.std()
         f = np.mean(zscore(ts)[output_windows], axis=1)
-    elif f_name in ['dfTheta']:
+    elif f_name in ['fAV']:
         ts = sf['fTheta']
         ts = smooth_gaussian(ts, sigma=3)
         fTheta = ts[output_windows]
@@ -206,7 +201,7 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         std = dfTheta.std()
         dfTheta = zscore(dfTheta)
         f = dfTheta
-    elif f_name in ['dfTheta_abs']:
+    elif f_name in ['fAS']:
         ts = sf['fTheta']
         ts = smooth_gaussian(ts, sigma=3)
         fTheta = ts[output_windows]
@@ -216,7 +211,7 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         std = dfTheta_abs.std()
         dfTheta_abs = zscore(dfTheta_abs)
         f = dfTheta_abs
-    elif f_name in ['dmTheta']:
+    elif f_name in ['mAV']:
         ts = sf['mTheta']
         ts = smooth_gaussian(ts, sigma=3)
         mTheta = ts[output_windows]
@@ -263,41 +258,21 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         mn = dfmAng_abs.mean()
         std = dfmAng_abs.std()
         f = zscore(dfmAng_abs)
-    elif f_name in ['wingFlickTheta']:
-        ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
-        ts = smooth_gaussian(ts, sigma=3)
-        wingFlickTheta = ts * sf['wingFlick']
-        wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
-        mn = 0  # no zscoring for wing flick angles, as most of them are zeros
-        std = 1
-        f = wingFlickTheta
+    # elif f_name in ['wingFlickTheta']:
+    #     ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
+    #     ts = smooth_gaussian(ts, sigma=3)
+    #     wingFlickTheta = ts * sf['wingFlick']
+    #     wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
+    #     mn = 0  # no zscoring for wing flick angles, as most of them are zeros
+    #     std = 1
+    #     f = wingFlickTheta
     elif f_name in ['wingFlickBin']:
-        ts = sf['wingFlick']
-        wingFlickBin = (np.sum(ts[output_windows], axis=1) >= 1).astype(float)
+        wing_sep = sf['wingFL'] - sf['wingFR']      # right wing angle is generally -ve
+        ts = (np.abs(wing_sep) > 20).astype(int)    # 20 degrees difference between left and right wing extensions
+        wingFlick = (np.sum(ts[output_windows], axis=1) >= 1).astype(float)
         mn = 0
         std = 1
-        f = wingFlickBin
-        # print(np.unique(f, return_counts=True))
-
-        # print(sf.keys())
-        # fig = plt.figure(figsize=(20, 4))
-        # ax = plt.gca()
-        #
-        # # Find where it goes from 0→1 and 1→0
-        # diff = np.diff(ts, prepend=0, append=0)
-        # starts = np.where(diff == 1)[0]
-        # ends = np.where(diff == -1)[0]
-        #
-        # # Shade regions where binary == 1
-        # for start, end in zip(starts, ends):
-        #     ax.axvspan(start, end, color='orange', alpha=0.3)
-        #
-        # ax.plot(sf['wingFL'], label='wingFL')
-        # ax.plot(sf['wingFR'], label='wingFR')
-        # plt.suptitle(s)
-        # plt.tight_layout()
-        # plt.show()
-
+        f = wingFlick
     else:
         raise Exception(f'unsupported {f_name} output feature.')
     # print(f_name, f.shape)
@@ -321,13 +296,13 @@ def some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, inp
         idxs = np.random.choice(inputs_raw[random_session].shape[0], 10)
         fig, ax = plt.subplots(3, 1, figsize=(17, 10))
 
-        ax[0].plot(inputs_raw[random_session][idxs].T)
+        ax[0].plot(inputs_raw[random_session][idxs].T, '-')
         ax[0].set_title(f'Raw input series ({basis_transformed})')
 
-        ax[1].plot(inputs[random_session][idxs].T)
+        ax[1].plot(inputs[random_session][idxs].T, '.-')
         ax[1].set_title(f'Basis transformed series ({basis_transformed})')
 
-        ax[2].plot(BasisProjection(basis).inverse_transform(inputs[random_session][idxs]).T)
+        ax[2].plot(BasisProjection(basis).inverse_transform(inputs[random_session][idxs]).T, '.-')
         ax[2].set_title(f'Basis inverse-transformed series ({basis_transformed})')
 
         # plot vertical lines
@@ -336,7 +311,60 @@ def some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, inp
             ax[0].axvline(c * input_raw_each_dim, ls=':', c='k')
             ax[1].axvline(c * input_each_dim, ls=':', c='k')
             ax[2].axvline(c * input_raw_each_dim, ls=':', c='k')
-            ax[0].text(c * input_raw_each_dim + 1, 0.1, x_labels[_], color='r', rotation=90)
+            ax[0].text(c * input_raw_each_dim + 1, 0.1, _, color='r', rotation=90)
+            c += 1
+
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+    return
+
+
+def some_plotsb3(b3, b_multi, inputs_raw, inputs, inputs_multi, input_raw_each_dim, input_each_dim, basis_transformed, x_labels):
+    print("b3", b3.shape)
+    fig, ax = plt.subplots(2, 1)
+    ax[0].plot(b3)
+    ax[0].set_title('b3')   # separate basis for each feature
+    ax[1].plot(b_multi)
+    ax[1].set_title('b_multi')
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+
+    for _ in range(5):
+        random_session = np.random.choice(len(inputs_raw))
+        idxs = np.random.choice(inputs_raw[random_session].shape[0], 10)
+        fig, ax = plt.subplots(5, 1, figsize=(18, 10))
+
+        print(inputs_raw[random_session][idxs].T.shape)
+        miny = np.min(inputs_raw[random_session][idxs])
+        ax[0].plot(inputs_raw[random_session][idxs].T, '-')
+        ax[0].set_title(f'Raw input series ({basis_transformed})')
+
+        print(inputs[random_session][idxs].T.shape)
+        ax[1].plot(inputs[random_session][idxs].T, '.-')
+        ax[1].set_title(f'Basis transformed series ({basis_transformed}) (b3)')
+
+        inpr_invtr = np.array([np.array([BasisProjection(b3).inverse_transform(_) for _ in inpr.reshape(-1, input_each_dim)]).reshape(-1) for inpr in inputs[random_session][idxs]])
+        ax[2].plot(inpr_invtr.T, '-')
+        ax[2].set_title(f'Basis inverse-transformed series ({basis_transformed}) (b3)')
+
+        print(inputs_multi[random_session][idxs].T.shape)
+        ax[3].plot(inputs_multi[random_session][idxs].T, '.-')
+        ax[3].set_title(f'Basis transformed series ({basis_transformed}) (bmulti)')
+
+        ax[4].plot(BasisProjection(b_multi).inverse_transform(inputs_multi[random_session][idxs]).T, '-')
+        ax[4].set_title(f'Basis inverse-transformed series ({basis_transformed}) (bmulti)')
+
+        # plot vertical lines
+        c = 0
+        for _ in x_labels:
+            ax[0].axvline(c * input_raw_each_dim, ls=':', c='k')
+            ax[1].axvline(c * input_each_dim, ls=':', c='k')
+            ax[2].axvline(c * input_raw_each_dim, ls=':', c='k')
+            ax[3].axvline(c * input_each_dim, ls=':', c='k')
+            ax[4].axvline(c * input_raw_each_dim, ls=':', c='k')
+            ax[0].text(c * input_raw_each_dim + 1, miny, _, color='r', rotation=90)
             c += 1
 
         plt.tight_layout()
@@ -349,9 +377,9 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
     basis_transformed = config['basis_transformed']
 
-    x_labels = config['input_labels']
+    x_labels = config['input_labels_list']
+    a_labels = config['auxiliary_labels_list']
     y_labels = config['emission_labels']
-    a_labels = config['auxiliary_labels']
     ay_labels = config['auxiliary_emission_labels']
     n_inputs = len(x_labels)
     emission_dim = len(y_labels)
@@ -363,10 +391,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
     # Cosine basis transformation of inputs
     input_each_dim = config['ncos']
-    b = raised_cosine(0, input_each_dim, [0, 3*input_raw_each_dim/4], 10, input_raw_each_dim)
-    b_multi = multifeature_basis(b, n_inputs)
-    basis_ortho = scipy.linalg.orth(b_multi)
-    basis = basis_ortho
+    b = multifeature_basis(raised_cosine(0, input_each_dim, [0, 3*input_raw_each_dim/4], 10, input_raw_each_dim), 1)
+    basis = scipy.linalg.orth(multifeature_basis(b, 1))
     print("Basis created.")
 
     inputs_raw = []
@@ -416,6 +442,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         # INPUTS
         feats = []
         for _ in x_labels:
+            # print(_)
             f_ = get_input_feat(sessions_features, s, _)
             # print(_, "mean=", np.mean(f_), "std", np.std(f_))
             f = f_[s_input_windows]
@@ -488,25 +515,43 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     auxem_mn_std = np.array(auxem_mn_std)
 
     print("Basis transforming now..")
-    print(len(inputs_raw))
-    inputs_transformed = [BasisProjection(basis).transform(_) for _ in inputs_raw]
+    print(len(inputs_raw), inputs_raw[0].shape)
 
-    print("Basis transformed.")
+    inputs_transformed = []
+    for s in inputs_raw:
+        inp_s_ = []
+        for inp in s:
+            inp_tr_ = []
+            for _ in inp.reshape(-1, input_raw_each_dim):
+                inp_tr_.append(BasisProjection(basis).transform(_))
+            inp_tr_ = np.array(inp_tr_).reshape(-1)
+            inp_s_.append(inp_tr_)
+        inp_s_ = np.array(inp_s_)
+        inputs_transformed.append(inp_s_)
     inputs = np.array(inputs_transformed, dtype=object)
-    input_dim = inputs[0].shape[-1]
 
-    print("basis", basis.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim,
+    input_dim = inputs[0].shape[-1]
+    print("Basis transformed.")
+    print("basis", b.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim,
           "input_dim", input_dim, "input_each_dim", input_each_dim)
     print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape",
           inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape)
     print("inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape",
           inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape)
 
-    # emissions = np.array(emissions)
-    # aux_data = np.array(aux_data)
-    # downsampled_indices = np.array(downsampled_indices)
-    # upsampled_indices = np.array(upsampled_indices)
-    # output_mn_std = np.array(output_mn_std)
+    n_inputs_by_emission = [len(config['emission_labels'][o]) for o in config['emission_labels']]
+    input_sizes_by_emission = [_ * input_each_dim for _ in n_inputs_by_emission]
+    blocks = [np.ones(s) for s in input_sizes_by_emission]
+    input_mask_by_emission = block_diag(*blocks).astype(int)
+    print(n_inputs_by_emission, input_sizes_by_emission)
+    print("input_mask_by_emission", input_mask_by_emission)
+
+    n_inputs_by_auxemission = [len(config['auxiliary_emission_labels'][o]) for o in config['auxiliary_emission_labels']]
+    input_sizes_by_auxemission = [_ * input_each_dim for _ in n_inputs_by_auxemission]
+    blocks = [np.ones(s) for s in input_sizes_by_auxemission]
+    input_mask_by_auxemission = block_diag(*blocks).astype(int)
+    print(n_inputs_by_auxemission, input_sizes_by_auxemission)
+    print("input_mask_by_auxemission", input_mask_by_auxemission)
 
     # enhance the config
     config['input_dim'] = input_dim
@@ -514,6 +559,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     config['input_each_dim'] = input_each_dim
     config['n_inputs'] = n_inputs
     config['basis'] = basis
+    config['input_mask_by_emission'] = input_mask_by_emission
+    config['input_mask_by_auxemission'] = input_mask_by_auxemission
     config['num_sessions'] = num_sessions   # number of total sessions
     config['session_keys'] = session_keys   # sessions in this data in order
 
@@ -535,7 +582,10 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
     # Plot few samples of inputs
     if display:
-        some_plots(b_multi, basis_ortho, inputs_raw, inputs, input_raw_each_dim, input_each_dim, basis, basis_transformed, x_labels)
+        b_multi = scipy.linalg.orth(multifeature_basis(b, n_inputs))
+        inputs_transformed_multi = [BasisProjection(b_multi).transform(_) for _ in inputs_raw]
+        inputs_multi = np.array(inputs_transformed_multi, dtype=object)
+        some_plotsb3(basis, b_multi, inputs_raw, inputs, inputs_multi, input_raw_each_dim, input_each_dim, basis_transformed, x_labels)
 
     return data
 
@@ -566,31 +616,21 @@ def extract_male(source):
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
-    data_config['input_labels'] = OrderedDict({
-        'fFV': 'z-fFV',
-        'fLS': 'z-fLS',
-        'mfDist': 'z-mfDist',
-
-        'mfAng_cos': 'front_back',
-
-    })
     data_config['emission_labels'] = OrderedDict({
-        'mFV': 'z-mFV',
-        'mLV': 'z-mLV',
-        'dmTheta': 'z-dmTheta',
-        # 'dfmAng': 'z-dfmAng',
+        'mFV': ['fFV', 'fLS', 'mfDist', 'fmAng_cos'],
+        'mLV': ['fFV_directedlr', 'fLS_directedlr', 'mfDist_directedlr'],
+        'mAV': ['fFV_directedlr', 'fLS_directedlr', 'mfDist_directedlr'],
     })
-    data_config['auxiliary_labels'] = OrderedDict({
-        'fFV': 'z-fFV',     # we basically need full series as well as windowed-versions of inputs
-        'fLS': 'z-fLS',
-        'mfDist': 'z-mfDist',
-        'mfAng_cos': 'mfAng_cos',
-        # 'fmAng_sin': 'fmAng_sin',
-    })
+    data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
+    data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
+    print(data_config['input_labels_list'])
+    data_config['auxiliary_labels_list'] = ['fFV', 'fLS', 'mfDist', 'fmAng_cos']  # we basically need full series as well as windowed-versions of inputs
     data_config['auxiliary_emission_labels'] = OrderedDict({
-        'wingFlickBin': 'wingFlickBin',
-        # 'wingFlickTheta': 'wingAngFlick',
+        'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2', ]
     })
+    data_config['auxiliary_input_labels_list'] = [data_config['auxiliary_emission_labels'][o] for o in data_config['auxiliary_emission_labels']]
+    data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
+    print(data_config['auxiliary_input_labels_list'])
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
                f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_MALE.pkl'
@@ -629,48 +669,24 @@ def extract_female(source):
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
-    data_config['input_labels'] = OrderedDict({
-        'mFV': 'z-mFV',
-        'mLS': 'z-mLS',
-        'mfDist': 'z-mfDist',
-
-        # 'fmAng_sin': 'maleLR',
-        'fmAng_cos': 'front_back',
-
-        'wingAlign': 'z-wingAlign',
-        'pfast_i': 'z-pulse',
-        'sine_i': 'z-sine',
-        'pfast_i_directed': 'pulseLR',
-        'sine_i_directed': 'sineLR',
-
-        'tap2': 'z-tap2',
-        'tap2_directed': 'tap2LR',
-
-        # 'fDistWall': 'distWall',
-    })
     data_config['emission_labels'] = OrderedDict({
-        'fFV': 'z-fFV',
-        'fLV': 'z-fLV',
-        'dfTheta': 'z-dfTheta',
-        # 'dfmAng': 'z-dfmAng',
+        'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2'],
+        'fLV': ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'pfast_i_directedlr', 'sine_i_directedlr', 'tap2_directedlr'],
+        'fAV': ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'pfast_i_directedlr', 'sine_i_directedlr', 'tap2_directedlr'],
     })
-    data_config['auxiliary_labels'] = OrderedDict({
-        'mFV': 'z-mFV',     # we basically need full series as well as windowed-versions of inputs
-        'mLS': 'z-mLS',
-        'mfDist': 'z-mfDist',
-        'pfast_i': 'z-pulse',
-        'sine_i': 'z-sine',
-        'tap2': 'z-tap2',
-        'fmAng_cos': 'fmAng_cos',
-        # 'fmAng_sin': 'fmAng_sin',
-    })
+    data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
+    data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
+    print(data_config['input_labels_list'])
+    data_config['auxiliary_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'fmAng_sin', 'pfast_i', 'sine_i', 'tap2', ]  # we basically need full series as well as windowed-versions of inputs
     data_config['auxiliary_emission_labels'] = OrderedDict({
-        'wingFlickBin': 'wingFlickBin',
-        # 'wingFlickTheta': 'wingAngFlick',
+        'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2', ]
     })
+    data_config['auxiliary_input_labels_list'] = [data_config['auxiliary_emission_labels'][o] for o in data_config['auxiliary_emission_labels']]
+    data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
+    print(data_config['auxiliary_input_labels_list'])
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0723.pkl'
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     print("Saving at:", filename)
@@ -681,6 +697,6 @@ def extract_female(source):
 
 
 if __name__ == '__main__':
-    src = 'wt'
+    src = 'wt_fred'
     extract_female(src)
     # extract_male(src)

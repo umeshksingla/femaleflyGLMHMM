@@ -5,21 +5,23 @@ from sklearn.metrics import log_loss, balanced_accuracy_score
 
 
 def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
+    print('Fitting LogReg on aux emissions...')
 
     def train_logreg(x, y):
         # print(x.shape, y.shape)
         model = LogisticRegression(solver='lbfgs', max_iter=1000, class_weight='balanced')
         model.fit(x, y)
         probs = model.predict_proba(x)[:, 1]  # probability of class 1
-        preds = (probs >= 0.5).astype(int)
+        # preds = (probs >= 0.5).astype(int)
         loss = log_loss(y, probs)
-        acc = balanced_accuracy_score(y, preds)
+        # acc = balanced_accuracy_score(y, preds)
         weights = model.coef_[0]  # shape: (D,)
         bias = model.intercept_[0]
-        return loss, probs, acc, weights, bias
+        # return loss, probs, acc, weights, bias
+        return loss, probs, weights, bias
 
     inputs_ = np.concatenate(inputs, axis=0)
-    aux_emissions_ = np.concatenate(aux_emissions, axis=0) # np.hstack([np.concatenate(aux_emissions, axis=0), np.concatenate(aux_emissions, axis=0)])
+    aux_emissions_ = np.concatenate(aux_emissions, axis=0)
     z_seq_ = np.concatenate(z_seqs, axis=0)
 
     aux_emission_dim = aux_emissions_.shape[-1]
@@ -33,16 +35,18 @@ def train_aux_emissions(inputs, aux_emissions, z_seqs, num_z):
     for z in range(num_z):
         loss[z] = {}
         probs[z] = {}
-        accuracy[z] = {}
-        counts[z] = {}
+        # accuracy[z] = {}
+        # counts[z] = {}
         z_mask = (z_seq_ == z)
         for o in range(aux_emission_dim):
-            counts[z][o] = np.sum(aux_emissions_[z_mask][:, o])/len(aux_emissions_[z_mask][:, o])
-            loss[z][o], probs[z][o], accuracy[z][o], w[z, o], b[z, o] = train_logreg(inputs_[z_mask], aux_emissions_[z_mask][:, o])
+            # counts[z][o] = np.sum(aux_emissions_[z_mask][:, o])/len(aux_emissions_[z_mask][:, o])
+            # loss[z][o], probs[z][o], accuracy[z][o], w[z, o], b[z, o] = train_logreg(inputs_[z_mask], aux_emissions_[z_mask][:, o])
+            loss[z][o], probs[z][o], w[z, o], b[z, o] = train_logreg(inputs_[z_mask], aux_emissions_[z_mask][:, o])
 
     # print(loss, probs, accuracy)
     # print(w, b, w.shape, b.shape)
-    return accuracy, counts, w, b
+    print('Done fitting LogReg.')
+    return w, b, probs
 
 
 def predict_aux_emissions(weights, inputs, aux_emissions, z_seqs, num_z):
@@ -59,19 +63,22 @@ def predict_aux_emissions(weights, inputs, aux_emissions, z_seqs, num_z):
         # print(logits.shape)
         probs = expit(logits)  # sigmoid to get probabilities
         # print(probs, probs.shape)
-        preds = (probs >= 0.5).astype(int)  # threshold at 0.5
+        # preds = (probs >= 0.5).astype(int)  # threshold at 0.5
         # print(preds, preds.shape)
-        acc = balanced_accuracy_score(y_true, preds)  # compute accuracy
-        return acc
+        return probs
 
-    accuracy = {}
-    counts = {}
+    # accuracy = {}
+    # counts = {}
+    probs = {}
     for z in range(num_z):
-        accuracy[z] = {}
-        counts[z] = {}
+        # accuracy[z] = {}
+        # counts[z] = {}
+        probs[z] = {}
         z_mask = (z_seq_ == z)
         for o in range(aux_emission_dim):
-            counts[z][o] = np.sum(aux_emissions_[z_mask][:, o]) / len(aux_emissions_[z_mask][:, o])
-            accuracy[z][o] = predict(inputs_[z_mask], aux_emissions_[z_mask][:, o], W[z, o], B[z, o])
+            # counts[z][o] = np.sum(aux_emissions_[z_mask][:, o]) / len(aux_emissions_[z_mask][:, o])
+            # accuracy[z][o] = predict(inputs_[z_mask], aux_emissions_[z_mask][:, o], W[z, o], B[z, o])
+            probs[z][o] = predict(inputs_[z_mask], aux_emissions_[z_mask][:, o], W[z, o], B[z, o])
     # print("accuracy", accuracy)
-    return accuracy, counts
+    # return accuracy, counts
+    return probs

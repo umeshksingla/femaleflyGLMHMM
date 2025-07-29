@@ -13,6 +13,7 @@ from datetime import datetime
 from collections import defaultdict
 from itertools import groupby
 
+from glm_utils.preprocessing import BasisProjection
 import tensorflow_probability.substrates.jax.distributions as tfd
 import jax.numpy as jnp
 
@@ -85,6 +86,16 @@ def calculate_steady_state_p(P):
 
 
 def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None):
+    """
+    Return a dictionary of states mapped to emission values in that state.
+    :param emissions:
+    :param stateseq:
+    :param num_states:
+    :param output_mn_std:
+    :param rescaled:
+    :param effective_fps:
+    :return:
+    """
     emissions_z = {}
     for btch in range(len(stateseq)):
         for z in range(num_states):
@@ -101,15 +112,76 @@ def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, 
     return emissions_z
 
 
-# def get_stateseq_indices(indices_seq, state_seq, min_length=10):
-#     intervals = defaultdict(list)
-#     transitions_at = np.where(np.diff(state_seq) != 0)[0]+1
-#     transitions_at = np.insert(transitions_at, 0, 0)
-#     transitions_at = np.append(transitions_at, len(indices_seq)-1)
-#     for s, e in zip(transitions_at, transitions_at[1:]):
-#         if (e-s) >= min_length:
-#             intervals[state_seq[s]].append((indices_seq[s], indices_seq[e]-1))  # state doesn't end at e-1 frame but original_indexing-1
-#     return intervals
+def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False, effective_fps=None):
+    """
+    Return a dictionary of states mapped to emission values in that state.
+    :param aux_data:
+    :param stateseq:
+    :param num_states:
+    :param output_mn_std:
+    :param rescaled:
+    :param effective_fps:
+    :return:
+    """
+    aux_data_z = {}
+    for btch in range(len(stateseq)):
+        for z in range(num_states):
+            if z not in aux_data_z: aux_data_z[z] = []
+            if rescaled:
+                mn_std_btch = aux_mn_std[btch]
+                eez = aux_data[btch][stateseq[btch] == z] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+                eez = eez #* effective_fps
+            else:
+                eez = aux_data[btch][stateseq[btch] == z]
+            aux_data_z[z].append(eez)
+    for z in aux_data_z:
+        aux_data_z[z] = np.vstack(aux_data_z[z])
+    return aux_data_z
+
+
+def get_feat_windows(true_feat_series, pred_feat_series, event_onsets, window_len):
+    """
+
+    :param true_feat_series:
+    :param pred_feat_series:
+    :param event_onsets:
+    :param window_len:
+    :return:
+    """
+    true_feat_series_windows = []
+    pred_feat_series_windows = []
+
+    for onset in event_onsets:
+        start = onset - window_len
+        end = onset + window_len
+        if (start < 0) or (end > len(true_feat_series)):
+            continue  # skip this window
+
+        t_win = true_feat_series[start:end]
+        p_win = pred_feat_series[start:end]
+
+        true_feat_series_windows.append(t_win)
+        pred_feat_series_windows.append(p_win)
+    true_feat_series_windows = np.stack(true_feat_series_windows)  # shape (n_onsets, 2 * window_frames)
+    pred_feat_series_windows = np.stack(pred_feat_series_windows)  # shape (n_onsets, 2 * window_frames)
+    return true_feat_series_windows, pred_feat_series_windows
+
+
+def get_event_onsets(eventts, min_duration, lr_mask=None):
+    # print(np.unique(eventts, return_counts=True))
+    eventts = np.where(eventts > 0, 1, 0)   # replace pulse, sine, tap in original binary space (they are zscored)
+    if lr_mask is not None:
+        eventts = eventts[lr_mask]
+    event_onsets = np.where((eventts[1:] == 1) & (eventts[:-1] == 0))[0] + 1
+    event_offsets = np.where((eventts[1:] == 0) & (eventts[:-1] == 1))[0] + 1
+    if eventts[0] == 1:
+        event_onsets = np.insert(event_onsets, 0, 0)
+    if eventts[-1] == 1:
+        event_offsets = np.append(event_offsets, len(eventts) - 1)
+    durations = event_offsets - event_onsets  # in frames
+    keep_idx = np.where(durations >= min_duration)[0]
+    filtered_onsets = event_onsets[keep_idx]
+    return filtered_onsets
 
 
 def normalize_to_equal_length(arr_list, GRID=101):
@@ -154,10 +226,10 @@ def get_windows_to_plot(effective_fps, num_timestamps):
         return windows
 
     window_size = effective_fps * 1  # 1 second windows
-    windows1 = make_windows(window_size * 60, n_windows=10)  # 1 min
-    windows2 = make_windows(window_size * 60 * 5, n_windows=5)  # 5 min
-    windows3 = make_windows(window_size, n_windows=200)  # 1 sec
-    windows4 = make_windows(window_size * 30, n_windows=50)  # 30 sec
+    windows1 = make_windows(window_size, n_windows=20)  # 1 sec
+    windows2 = make_windows(window_size * 30, n_windows=10)  # 30 sec
+    windows3 = make_windows(window_size * 60, n_windows=10)  # 1 min
+    windows4 = make_windows(window_size * 60 * 5, n_windows=5)  # 5 min
 
     windows = np.vstack((windows1, windows2, windows3, windows4)).astype(int)
 
@@ -187,6 +259,8 @@ def get_full_window_to_plot(effective_fps, num_timestamps):
 def get_chance_logprob(y):
     mu = jnp.mean(y, axis=0)
     cov = jnp.cov(y.T)
+    cov = jnp.atleast_2d(cov)
+    print(mu, cov)
     model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
     p = model.prob(y)
     p = jnp.maximum(p, 1e-15)
@@ -228,3 +302,28 @@ def get_state_indices(z_seq, z, min_length=5, max_length=None, max_clips=5):
         clips = clips[indices]
 
     return clips
+
+
+def basis_invtransform_one_by_one(weights, basis, n_inputs):
+    num_states = weights.shape[0]
+    emission_dim = weights.shape[1]
+    filter_len = weights.shape[2]
+    each_filter_len = filter_len // n_inputs
+    new_weights = []
+    for z in range(num_states):
+        z_ = []
+        for o in range(emission_dim):
+            o_ = []
+            for e in range(n_inputs):
+                w_ = weights[z][o, e * each_filter_len:e * each_filter_len + each_filter_len]
+                # print(w_, w_.shape)
+                w = BasisProjection(basis).inverse_transform(w_).squeeze()
+                # print(w.shape)
+                o_.append(w)
+            # print(o_)
+            o_ = np.array(o_).reshape(-1)
+            # print(o_)
+            z_.append(o_)
+        new_weights.append(z_)
+    new_weights = np.array(new_weights)
+    return new_weights.reshape(num_states, emission_dim, n_inputs, -1)

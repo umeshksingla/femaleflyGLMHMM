@@ -44,20 +44,15 @@ def get_feat(sessions_features, s, f_name):
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
         ts = smooth_gaussian(ts, sigma=3)
-    elif f_name in ['song_directed', 'sine_i_directed', 'pfast_i_directed', 'song_i_directed', 'tap_directed', 'tap2_directed']:
+    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pfast_i_directedlr', 'song_i_directedlr', 'tap_directedlr', 'tap2_directedlr']:
         f_name_ = f_name.split('_directed')[0]
         ts = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
-    elif f_name in ['dfTheta']:
+    elif f_name in ['fAV']:
         ts = sf['fTheta']
         ts = smooth_gaussian(ts, sigma=3)
         dfTheta = np.diff(ts, prepend=ts[0])
         ts = np.where(np.abs(dfTheta) > 90, 0, dfTheta)
-    elif f_name in ['dfTheta_abs']:
-        ts = sf['fTheta']
-        ts = smooth_gaussian(ts, sigma=3)
-        dfTheta_abs = np.diff(np.diff(ts, prepend=ts[0]))
-        ts = np.where(dfTheta_abs > 90, 0, dfTheta_abs)
-    elif f_name in ['dmTheta']:
+    elif f_name in ['mAV']:
         ts = sf['mTheta']
         ts = smooth_gaussian(ts, sigma=3)
         dmTheta = np.diff(ts, prepend=ts[0])
@@ -73,30 +68,17 @@ def get_feat(sessions_features, s, f_name):
     return ts
 
 
-def get_x_and_y_data(datacls, sessions_features, config, display=False):
-
-    basis_transformed = config['basis_transformed']
+def get_x_and_y_data(datacls, sessions_features, config):
 
     x_labels = config['input_labels']
     y_labels = config['emission_labels']
-    n_inputs = len(x_labels)
-    emission_dim = len(y_labels)
     input_raw_each_dim = config['input_raw_each_dim']
-    input_raw_dim = input_raw_each_dim * n_inputs
     predict_window_size = config['predict_window_size']
     input_raw_overlap = config['input_raw_overlap']
     predict_gap_size = config['predict_gap_size']
 
-    # Cosine basis transformation of inputs
-    input_each_dim = config['ncos']
-    b = raised_cosine(0, input_each_dim, [0, 3*input_raw_each_dim/4], 10, input_raw_each_dim)
-    b_multi = multifeature_basis(b, n_inputs)
-    basis_ortho = scipy.linalg.orth(b_multi)
-    basis = basis_ortho
-    print("Basis created.")
-
     inputs_raw = []
-    emissions = []
+    outputs_raw = []
     session_keys = []
 
     for s_i, s in enumerate(sessions_features):
@@ -113,7 +95,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         session_copulation = datacls.get_copulation_bool_from_session(s, session_len)
         print(f'Session {s_i} copulation={session_copulation} session_len={session_len}.')
 
-        input_windows, output_windows = create_x_and_y_windows(num_timesteps, x_size=input_raw_each_dim,
+        input_windows, _ = create_x_and_y_windows(num_timesteps, x_size=input_raw_each_dim,
                                                                y_size=predict_window_size, x_overlap=input_raw_overlap,
                                                                y_gap_size=predict_gap_size)
 
@@ -129,38 +111,41 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         s_inputs = np.hstack(i_feats)
         print(f"session {s_i} inp processed")
 
-        # EMISSIONS
+        # OUTPUTS
         o_feats = []
         for _ in y_labels:
             f = get_feat(sessions_features, s, _)[s_windows]
             o_feats.append(f)
-        s_emissions = np.hstack(o_feats)
+        s_outputs = np.hstack(o_feats)
         print(f"session {s_i} output processed")
 
         inputs_raw.append(s_inputs)
-        emissions.append(s_emissions)
-        if s_i == 0:
+        outputs_raw.append(s_outputs)
+        if s_i == 5:
             break
 
     inputs_raw = np.array(inputs_raw, dtype=object)
-    emissions = np.array(emissions, dtype=object)
-    # aux_emissions = np.array(aux_emissions, dtype=object)
-
-    return inputs_raw, emissions
+    outputs_raw = np.array(outputs_raw, dtype=object)
+    return inputs_raw, outputs_raw
 
 
-def plot_inputs(batch, idxs, inputs_raw, data_config, savedir=None, display=True):
+def plot_inputs(batch, idxs, inputs_raw, data_config, small=False, savedir=None, display=True):
     input_labels = data_config['input_labels']
     n_feats = len(input_labels)
     feat_size = data_config['input_raw_each_dim']
     i_features = inputs_raw[batch].reshape(-1, n_feats, feat_size)
 
+    fontsize = 14 if small else 18
+    figwidth = 2 if small else 5
+    figheight = n_feats * 0.5
+
     for idx in idxs:
         print("batch", batch, "idx", idx)
-        fig, axes = plt.subplots(n_feats, 1, figsize=(2, n_feats * 0.4), sharex=True)
+        fig, axes = plt.subplots(n_feats, 1, figsize=(figwidth, figheight), sharex=True)
         i = 0
         for _ in input_labels:
-            axes[i].plot(i_features[idx][i][225:], color=data_config['input_label_colors'][_], linewidth=2)
+            r = np.r_[feat_size // 2:] if small else np.r_[0:feat_size]
+            axes[i].plot(i_features[idx][i][r], color=data_config['input_label_colors'][_], linewidth=2)
             axes[i].spines['top'].set_visible(False)
             axes[i].spines['right'].set_visible(False)
             axes[i].spines['left'].set_visible(False)
@@ -168,13 +153,13 @@ def plot_inputs(batch, idxs, inputs_raw, data_config, savedir=None, display=True
             axes[i].set_xticks([])
             axes[i].set_yticks([])
             # axes[i].text(-0.5, 0, input_labels[_], ha='right')
-            axes[i].text(-0.02, 0.5, input_labels[_], transform=axes[i].transAxes, fontsize=14,
+            axes[i].text(-0.02, 0.5, input_labels[_], transform=axes[i].transAxes, fontsize=fontsize,
                          ha='right', va='center', color=data_config['input_label_colors'][_])
             i += 1
         fig.align_ylabels()
         plt.tight_layout()
 
-        if savedir: plt.savefig(os.path.join(savedir, f'i_batch={batch}_ix={idx}_.pdf'), transparent=True, dpi=300, bbox_inches='tight')
+        if savedir: plt.savefig(os.path.join(savedir, f'i_small={small}_batch={batch}_ix={idx}.pdf'), transparent=True, dpi=300, bbox_inches='tight')
         if display: plt.show()
         plt.close()
     return
@@ -188,22 +173,22 @@ def plot_emissions(batch, idxs, emissions, data_config, savedir=None, display=Tr
 
     for idx in idxs:
         print("batch", batch, "idx", idx)
-        fig, axes = plt.subplots(n_feats, 1, figsize=(2, n_feats * 0.4), sharex=True)
+        fig, axes = plt.subplots(n_feats, 1, figsize=(6, n_feats * 0.75), sharex=True)
         i = 0
         for _ in emission_labels:
-            axes[i].plot(i_features[idx][i][225:], color=data_config['emission_label_colors'][_], linewidth=2)
+            axes[i].plot(i_features[idx][i], color=data_config['emission_label_colors'][_], linewidth=2)
             axes[i].spines['top'].set_visible(False)
             axes[i].spines['right'].set_visible(False)
             axes[i].spines['left'].set_visible(False)
             axes[i].spines['bottom'].set_visible(False)
             axes[i].set_xticks([])
             axes[i].set_yticks([])
-            axes[i].text(-0.02, 0.5, emission_labels[_], transform=axes[i].transAxes, fontsize=14,
+            axes[i].text(-0.02, 0.5, emission_labels[_], transform=axes[i].transAxes, fontsize=18,
                          ha='right', va='center', color=data_config['emission_label_colors'][_])
             i += 1
         fig.align_ylabels()
         plt.tight_layout()
-        if savedir: plt.savefig(os.path.join(savedir, f'e_batch={batch}_ix={idx}_.pdf'), transparent=True, dpi=300, bbox_inches='tight')
+        if savedir: plt.savefig(os.path.join(savedir, f'e_batch={batch}_ix={idx}.pdf'), transparent=True, dpi=300, bbox_inches='tight')
         if display: plt.show()
         plt.close()
     return
@@ -231,17 +216,18 @@ def extract_female(source):
         'mLS': 'mLS',
         'mfDist': 'mfDist',
 
-        # 'fmAng_sin': 'maleLR',
-        'fmAng_cos': 'front_back',
+        # 'fmAng': "fmAng",
+        'fmAng_cos': r"$\it{cos}$(fmAng)",
+        'fmAng_sin': r"$\it{sin}$(fmAng)",
 
-        'wingAlign': 'wingAng',
+        # 'wingAlign': 'wingAng',
         'pfast_i': 'pulse song',
-        'pfast_i_directed': 'pulse song\nx side',
+        # 'pfast_i_directedlr': 'pulse song\nx side',
         'sine_i': 'sine song',
-        'sine_i_directed': 'sine song\nx side',
+        # 'sine_i_directedlr': 'sine song\nx side',
 
         'tap2': 'tap',
-        'tap2_directed': 'tap\nx side',
+        # 'tap2_directedlr': 'tap\nx side',
 
         # 'fDistWall': 'distWall',
     })
@@ -250,34 +236,35 @@ def extract_female(source):
         'mLS': input_label_colors['mfDist'],
         'mfDist': input_label_colors['mfDist'],
 
-        # 'fmAng_sin': 'k',
+        'fmAng': input_label_colors['mfDist'],
         'fmAng_cos': input_label_colors['mfDist'],
+        'fmAng_sin': input_label_colors['mfDist'],
 
         'wingAlign': input_label_colors['mFV'],
         'pfast_i': input_label_colors['pfast_i'],
         'sine_i': input_label_colors['sine_i'],
-        'pfast_i_directed': input_label_colors['pfast_i_directed'],
-        'sine_i_directed': input_label_colors['sine_i_directed'],
+        'pfast_i_directedlr': input_label_colors['pfast_i_directedlr'],
+        'sine_i_directedlr': input_label_colors['sine_i_directedlr'],
 
-        'tap2': input_label_colors['tap2_directed'],
-        'tap2_directed': input_label_colors['tap2_directed'],
+        'tap2': input_label_colors['tap2'],
+        'tap2_directedlr': input_label_colors['tap2_directedlr'],
 
         # 'fDistWall': 'distWall',
     })
     data_config['emission_labels'] = OrderedDict({
-        'fFV': 'forward\nvelocity',
-        'fLV': 'lateral\nvelocity',
-        'dfTheta': 'angular\nvelocity',
+        'fFV': 'forward velocity\n(fFV)',
+        'fLV': 'lateral velocity\n(fLV)',
+        'fAV': 'angular velocity\n(fAV)',
         'wingFlickBin': 'wing flick',
     })
     data_config['emission_label_colors'] = OrderedDict({
         'fFV': EC,
         'fLV': EC,
-        'dfTheta': EC,
+        'fAV': EC,
         'wingFlickBin': EC,
     })
 
-    inputs_raw, emissions = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
+    inputs_raw, emissions = get_x_and_y_data(datacls, sessions_features, data_config)
 
     print("====", inputs_raw[0].shape)
 
@@ -285,21 +272,20 @@ def extract_female(source):
     os.makedirs(introfigs_dir, exist_ok=True)
 
     # Plot each feature
-    batch = 0
+    batch = 3
     np.random.seed()
     i_features = inputs_raw[batch].reshape(-1, len(data_config['input_labels']), data_config['input_raw_each_dim'])
-
-    idxs = np.random.choice(i_features.shape[0], size=10)
+    idxs = np.random.choice(i_features.shape[0], size=100)
     for ix in idxs:
-        batch = 0
-        ix = 7056
-        plot_inputs(batch, [ix], inputs_raw, data_config, savedir=introfigs_dir, display=False)
-        plot_emissions(batch, [ix], emissions, data_config, savedir=introfigs_dir, display=False)
+        ix = 12972  # 190724_112816_wt_16276625_rig2.1.h5
+        print("batch", batch, "ix", ix)
+        plot_inputs(batch, [ix], inputs_raw, data_config, small=True, savedir=introfigs_dir, display=False)
+        # plot_emissions(batch, [ix], emissions, data_config, savedir=introfigs_dir, display=True)
         break
+
     return
 
 
 if __name__ == '__main__':
     src = 'wt'
     extract_female(src)
-    # extract_male(src)
