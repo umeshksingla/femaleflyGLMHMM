@@ -5,6 +5,7 @@ import numpy as np
 from jax import vmap
 import jax.random as jr
 from dynamax.hidden_markov_model import LinearRegressionHMM
+from library.linreghmm import LinearRegressionHMMCustom
 from hmms.BaseFemaleFly import BaseFemaleFly
 
 from utilities.io import get_chance_logprob
@@ -24,9 +25,10 @@ class LRHMMFemaleFly(BaseFemaleFly):
         self.num_states = model_config['num_states']
         # print("self.model_config", self.model_config)
         self.seed = model_config.get('seed', 0)
-        self.model = LinearRegressionHMM(num_states=self.model_config['num_states'],
+        self.model = LinearRegressionHMMCustom(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
                                     emission_dim=self.data_config['emission_dim'],
+                                    input_mask_by_emission=self.data_config['input_mask_by_emission'],
                                     transition_matrix_stickiness=self.model_config['transition_matrix_stickiness'])
         self.learned_params = None
         self.learned_lps = None

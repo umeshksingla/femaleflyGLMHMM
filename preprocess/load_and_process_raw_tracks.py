@@ -3,9 +3,11 @@ import joblib
 
 def process_and_dump_sessions():
     from preprocess.leaprig import WT_DATA
+    from preprocess.new16mic import FREDCLEANED_DATA
     from preprocess.extract_data_from_h5 import fill_missing_tracks_SR, smooth
 
-    DATA = WT_DATA
+    # DATA = WT_DATA
+    DATA = FREDCLEANED_DATA
 
     # Get raw tracks in mm space up to copulation
     session_paths = DATA.get_session_paths()
@@ -44,9 +46,12 @@ def process_and_dump_sessions():
         mtracks[s_path] = mTrx
         print("==")
         if s%5 == 0:
-            joblib.dump(ftracks, 'processed_ftracks.pkl')
-            joblib.dump(mtracks, 'processed_mtracks.pkl')
+            joblib.dump(ftracks, f'{DATA.dataset}_processed_ftracks.pkl')
+            joblib.dump(mtracks, f'{DATA.dataset}_processed_mtracks.pkl')
 
-    joblib.dump(ftracks, 'processed_ftracks.pkl')
-    joblib.dump(mtracks, 'processed_mtracks.pkl')
+    joblib.dump(ftracks, f'{DATA.dataset}_processed_ftracks.pkl')
+    joblib.dump(mtracks, f'{DATA.dataset}_processed_mtracks.pkl')
     return
+
+
+process_and_dump_sessions()

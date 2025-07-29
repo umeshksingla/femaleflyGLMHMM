@@ -26,7 +26,7 @@ def fitEMCustomInit(key, hmm, train_emissions, train_inputs,
                                         num_iters=50, verbose=True)
     train_emissions_size = np.sum([e.size for e in train_emissions])
     em_lps = -em_losses / train_emissions_size
-    # print("em_lps:", em_lps)
+    print("em_lps:", em_lps)
     ll_diff = np.diff(em_lps)
     # print(ll_diff)
     converged = np.abs(ll_diff[-1]) < 1e-3
@@ -76,7 +76,7 @@ def fitEM(key, hmm, train_emissions, train_inputs):
     s = time.time()
     fbgd_key, key = jr.split(key)
     em_params, em_props = hmm.initialize(key)
-    em_params, em_losses = hmm.fit_em(em_params,
+    em_params, em_losses = hmm.fit_em_lrhmm_custom(em_params,
                                         em_props,
                                         train_emissions,
                                         train_inputs,
@@ -92,7 +92,4 @@ def fitEM(key, hmm, train_emissions, train_inputs):
     print("=== END em ==========")
     print(f"Time taken to fit EM: {round(e - s, 2)}s")
     return em_params, em_lps
-
-
-
 

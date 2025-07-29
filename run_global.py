@@ -15,6 +15,7 @@ import numpy as np
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LogRHMMFemaleFly import LogRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
+from hmms.LRFemaleFly1 import LRFemaleFly1
 from hmms.LogRFemaleFly import LogRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
@@ -57,8 +58,15 @@ def run(mc, enhance=False, genfig=False):
     emissions, inputs, output_mn_std = data['emissions'], data['inputs'], data['output_mn_std']
 
     data_config = data['data_config']
-    print('Inputs:', data_config['input_labels'])
+    print('Inputs:', data_config['input_labels_list'])
     print('Emissions:', data_config['emission_labels'])
+
+    # input_mask_by_emission = np.zeros((len(data_config['emission_labels']), len(data_config['input_labels'])*4))
+    # input_mask_by_emission[0, 0:8] = 1
+    # input_mask_by_emission[1, 8:20] = 1
+    # input_mask_by_emission[2, 20:24] = 1
+    # print("input_mask_by_emission", input_mask_by_emission)
+    # data_config['input_mask_by_emission'] = input_mask_by_emission
 
     num_batches = data_config['num_sessions']
     datasplit_seed = mc.get('datasplit_seed', 0)
@@ -94,6 +102,8 @@ def run(mc, enhance=False, genfig=False):
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
         model = LRFemaleFly(data_config, mc)
+    elif model_prefix == 'lr1':
+        model = LRFemaleFly1(data_config, mc)
     elif model_prefix == 'logr':
         model = LogRFemaleFly(data_config, mc)
     else:
@@ -121,14 +131,14 @@ def run(mc, enhance=False, genfig=False):
             utils.generate_figures(dump_filepath, savefig=True, display=False)
             print(">> Done with figures.\n")
 
-            print(">> Generating trajectories:")
+            # print(">> Generating trajectories:")
             utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
-            print(">> Done with trajectories.\n")
+            # print(">> Done with trajectories.\n")
 
-            print(">> Generating videos:")
-            utils.generate_state_traces(dump_filepath, savefig=True, display=False)
-            utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
-            print(">> Done with videos.\n")
+            # print(">> Generating videos:")
+            # utils.generate_state_traces(dump_filepath, savefig=True, display=False)
+            # utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
+            # print(">> Done with videos.\n")
 
     print("Finished.\n")
     return dump_filepath

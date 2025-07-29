@@ -2,7 +2,8 @@ import jax
 import numpy as np
 import jax.random as jr
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
-from hmms.LRFemaleFly import LRFemaleFly
+# from hmms.LRFemaleFly import LRFemaleFly
+from hmms.LRFemaleFly1 import LRFemaleFly1
 
 from utilities import fitting
 
@@ -17,12 +18,13 @@ class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
         print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
 
-        lr = LRFemaleFly(self.data_config, self.model_config)
+        lr = LRFemaleFly1(self.data_config, self.model_config)
         lr.fit(emissions, inputs, output_mn_std)
         W = np.repeat(lr.learned_params['w'], repeats=self.num_states, axis=0)
         b = np.repeat(lr.learned_params['b'], repeats=self.num_states, axis=0)
-        W = W + np.random.random(W.shape) * 0.01
-        b = b + np.random.random(b.shape) * 0.01
+        W = W + np.random.random(W.shape) * 1e-4
+        b = b + np.random.random(b.shape) * 1e-4
+        # print("W", W)
         print("LR global W and b computed.", W.shape, b.shape)
         em_params, em_lps = fitting.fitEMCustomInit(key, self.model, emissions, train_inputs=inputs,
                                                     emission_weights=W, emission_biases=b)
