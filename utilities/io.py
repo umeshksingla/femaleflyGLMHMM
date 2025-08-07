@@ -43,6 +43,16 @@ def load_specific_path(model_path):
     return model_pkl, data_config_pkl, model_config
 
 
+def load_specific_path_auxem(model_path):
+    print('Loading auxem:', model_path)
+    model_pkl = joblib.load(os.path.join(model_path, 'auxem_model.pkl'))
+    with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
+    if fit_success != 'True':
+        print(Warning(f'Unsuccessful model loaded. {model_path}'))
+        return None
+    return model_pkl
+
+
 def load_specific_path_single(model_path):
     data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
     model_pkl = joblib.load(os.path.join(model_path, 'model_ind.pkl'))
@@ -278,8 +288,6 @@ def calc_dwell_times_by_z(z_seqs, num_states):
 
     for z in dwell_times_z:
         dwell_times_z[z] = np.array(dwell_times_z[z])
-    for z, durations in dwell_times_z.items():
-        print(f"State {z+1}: Mean dwell time = {np.mean(durations):.2f}, n = {len(durations)}")
     return dwell_times_z
 
 

@@ -35,6 +35,10 @@ def get_features(DATA, expt_path, cop_start_frame):
     tap_ftr_dict = DATA.get_tap_feature(expt_path, cop_start_frame, mTrx, fTrx)
     all_session_features.update(tap_ftr_dict)
 
+    # Compute wing midpoint angles using various body points
+    male_wingmidpoint_ftr_dict = female_features.compute_male_wing_midpoint_features(fTrx, mTrx, fly_nodes)
+    all_session_features.update(male_wingmidpoint_ftr_dict)
+
     # Compute wing flick features using various body points
     female_wing_flick_ftr_dict = female_features.compute_wing_flick_features(fTrx, fly_nodes)
     all_session_features.update(female_wing_flick_ftr_dict)
@@ -46,15 +50,14 @@ def get_features(DATA, expt_path, cop_start_frame):
     # Get auditory bout features
     song = DATA.get_all_song(expt_path)[:cop_start_frame]
     all_session_features['pulse'] = song[:, 0]
-    all_session_features['sine'] = song[:, 1]
-    all_session_features['mix'] = song[:, 2]
+    all_session_features['mix'] = song[:, 1]
+    all_session_features['sine'] = song[:, 2]
     all_session_features['song'] = ~song[:, 3]
     all_session_features['silence'] = song[:, 3]
 
     # Get auditory individual pulse and sine features
     isong = DATA.get_all_individual_song(expt_path)[:cop_start_frame]
-    all_session_features['pfast_i'] = isong[:, 0]
-    all_session_features['pslow_i'] = isong[:, 1]
+    all_session_features['pulse_i'] = isong[:, 0]   # no individual mix or pslow
     all_session_features['sine_i'] = isong[:, 2]
     all_session_features['song_i'] = ~isong[:, 3]
     all_session_features['silence_i'] = isong[:, 3]
@@ -87,9 +90,9 @@ if __name__ == '__main__':
 
         session_name = DATA.get_session_name(session_path)
 
-        if session_name in ['190723_102650_wt_18159211_rig1.1.h5']:
-            print("Skipped. usually file open error.")
-            continue
+        # if session_name in ['190723_102650_wt_18159211_rig1.1.h5']:
+        #     print("Skipped. usually file open error.")
+        #     continue
 
         if session_name in ['20190927_151317_left']:
             print("Corrupted tap file.")
@@ -110,10 +113,10 @@ if __name__ == '__main__':
             print(e)
             continue
 
-        if len(sessions_features) == 10:
+        if len(sessions_features) % 10 == 0:
             joblib.dump(sessions_features,
-                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_may30.pkl'))
+                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jul29.pkl'))
 
     joblib.dump(sessions_features,
-                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_may30.pkl'))
+                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jul29.pkl'))
     print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(sessions_features)}")

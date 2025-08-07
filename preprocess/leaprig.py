@@ -69,15 +69,15 @@ class WT_DATA:
             # Load.
             frame_at_sample = f["frame_at_sample"][:]
             s1 = f["pulse_bouts"][:]
-            s2 = f["sine_bouts"][:]
-            s3 = f["mix_bouts"][:]
+            s2 = f["mix_bouts"][:]
+            s3 = f["sine_bouts"][:]
 
         # Reconstruct masks.
         s1 = preproc_utils.lims_to_mask(frame_at_sample[s1], n_frames)
         s2 = preproc_utils.lims_to_mask(frame_at_sample[s2], n_frames)
         s3 = preproc_utils.lims_to_mask(frame_at_sample[s3], n_frames)
         silence = ~(s1 | s2 | s3)
-        all_song = np.stack([s1, s2, s3, silence], axis=1)
+        all_song = np.stack([s1, s2, s3, silence], axis=1)  # pulse, mix, sine, then silence
         return all_song
 
     @staticmethod
@@ -91,21 +91,23 @@ class WT_DATA:
             # Load.
             frame_at_sample = f["frame_at_sample"][:]
             s1 = f["pfast_lims"][:].astype(int)
-            s2 = f["pslow_lims"][:].astype(int)
+            s1_ = f["pslow_lims"][:].astype(int)
             s3 = f["sine_lims"][:].astype(int)
 
         # Reconstruct masks.
         s1 = preproc_utils.lims_to_mask(frame_at_sample[s1], n_frames)
-        s2 = preproc_utils.lims_to_mask(frame_at_sample[s2], n_frames)
+        s1_ = preproc_utils.lims_to_mask(frame_at_sample[s1_], n_frames)
+        s1 = s1 | s1_   # merge pfast and pslow
+        s2 = np.zeros_like(s1).astype(int)
         s3 = preproc_utils.lims_to_mask(frame_at_sample[s3], n_frames)
         silence = ~(s1 | s2 | s3)
-        all_individual_song = np.stack([s1, s2, s3, silence], axis=1)
+        all_individual_song = np.stack([s1, s2, s3, silence], axis=1)  # pulse, create 0s for mix, sine, then silence
         return all_individual_song
 
     @staticmethod
     def get_tap_feature(expt_path=None, cop_start_frame=None, mTrx=None, fTrx=None):
         d = dict()
-        d['tap'] = tactile_features.compute_mechanical_features_v1(mTrx, fTrx, WT_DATA.get_fly_nodes())['touch']
+        # d['tap'] = tactile_features.compute_mechanical_features_v1(mTrx, fTrx, WT_DATA.get_fly_nodes())['touch']
         tap_feat = tactile_features.compute_mechanical_features_v2(mTrx, fTrx, WT_DATA.get_fly_nodes())
         d['tap2'] = tap_feat['tapClosestDist'] <= 0.0  # unsigned tap
         # d['tap2_directed'] = (tap_feat['tapClosestDist'] <= 0.0) * np.sign(tap_feat['tapClosestAng'])  # signed tap

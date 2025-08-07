@@ -25,7 +25,7 @@ def get_feat(sessions_features, s, f_name):
     if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall', 'fFV', 'fLS', 'fLV', 'fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
-    elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap', 'tap2']:
+    elif f_name in ['song', 'sine_i', 'pulse_i', 'song_i', 'tap2']:
         ts = sf[f_name]
     elif f_name in ['fmAng']:
         ts = np.radians(sf['fmAng'])
@@ -44,7 +44,7 @@ def get_feat(sessions_features, s, f_name):
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
         ts = smooth_gaussian(ts, sigma=3)
-    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pfast_i_directedlr', 'song_i_directedlr', 'tap_directedlr', 'tap2_directedlr']:
+    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pulse_i_directedlr2', 'song_i_directedlr2', 'tap2_directedlr']:
         f_name_ = f_name.split('_directed')[0]
         ts = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
     elif f_name in ['fAV']:
@@ -198,7 +198,7 @@ def extract_female(source):
 
     data_config = {}
 
-    sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
+    sessions_features = joblib.load('../data/wt/sessions_features_78_jul29.pkl')
     datacls = WT_DATA
 
     fps = sessions_features.get('fps', datacls.fps)
@@ -220,8 +220,9 @@ def extract_female(source):
         'fmAng_cos': r"$\it{cos}$(fmAng)",
         'fmAng_sin': r"$\it{sin}$(fmAng)",
 
-        # 'wingAlign': 'wingAng',
-        'pfast_i': 'pulse song',
+        'wingAlign': 'wingAng',
+        # 'pfast_i': 'pulse song',
+        'pulse_i': 'pulse song',
         # 'pfast_i_directedlr': 'pulse song\nx side',
         'sine_i': 'sine song',
         # 'sine_i_directedlr': 'sine song\nx side',
@@ -232,22 +233,24 @@ def extract_female(source):
         # 'fDistWall': 'distWall',
     })
     data_config['input_label_colors'] = OrderedDict({
-        'mFV': input_label_colors['mfDist'],
-        'mLS': input_label_colors['mfDist'],
-        'mfDist': input_label_colors['mfDist'],
+        'mFV': IC,
+        'mLS': IC,
+        'mfDist': 'k',
 
-        'fmAng': input_label_colors['mfDist'],
+        'fmAng': 'k',
         'fmAng_cos': input_label_colors['mfDist'],
         'fmAng_sin': input_label_colors['mfDist'],
 
-        'wingAlign': input_label_colors['mFV'],
-        'pfast_i': input_label_colors['pfast_i'],
+        'wingAlign': IC,
+        # 'pfast_i': input_label_colors['pfast_i'],
+        'pulse_i': input_label_colors['pfast_i'],
         'sine_i': input_label_colors['sine_i'],
-        'pfast_i_directedlr': input_label_colors['pfast_i_directedlr'],
-        'sine_i_directedlr': input_label_colors['sine_i_directedlr'],
+        # 'pfast_i_directedlr': input_label_colors['pfast_i_directedlr'],
+        'pulse_i_directedlr2': input_label_colors['pulse_i_directedlr2'],
+        'sine_i_directedlr2': input_label_colors['sine_i_directedlr2'],
 
         'tap2': input_label_colors['tap2'],
-        'tap2_directedlr': input_label_colors['tap2_directedlr'],
+        'tap2_directedlr2': input_label_colors['tap2_directedlr2'],
 
         # 'fDistWall': 'distWall',
     })
@@ -268,17 +271,18 @@ def extract_female(source):
 
     print("====", inputs_raw[0].shape)
 
-    introfigs_dir = '../paper figs/figure_behavior/datasamples'
+    introfigs_dir = '../paper figs/figure_behavior/datasamples_'
     os.makedirs(introfigs_dir, exist_ok=True)
 
     # Plot each feature
-    batch = 3
+    batch = 4
     np.random.seed()
     i_features = inputs_raw[batch].reshape(-1, len(data_config['input_labels']), data_config['input_raw_each_dim'])
     idxs = np.random.choice(i_features.shape[0], size=100)
     for ix in idxs:
-        ix = 12972  # 190724_112816_wt_16276625_rig2.1.h5
+        ix = 12942  # 190724_112816_wt_16276625_rig2.1.h5
         print("batch", batch, "ix", ix)
+        plot_inputs(batch, [ix], inputs_raw, data_config, small=False, savedir=introfigs_dir, display=False)
         plot_inputs(batch, [ix], inputs_raw, data_config, small=True, savedir=introfigs_dir, display=False)
         # plot_emissions(batch, [ix], emissions, data_config, savedir=introfigs_dir, display=True)
         break

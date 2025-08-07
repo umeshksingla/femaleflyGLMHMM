@@ -34,7 +34,7 @@ def __create_ellipse(length: float, width: float, rotation: np.ndarray, offset: 
     ellipse = np.radians(np.arange(0, 360, 1))
     ellipse = np.column_stack([np.cos(ellipse) * length / 2, np.sin(ellipse) * width / 2])
     offset = np.atleast_2d(offset)
-    print(offset.shape)
+    # print(offset.shape)
     return __rotate_points(ellipse, rotation) + offset[:, np.newaxis, :]
 
 

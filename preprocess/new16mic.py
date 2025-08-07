@@ -63,10 +63,10 @@ class FREDCLEANED_DATA:
             # Bout sample limits.
             bout_lims = seg["bInf"]["stEn"][0][0]
             pulse_bouts = bout_lims[np.where(seg["bInf"]["Type"][0][0] == "Pul")[0]]
-            sine_bouts = bout_lims[np.where(seg["bInf"]["Type"][0][0] == "Sin")[0]]
             mix_bouts = bout_lims[np.where(seg["bInf"]["Type"][0][0] == "Mix")[0]]
+            sine_bouts = bout_lims[np.where(seg["bInf"]["Type"][0][0] == "Sin")[0]]
 
-            return pulse_bouts, sine_bouts, mix_bouts
+            return pulse_bouts, mix_bouts, sine_bouts
 
         n_frames = h5read(expt_path, "/track_occupancy").squeeze().shape[0]
         s1, s2, s3 = __load_song__(os.path.join(os.path.dirname(expt_path), 'sInf_params_new16mic.mat'))
@@ -79,7 +79,7 @@ class FREDCLEANED_DATA:
         s2 = preproc_utils.lims_to_mask(frame_at_sample[s2], n_frames)
         s3 = preproc_utils.lims_to_mask(frame_at_sample[s3], n_frames)
         silence = ~(s1 | s2 | s3)
-        all_song = np.stack([s1, s2, s3, silence], axis=1)
+        all_song = np.stack([s1, s2, s3, silence], axis=1)  # pulse, mix, sine, then silence
         return all_song
 
     @staticmethod
@@ -90,8 +90,8 @@ class FREDCLEANED_DATA:
     @staticmethod
     def get_tap_feature(expt_path, cop_start_frame, mTrx=None, fTrx=None, fTheta=None):
         d = dict()
-        d['tap'] = (np.load(os.path.join(os.path.dirname(expt_path), 'cropped_predictions.npy')) > 0.9)[:cop_start_frame]
-        d['tap2'] = d['tap']
+        d['tap2'] = (np.load(os.path.join(os.path.dirname(expt_path), 'cropped_predictions.npy')) > 0.9)[:cop_start_frame]
+        # d['tap2'] = d['tap']
         return d
 
     @staticmethod

@@ -1,3 +1,4 @@
+import sys
 import time
 
 import joblib
@@ -10,6 +11,7 @@ from scipy.ndimage import uniform_filter1d, gaussian_filter1d
 import scipy.ndimage
 from scipy.linalg import block_diag
 import pywt
+from joblib import Parallel, delayed
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
@@ -17,6 +19,22 @@ import matplotlib.pyplot as plt
 
 from preprocess.leaprig import WT_DATA, AC_BOTH
 from preprocess.new16mic import FREDCLEANED_DATA
+
+
+def transform_single_input(inp, basis, input_raw_each_dim):
+    transformed = [
+        BasisProjection(basis).transform(x)
+        for x in inp.reshape(-1, input_raw_each_dim)
+    ]
+    return np.array(transformed).reshape(-1)
+
+
+def transform_single_session(s_i, s, basis, input_raw_each_dim):
+    print(s_i)
+    return np.array([
+        transform_single_input(inp, basis, input_raw_each_dim)
+        for inp in s
+    ])
 
 
 # def smooth_moving_average(x, smooth_window):
@@ -98,7 +116,7 @@ def get_input_feat(sessions_features, s, f_name):
         ts = sf[f_name]
         ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(ts)
-    elif f_name in ['song', 'sine_i', 'pfast_i', 'song_i', 'tap', 'tap2']:
+    elif f_name in ['song', 'sine_i', 'pulse_i', 'song_i', 'tap2']:
 
         # print(f_name, np.mean(sf[f_name]), np.std(sf[f_name]))
 
@@ -120,24 +138,42 @@ def get_input_feat(sessions_features, s, f_name):
         ts = np.radians(sf['fmAng'])
         ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(np.sin(ts))    # sin: left or right of the fly
-    elif f_name in ['wingAlign']:
+    elif f_name in ['wingAlign_song_i_directedlr2']:
         ts = np.min([sf['wingLAristaLAlignAng'],
                        sf['wingRAristaRAlignAng'],
                        sf['wingLAristaRAlignAng'],
-                       sf['wingRAristaLAlignAng']], axis=0)
+                       sf['wingRAristaLAlignAng']], axis=0)     # positive
+        ts = np.cos(np.radians(np.abs(ts))) * sf['song_i'] * np.sign(np.sin(np.radians(sf['fmAng'])))   # we do not expect the variance to be very high among these vars. so no need to zscore them separately
+        # cos makes 0 deg to 1 (best alignment) and 180 degrees to -1 (worst alignment).
+        # Multiplied by binary song, when song is 0, this variable is 0 (so equivalent to the worst alignment).
+        # Multiplied by -1/1 direction, cos gets divided into negative and positive.
         ts = smooth_gaussian(ts, sigma=3)
-        feat = zscore(ts)     # it is okay to zscore these alignment angles as if they are being treated linearly
-    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pfast_i_directedlr', 'song_i_directedlr', 'tap_directedlr', 'tap2_directedlr']:
+        feat = safe_zscore(ts)     # it is okay to zscore these alignment angles as if they are being treated linearly
+    elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pulse_i_directedlr', 'song_i_directedlr', 'tap2_directedlr']:  # directedlr using male position from fmAng
         f_name_ = f_name.split('_directed')[0]
-        feat = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
+        male_pos = sf['fmAng']
+        feat = sf[f_name_] * np.sign(np.sin(np.radians(male_pos)))
         feat = safe_zscore(feat)
-    elif f_name in ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'fFV_directedlr', 'fLS_directedlr']:
+    elif f_name in ['song_directedlr2', 'sine_i_directedlr2', 'pulse_i_directedlr2', 'song_i_directedlr2']:  # directedlr using singing wing position
+        f_name_ = f_name.split('_directed')[0]
+        male_pos = np.where(np.abs(sf['wingML']) > np.abs(sf['wingMR']), sf['fmWLAng'], sf['fmWRAng'])  # use the position of the most extended wing
+        feat = sf[f_name_] * np.sign(np.sin(np.radians(male_pos)))
+        feat = safe_zscore(feat)
+    elif f_name in ['tap2_directedlr2']:    # directedlr using male position from fmAng
+        f_name_ = f_name.split('_directed')[0]
+        male_pos = sf['fmAng']
+        feat = sf[f_name_] * np.sign(np.sin(np.radians(male_pos)))
+        feat = safe_zscore(feat)
+    elif f_name in ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'fFV_directedlr2', 'fLS_directedlr2']:
         f_name_ = f_name.split('_directed')[0]
         feat = zscore(sf[f_name_]) * zscore(np.sin(np.radians(sf['fmAng'])))
         feat = zscore(feat)
     else:
         raise Exception(f'unsupported {f_name} input feature.')
     # print(f_name, "done.")
+    nan_counts = np.sum(np.isnan(feat))
+    if nan_counts:
+        print("!!!!! feat NAN", f_name, f"{nan_counts}/{len(feat)}", "NANS !!!!!")
     return feat
 
 
@@ -149,7 +185,7 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
-    elif f_name in ['pfast_i', 'sine_i', 'tap2']:
+    elif f_name in ['pulse_i', 'sine_i', 'tap2']:
         ts = sf[f_name]
         mn = ts.mean()
         std = ts.std()
@@ -166,6 +202,15 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
         ts_rad = np.radians(sf['fmAng'])
         ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
         ts = np.sin(ts_smoothed)  # sin: left <-> right
+        mn = ts.mean()
+        std = ts.std()
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
+    elif f_name in ['wingAlign']:
+        ts = np.min([sf['wingLAristaLAlignAng'],
+                       sf['wingRAristaRAlignAng'],
+                       sf['wingLAristaRAlignAng'],
+                       sf['wingRAristaLAlignAng']], axis=0)     # positive
+        ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
@@ -222,25 +267,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         dmTheta = zscore(dmTheta)
         f = dmTheta
     elif f_name in ['dfmAng']:
-        # r = np.r_[:100000]
-        #
-        # fig, ax = plt.subplots(3, 1, figsize=(18, 8), sharex=True)
-        #
-        # ax[0].plot(np.diff(np.abs(sf['fmAng'][r])), label='dfmAng_abs')
-        # ax[0].plot(np.diff(np.abs(sf['fTheta'][r])), label='dfTheta_abs')
-        #
-        # ax[1].plot(uniform_filter1d(np.diff(np.abs(sf['fmAng'][r])), size=10), label='dfmAng_abs_smoothed')
-        # ax[1].plot(uniform_filter1d(np.diff(np.abs(sf['fTheta'][r])), size=10), label='dfTheta_abs_smoothed')
-        #
-        # ax[2].plot(np.diff(np.abs(sf['fmAng'][r])), label='dfmAng_abs_wavedec')
-        # ax[2].plot(np.diff(np.abs(sf['fTheta'][r])), label='dfTheta_abs_wavedec')
-        #
-        # plt.suptitle('fmAng_abs vs dfTheta_abs')
-        # ax[0].legend(loc='upper left')
-        # ax[1].legend(loc='upper left')
-        # ax[2].legend(loc='upper left')
-        # plt.tight_layout()
-        # plt.show()
         ts = sf['fmAng']
         ts = smooth_gaussian(ts, sigma=3)
         fmAng = np.abs(ts)     # abs to make left and right male positions symmetric
@@ -378,6 +404,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     basis_transformed = config['basis_transformed']
 
     x_labels = config['input_labels_list']
+    ax_labels = config['auxiliary_input_labels_list']
     a_labels = config['auxiliary_labels_list']
     y_labels = config['emission_labels']
     ay_labels = config['auxiliary_emission_labels']
@@ -396,6 +423,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     print("Basis created.")
 
     inputs_raw = []
+    auxem_inputs_raw = []
     emissions = []
     aux_data = []
     aux_emissions = []
@@ -413,8 +441,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     for s_i, s in enumerate(sessions_features):
         if s_i == 0:
             print('Available features:', sessions_features[s].keys())
-        if s_i == 41:
-            continue
+        # if s_i == 41:
+        #     continue
         session_len = len(sessions_features[s]['mFV'])
         print(f"Session {s_i} ({s}) length: {session_len}.")
 
@@ -463,6 +491,18 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         s_o_mn_std = np.vstack(o_mn_std)
         print(f"session {s_i} output processed")
 
+        # AUXILIARY INPUTS
+        feats = []
+        for _ in ax_labels:
+            # print(_)
+            f_ = get_input_feat(sessions_features, s, _)
+            # print(_, "mean=", np.mean(f_), "std", np.std(f_))
+            f = f_[s_input_windows]
+            feats.append(f)
+        print(f"session {s_i} inp computed")
+        s_auxem_inputs = np.hstack(feats)
+        print(f"session {s_i} inp processed")
+
         # AUXILIARY EMISSIONS
         ay_feats = []
         ay_mn_std = []
@@ -487,6 +527,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         print(f"session {s_i} processed")
 
         inputs_raw.append(s_inputs)
+        auxem_inputs_raw.append(s_auxem_inputs)
         emissions.append(s_emissions)
         aux_data.append(s_aux_data)
         aux_emissions.append(s_aux_emissions)
@@ -501,10 +542,11 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         num_sessions += 1
         print("num_sessions", num_sessions)
         print("============")
-        # if num_sessions == 5:
+        # if num_sessions == 70:
         #     break
 
     inputs_raw = np.array(inputs_raw, dtype=object)
+    auxem_inputs_raw = np.array(auxem_inputs_raw, dtype=object)
     emissions = np.array(emissions, dtype=object)
     aux_data = np.array(aux_data, dtype=object)
     aux_emissions = np.array(aux_emissions, dtype=object)
@@ -515,20 +557,22 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     auxem_mn_std = np.array(auxem_mn_std)
 
     print("Basis transforming now..")
-    print(len(inputs_raw), inputs_raw[0].shape)
+    print("inputs_raw", len(inputs_raw), inputs_raw[0].shape)
+    print("auxem_inputs_raw", len(auxem_inputs_raw), auxem_inputs_raw[0].shape)
 
-    inputs_transformed = []
-    for s in inputs_raw:
-        inp_s_ = []
-        for inp in s:
-            inp_tr_ = []
-            for _ in inp.reshape(-1, input_raw_each_dim):
-                inp_tr_.append(BasisProjection(basis).transform(_))
-            inp_tr_ = np.array(inp_tr_).reshape(-1)
-            inp_s_.append(inp_tr_)
-        inp_s_ = np.array(inp_s_)
-        inputs_transformed.append(inp_s_)
+    # Parallelize across sessions (outermost level)
+    inputs_transformed = Parallel(n_jobs=-1, prefer="threads")(
+        delayed(transform_single_session)(s_i, s, basis, input_raw_each_dim)
+        for s_i, s in enumerate(inputs_raw)
+    )
     inputs = np.array(inputs_transformed, dtype=object)
+
+    # Parallelize across sessions (outermost level)
+    auxem_inputs_transformed = Parallel(n_jobs=-1, prefer="threads")(
+        delayed(transform_single_session)(s_i, s, basis, input_raw_each_dim)
+        for s_i, s in enumerate(auxem_inputs_raw)
+    )
+    auxem_inputs = np.array(auxem_inputs_transformed, dtype=object)
 
     input_dim = inputs[0].shape[-1]
     print("Basis transformed.")
@@ -567,6 +611,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     data = {
         'emissions': emissions,
         'inputs': inputs,
+        'auxem_inputs': auxem_inputs,
         'aux_data': aux_data,
         'aux_emissions': aux_emissions,
         'output_mn_std': np.array(output_mn_std),
@@ -648,13 +693,13 @@ def extract_female(source):
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
+        sessions_features = joblib.load('../data/wt/sessions_features_78_jul29.pkl')
         datacls = WT_DATA
     elif source == 'ac_both':
         sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
         datacls = AC_BOTH
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_may30.pkl')
+        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_jul29.pkl')
         datacls = FREDCLEANED_DATA
     else:
         raise Exception('Wrong data source.')
@@ -670,23 +715,23 @@ def extract_female(source):
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
     data_config['emission_labels'] = OrderedDict({
-        'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2'],
-        'fLV': ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'pfast_i_directedlr', 'sine_i_directedlr', 'tap2_directedlr'],
-        'fAV': ['mFV_directedlr', 'mLS_directedlr', 'mfDist_directedlr', 'pfast_i_directedlr', 'sine_i_directedlr', 'tap2_directedlr'],
+        'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
+        'fLV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
+        'fAV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
     })
     data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
     data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
     print(data_config['input_labels_list'])
-    data_config['auxiliary_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'fmAng_sin', 'pfast_i', 'sine_i', 'tap2', ]  # we basically need full series as well as windowed-versions of inputs
+    data_config['auxiliary_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'fmAng_sin', 'wingAlign', 'pulse_i', 'sine_i', 'tap2', ]  # we basically need full series as well as windowed-versions of inputs
     data_config['auxiliary_emission_labels'] = OrderedDict({
-        'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2', ]
+        'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2', ]
     })
     data_config['auxiliary_input_labels_list'] = [data_config['auxiliary_emission_labels'][o] for o in data_config['auxiliary_emission_labels']]
     data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
     print(data_config['auxiliary_input_labels_list'])
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0723.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0408.pkl'
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     print("Saving at:", filename)
@@ -697,6 +742,6 @@ def extract_female(source):
 
 
 if __name__ == '__main__':
-    src = 'wt_fred'
+    src = 'wt'
     extract_female(src)
     # extract_male(src)

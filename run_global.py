@@ -61,13 +61,6 @@ def run(mc, enhance=False, genfig=False):
     print('Inputs:', data_config['input_labels_list'])
     print('Emissions:', data_config['emission_labels'])
 
-    # input_mask_by_emission = np.zeros((len(data_config['emission_labels']), len(data_config['input_labels'])*4))
-    # input_mask_by_emission[0, 0:8] = 1
-    # input_mask_by_emission[1, 8:20] = 1
-    # input_mask_by_emission[2, 20:24] = 1
-    # print("input_mask_by_emission", input_mask_by_emission)
-    # data_config['input_mask_by_emission'] = input_mask_by_emission
-
     num_batches = data_config['num_sessions']
     datasplit_seed = mc.get('datasplit_seed', 0)
     num_train_batches = int(num_batches * 0.8)
@@ -122,6 +115,7 @@ def run(mc, enhance=False, genfig=False):
     if enhance or genfig:
         print(">> Saving enhanced checkpoint:")
         utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
+        utils.enhance_auxem(dump_filepath)     # add prediction statistics etc. to the same checkpoint
         print(">> Saved.\n")
 
         if model.prefix == 'chance': return
@@ -129,10 +123,11 @@ def run(mc, enhance=False, genfig=False):
         if genfig:
             print(">> Making figures:")
             utils.generate_figures(dump_filepath, savefig=True, display=False)
+            utils.generate_auxem_plots(dump_filepath, savefig=True, display=False)
             print(">> Done with figures.\n")
 
             # print(">> Generating trajectories:")
-            utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
+            # utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
             # print(">> Done with trajectories.\n")
 
             # print(">> Generating videos:")

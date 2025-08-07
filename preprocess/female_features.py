@@ -98,6 +98,42 @@ def compute_wing_angles(x, left_ind=3, right_ind=4):
     return thetaL, thetaR
 
 
+def compute_male_wing_midpoint_features(fTrx, mTrx, FLY_SKELETON):
+    fHd = fTrx[..., FLY_SKELETON.index('head'), :]
+    orig_dim = fHd.ndim
+    if orig_dim == 3:
+        time_dim = fHd.shape[1]
+
+    mThx = mTrx[..., FLY_SKELETON.index('thorax'), :]
+    mWingL = mTrx[..., FLY_SKELETON.index('wingL'), :]
+    mWingR = mTrx[..., FLY_SKELETON.index('wingR'), :]
+    mWingLmidpoint = (mThx + mWingL)/2
+    mWingRmidpoint = (mThx + mWingR)/2
+
+    fThx = fTrx[..., FLY_SKELETON.index('thorax'), :]
+    fDir = fHd - fThx
+    mWLfDir = fHd - mWingLmidpoint
+    fmWLAng = signed_angle(fDir, mWLfDir)   # angle of the male's left wing midpoint w.r.t female axis, with same sign as fmAng
+
+    mWRfDir = fHd - mWingRmidpoint
+    fmWRAng = signed_angle(fDir, mWRfDir)
+
+    egoM = normalize_to_egocentric(mTrx, ctr_ind=FLY_SKELETON.index('thorax'), fwd_ind=FLY_SKELETON.index('head'))
+    wingML, wingMR = compute_wing_angles(egoM, left_ind=FLY_SKELETON.index('wingL'), right_ind=FLY_SKELETON.index('wingR'))
+
+    ftrs = dict()
+    ftrs['wingML'] = wingML
+    ftrs['wingMR'] = wingMR
+    ftrs['fmWLAng'] = fmWLAng
+    ftrs['fmWRAng'] = fmWRAng
+
+    if orig_dim == 3:
+        for f in ftrs:
+            ftrs[f] = ftrs[f].reshape(-1, time_dim)
+    print("ftrs['fmWLAng']", ftrs['fmWLAng'].shape)
+    return ftrs
+
+
 def compute_wing_flick_features(fTrx, FLY_SKELETON):
 
     fThx = fTrx[..., FLY_SKELETON.index('thorax'), :]
