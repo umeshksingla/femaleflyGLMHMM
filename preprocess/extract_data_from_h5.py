@@ -1,3 +1,7 @@
+"""
+
+"""
+
 import sys
 
 import joblib
@@ -74,11 +78,11 @@ def get_features(DATA, expt_path, cop_start_frame):
 
 if __name__ == '__main__':
 
-    # DATA = WT_DATA
+    DATA = WT_DATA
     # DATA = AC_BOTH
-    DATA = FREDCLEANED_DATA
+    # DATA = FREDCLEANED_DATA
 
-    BASE_FOLDER = f'data/{DATA.dataset}/'
+    BASE_FOLDER = f'../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
 
     st1 = time.time()
@@ -112,11 +116,15 @@ if __name__ == '__main__':
         except np.linalg.LinAlgError as e:
             print(e)
             continue
+        except OSError as e:
+            print(e)
+            continue
 
         if len(sessions_features) % 10 == 0:
             joblib.dump(sessions_features,
-                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jul29.pkl'))
+                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_sep5.pkl'))
+            print(f'Temp dump.')
 
     joblib.dump(sessions_features,
-                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jul29.pkl'))
+                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_sep5.pkl'))
     print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(sessions_features)}")

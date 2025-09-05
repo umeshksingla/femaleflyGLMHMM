@@ -693,13 +693,13 @@ def extract_female(source):
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_78_jul29.pkl')
+        sessions_features = joblib.load('../data/wt/sessions_features_60_sep5.pkl')
         datacls = WT_DATA
     elif source == 'ac_both':
         sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
         datacls = AC_BOTH
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_jul29.pkl')
+        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
         datacls = FREDCLEANED_DATA
     else:
         raise Exception('Wrong data source.')
@@ -731,7 +731,7 @@ def extract_female(source):
     print(data_config['auxiliary_input_labels_list'])
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0408.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0905.pkl'
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     print("Saving at:", filename)

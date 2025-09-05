@@ -1674,7 +1674,7 @@ def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
     # Draw edge labels
     edge_labels = {(u, v): f"{d['weight']:.2f}" for (u, v, d) in edges}
     # print(edge_labels, len(edge_labels))
-    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.5, connectionstyle='arc3,rad=0.4')
+    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.5)
 
     # plt.title("Transition Probability Graph")
     plt.tight_layout()
