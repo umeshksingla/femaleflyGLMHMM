@@ -1,8 +1,17 @@
-import sys
-import time
+"""
 
+
+Written by Claude AI.
+"""
+
+
+import gc
 import joblib
 import numpy as np
+from pathlib import Path
+from scipy.linalg import block_diag
+import time
+
 from scipy.stats import zscore
 import scipy
 from collections import OrderedDict
@@ -10,8 +19,6 @@ from scipy.signal import savgol_filter
 from scipy.ndimage import uniform_filter1d, gaussian_filter1d
 import scipy.ndimage
 from scipy.linalg import block_diag
-import pywt
-from joblib import Parallel, delayed
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
@@ -219,13 +226,13 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
     return feat, mn, std
 
 
-def wavelet_denoise(signal):
-    coeffs = pywt.wavedec(signal, 'db4', level=4)
-    print(len(coeffs), [len(_) for _ in coeffs])
-    threshold = 0.25 * np.max(coeffs[-1])  # Set small wavelet coefficients to zero
-    coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
-    denoised_signal = pywt.waverec(coeffs, 'db4')
-    return denoised_signal
+# def wavelet_denoise(signal):
+#     coeffs = pywt.wavedec(signal, 'db4', level=4)
+#     print(len(coeffs), [len(_) for _ in coeffs])
+#     threshold = 0.25 * np.max(coeffs[-1])  # Set small wavelet coefficients to zero
+#     coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+#     denoised_signal = pywt.waverec(coeffs, 'db4')
+#     return denoised_signal
 
 
 def get_output_feat(sessions_features, s, f_name, output_windows):
@@ -400,9 +407,17 @@ def some_plotsb3(b3, b_multi, inputs_raw, inputs, inputs_multi, input_raw_each_d
 
 
 def get_x_and_y_data(datacls, sessions_features, config, display=False):
+    """
+    Memory-efficient version that saves each session individually.
+
+    This version:
+    1. Processes each session one at a time
+    2. Saves each session to disk immediately
+    3. Only keeps metadata in memory
+    4. Returns a data structure with references to session files
+    """
 
     basis_transformed = config['basis_transformed']
-
     x_labels = config['input_labels_list']
     ax_labels = config['auxiliary_input_labels_list']
     a_labels = config['auxiliary_labels_list']
@@ -411,178 +426,198 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     n_inputs = len(x_labels)
     emission_dim = len(y_labels)
     input_raw_each_dim = config['input_raw_each_dim']
-    input_raw_dim = input_raw_each_dim * n_inputs
     predict_window_size = config['predict_window_size']
     input_raw_overlap = config['input_raw_overlap']
     predict_gap_size = config['predict_gap_size']
 
     # Cosine basis transformation of inputs
     input_each_dim = config['ncos']
-    b = multifeature_basis(raised_cosine(0, input_each_dim, [0, 3*input_raw_each_dim/4], 10, input_raw_each_dim), 1)
+    b = multifeature_basis(raised_cosine(0, input_each_dim, [0, 3 * input_raw_each_dim / 4], 10, input_raw_each_dim), 1)
     basis = scipy.linalg.orth(multifeature_basis(b, 1))
     print("Basis created.")
 
-    inputs_raw = []
-    auxem_inputs_raw = []
-    emissions = []
-    aux_data = []
-    aux_emissions = []
-    output_mn_std = []
-    aux_mn_std = []
-    auxem_mn_std = []
-    start_frames = []
-    end_frames = []
-    downsampled_indices = []
-    upsampled_indices = []
+    # Create temporary directory for session files
+    temp_dir = Path('../data/temp_sessions')
+    temp_dir.mkdir(exist_ok=True)
+    print(f"Temporary session files will be saved to: {temp_dir}")
+
+    # Metadata to collect
     session_keys = []
     copulation_bools = []
+    output_mn_std_list = []
+    aux_mn_std_list = []
+    auxem_mn_std_list = []
+    start_frames_list = []
+    end_frames_list = []
     num_sessions = 0
 
+    # PHASE 1: Process each session and save immediately
+    print("\n=== PHASE 1: Processing and saving sessions ===")
     for s_i, s in enumerate(sessions_features):
         if s_i == 0:
             print('Available features:', sessions_features[s].keys())
-        # if s_i == 41:
-        #     continue
+
         session_len = len(sessions_features[s]['mFV'])
         print(f"Session {s_i} ({s}) length: {session_len}.")
 
         num_timesteps = session_len
-        # if session_len < num_timesteps:
-        #     print(f"Too short. Skipped.\n============")
-        #     continue
+        print(f"Proceeding with session {s_i}.")
 
-        print(f"Proceeding with the session {s_i}.")
-        session_keys.append(s)
         session_copulation = datacls.get_copulation_bool_from_session(s, session_len)
         print(f'Session {s_i} copulation={session_copulation} session_len={session_len}.')
 
-        input_windows, output_windows = create_x_and_y_windows(num_timesteps, x_size=input_raw_each_dim,
-                                                               y_size=predict_window_size, x_overlap=input_raw_overlap,
-                                                               y_gap_size=predict_gap_size)
+        input_windows, output_windows = create_x_and_y_windows(
+            num_timesteps,
+            x_size=input_raw_each_dim,
+            y_size=predict_window_size,
+            x_overlap=input_raw_overlap,
+            y_gap_size=predict_gap_size
+        )
 
-        s_start_frame = (session_len-num_timesteps)     # index of the first frame of this session used for modeling
+        s_start_frame = (session_len - num_timesteps)
         s_input_windows = input_windows + s_start_frame
         s_output_windows = output_windows + s_start_frame
-        s_end_frame = s_output_windows[-1, 0]           # index of the last frame of this session used for modeling
+        s_end_frame = s_output_windows[-1, 0]
         s_downsampled_indices = s_output_windows[:, 0]
         s_upsampled_indices = np.repeat(np.arange(len(s_downsampled_indices)), predict_window_size)
 
         # INPUTS
         feats = []
-        for _ in x_labels:
-            # print(_)
-            f_ = get_input_feat(sessions_features, s, _)
-            # print(_, "mean=", np.mean(f_), "std", np.std(f_))
+        for label in x_labels:
+            f_ = get_input_feat(sessions_features, s, label)
             f = f_[s_input_windows]
             feats.append(f)
-        print(f"session {s_i} inp computed")
-        s_inputs = np.hstack(feats)
+        s_inputs_raw = np.hstack(feats)
+        del feats
+        gc.collect()
         print(f"session {s_i} inp processed")
 
         # EMISSIONS
         o_feats = []
         o_mn_std = []
-        for _ in y_labels:
-            f, mn, std = get_output_feat(sessions_features, s, _, s_output_windows)
-            # print(_, f.shape)
+        for label in y_labels:
+            f, mn, std = get_output_feat(sessions_features, s, label, s_output_windows)
             o_feats.append(f)
             o_mn_std.append([mn, std])
         s_emissions = np.vstack(o_feats).T
         s_o_mn_std = np.vstack(o_mn_std)
+        del o_feats
+        gc.collect()
         print(f"session {s_i} output processed")
 
         # AUXILIARY INPUTS
         feats = []
-        for _ in ax_labels:
-            # print(_)
-            f_ = get_input_feat(sessions_features, s, _)
-            # print(_, "mean=", np.mean(f_), "std", np.std(f_))
+        for label in ax_labels:
+            f_ = get_input_feat(sessions_features, s, label)
             f = f_[s_input_windows]
             feats.append(f)
-        print(f"session {s_i} inp computed")
-        s_auxem_inputs = np.hstack(feats)
-        print(f"session {s_i} inp processed")
+        s_auxem_inputs_raw = np.hstack(feats)
+        del feats
+        gc.collect()
+        print(f"session {s_i} aux inp processed")
 
         # AUXILIARY EMISSIONS
         ay_feats = []
         ay_mn_std = []
-        for _ in ay_labels:
-            f, mn, std = get_output_feat(sessions_features, s, _, s_output_windows)
+        for label in ay_labels:
+            f, mn, std = get_output_feat(sessions_features, s, label, s_output_windows)
             ay_feats.append(f)
             ay_mn_std.append([mn, std])
         s_aux_emissions = np.vstack(ay_feats).T
         s_ay_mn_std = np.vstack(ay_mn_std)
+        del ay_feats
+        gc.collect()
         print(f"session {s_i} auxem processed")
 
-        # AUXILIARY DAta
+        # AUXILIARY DATA
         a_feats = []
         a_mn_std = []
-        for _ in a_labels:
-            f, mn, std = get_aux_feat(sessions_features, s, _, s_output_windows)   # aux windows are the same as output windows since we want to be able to compare outputs and aux data on the same timescale
+        for label in a_labels:
+            f, mn, std = get_aux_feat(sessions_features, s, label, s_output_windows)
             a_feats.append(f)
             a_mn_std.append([mn, std])
         s_aux_data = np.vstack(a_feats).T
         s_a_mn_std = np.vstack(a_mn_std)
+        del a_feats
+        gc.collect()
         print(f"session {s_i} aux processed")
-        print(f"session {s_i} processed")
 
-        inputs_raw.append(s_inputs)
-        auxem_inputs_raw.append(s_auxem_inputs)
-        emissions.append(s_emissions)
-        aux_data.append(s_aux_data)
-        aux_emissions.append(s_aux_emissions)
-        output_mn_std.append(s_o_mn_std)
-        aux_mn_std.append(s_a_mn_std)
-        auxem_mn_std.append(s_ay_mn_std)
-        start_frames.append(s_start_frame)
-        end_frames.append(s_end_frame)
-        downsampled_indices.append(s_downsampled_indices)
-        upsampled_indices.append(s_upsampled_indices)
+        # Save this session's raw data
+        session_data = {
+            'inputs_raw': s_inputs_raw,
+            'auxem_inputs_raw': s_auxem_inputs_raw,
+            'emissions': s_emissions,
+            'aux_data': s_aux_data,
+            'aux_emissions': s_aux_emissions,
+            'downsampled_indices': s_downsampled_indices,
+            'upsampled_indices': s_upsampled_indices,
+        }
+
+        session_file = temp_dir / f'session_{s_i:04d}.pkl'
+        joblib.dump(session_data, session_file)
+        print(f"Saved session {s_i} to {session_file}")
+
+        # Collect metadata (lightweight)
+        session_keys.append(s)
         copulation_bools.append(session_copulation)
+        output_mn_std_list.append(s_o_mn_std)
+        aux_mn_std_list.append(s_a_mn_std)
+        auxem_mn_std_list.append(s_ay_mn_std)
+        start_frames_list.append(s_start_frame)
+        end_frames_list.append(s_end_frame)
+
+        # Clear large objects from memory
+        del s_inputs_raw, s_auxem_inputs_raw, s_emissions, s_aux_data, s_aux_emissions
+        del session_data
+        gc.collect()
+
         num_sessions += 1
-        print("num_sessions", num_sessions)
+        print(f"Completed session {num_sessions}")
         print("============")
-        # if num_sessions == 70:
+
+        # if num_sessions == 25:
         #     break
 
-    inputs_raw = np.array(inputs_raw, dtype=object)
-    auxem_inputs_raw = np.array(auxem_inputs_raw, dtype=object)
-    emissions = np.array(emissions, dtype=object)
-    aux_data = np.array(aux_data, dtype=object)
-    aux_emissions = np.array(aux_emissions, dtype=object)
-    downsampled_indices = np.array(downsampled_indices, dtype=object)
-    upsampled_indices = np.array(upsampled_indices, dtype=object)
-    output_mn_std = np.array(output_mn_std)
-    aux_mn_std = np.array(aux_mn_std)
-    auxem_mn_std = np.array(auxem_mn_std)
+    print(f"\nPhase 1 complete: {num_sessions} sessions saved to disk")
 
-    print("Basis transforming now..")
-    print("inputs_raw", len(inputs_raw), inputs_raw[0].shape)
-    print("auxem_inputs_raw", len(auxem_inputs_raw), auxem_inputs_raw[0].shape)
+    # PHASE 2: Basis transformation (load one at a time)
+    print("\n=== PHASE 2: Applying basis transformation ===")
+    for s_i in range(num_sessions):
+        print(f"Transforming session {s_i}...")
+        session_file = temp_dir / f'session_{s_i:04d}.pkl'
+        session_data = joblib.load(session_file)
 
-    # Parallelize across sessions (outermost level)
-    inputs_transformed = Parallel(n_jobs=-1, prefer="threads")(
-        delayed(transform_single_session)(s_i, s, basis, input_raw_each_dim)
-        for s_i, s in enumerate(inputs_raw)
-    )
-    inputs = np.array(inputs_transformed, dtype=object)
+        # Transform inputs
+        inputs_raw = session_data['inputs_raw']
+        inputs_transformed = transform_single_session(s_i, inputs_raw, basis, input_raw_each_dim)
+        session_data['inputs'] = inputs_transformed
+        del session_data['inputs_raw']
+        del inputs_raw, inputs_transformed
+        gc.collect()
 
-    # Parallelize across sessions (outermost level)
-    auxem_inputs_transformed = Parallel(n_jobs=-1, prefer="threads")(
-        delayed(transform_single_session)(s_i, s, basis, input_raw_each_dim)
-        for s_i, s in enumerate(auxem_inputs_raw)
-    )
-    auxem_inputs = np.array(auxem_inputs_transformed, dtype=object)
+        # Transform auxiliary inputs
+        auxem_inputs_raw = session_data['auxem_inputs_raw']
+        auxem_inputs_transformed = transform_single_session(s_i, auxem_inputs_raw, basis, input_raw_each_dim)
+        session_data['auxem_inputs'] = auxem_inputs_transformed
+        del session_data['auxem_inputs_raw']
+        del auxem_inputs_raw, auxem_inputs_transformed
+        gc.collect()
 
-    input_dim = inputs[0].shape[-1]
-    print("Basis transformed.")
-    print("basis", b.shape, "input_raw_each_dim", input_raw_each_dim, "input_raw_dim", input_raw_dim,
-          "input_dim", input_dim, "input_each_dim", input_each_dim)
-    print("inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape",
-          inputs.shape, inputs_raw.shape, emissions.shape, aux_data.shape, aux_emissions.shape)
-    print("inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape",
-          inputs[0].shape, inputs_raw[0].shape, emissions[0].shape, aux_data[0].shape, aux_emissions[0].shape)
+        # Save back with transformations
+        joblib.dump(session_data, session_file)
+        del session_data
+        gc.collect()
+        print(f"Session {s_i} transformed and saved")
 
+    print("\nPhase 2 complete: All sessions transformed")
+
+    # Get dimensions from first session
+    first_session = joblib.load(temp_dir / 'session_0000.pkl')
+    input_dim = first_session['inputs'].shape[-1]
+    del first_session
+    gc.collect()
+
+    # Create input masks
     n_inputs_by_emission = [len(config['emission_labels'][o]) for o in config['emission_labels']]
     input_sizes_by_emission = [_ * input_each_dim for _ in n_inputs_by_emission]
     blocks = [np.ones(s) for s in input_sizes_by_emission]
@@ -597,7 +632,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     print(n_inputs_by_auxemission, input_sizes_by_auxemission)
     print("input_mask_by_auxemission", input_mask_by_auxemission)
 
-    # enhance the config
+    # Update config
     config['input_dim'] = input_dim
     config['emission_dim'] = emission_dim
     config['input_each_dim'] = input_each_dim
@@ -605,87 +640,89 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     config['basis'] = basis
     config['input_mask_by_emission'] = input_mask_by_emission
     config['input_mask_by_auxemission'] = input_mask_by_auxemission
-    config['num_sessions'] = num_sessions   # number of total sessions
-    config['session_keys'] = session_keys   # sessions in this data in order
+    config['num_sessions'] = num_sessions
+    config['session_keys'] = session_keys
+    config['temp_session_dir'] = str(temp_dir)
 
+    # Create final data structure (metadata only)
     data = {
-        'emissions': emissions,
-        'inputs': inputs,
-        'auxem_inputs': auxem_inputs,
-        'aux_data': aux_data,
-        'aux_emissions': aux_emissions,
-        'output_mn_std': np.array(output_mn_std),
-        'aux_mn_std': np.array(aux_mn_std),
-        'auxem_mn_std': np.array(auxem_mn_std),
-        'start_frames': np.array(start_frames),
-        'end_frames': np.array(end_frames),
-        'downsampled_indices': downsampled_indices,
-        'upsampled_indices': upsampled_indices,
+        'num_sessions': num_sessions,
+        'temp_session_dir': str(temp_dir),
+        'output_mn_std': np.array(output_mn_std_list),
+        'aux_mn_std': np.array(aux_mn_std_list),
+        'auxem_mn_std': np.array(auxem_mn_std_list),
+        'start_frames': np.array(start_frames_list),
+        'end_frames': np.array(end_frames_list),
         'data_config': config,
         'copulation_bools': np.array(copulation_bools),
     }
 
-    # Plot few samples of inputs
-    if display:
-        b_multi = scipy.linalg.orth(multifeature_basis(b, n_inputs))
-        inputs_transformed_multi = [BasisProjection(b_multi).transform(_) for _ in inputs_raw]
-        inputs_multi = np.array(inputs_transformed_multi, dtype=object)
-        some_plotsb3(basis, b_multi, inputs_raw, inputs, inputs_multi, input_raw_each_dim, input_each_dim, basis_transformed, x_labels)
+    print(f"\n=== Processing Complete ===")
+    print(f"Session files stored in: {temp_dir}")
+    print(f"Total sessions: {num_sessions}")
+    print(f"\nTo load a specific session:")
+    print(f"  session_data = joblib.load('{temp_dir}/session_XXXX.pkl')")
+    print(f"\nTo load all sessions (if you have RAM):")
+    print(f"  all_data = load_all_sessions_into_memory(data)")
 
     return data
 
 
-def extract_male(source):
+def load_all_sessions_into_memory(data):
+    """
+    Load all session data into memory in the original format.
+    Only use this if you have sufficient RAM!
+    """
+    print(data.keys())
+    num_sessions = data['num_sessions']
+    temp_dir = Path(data['temp_session_dir'])
 
-    data_config = {}
+    print(f"Loading {num_sessions} sessions into memory...")
 
-    if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_75_may30.pkl')
-        datacls = WT_DATA
-    elif source == 'ac_both':
-        sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
-        datacls = AC_BOTH
-    elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_may30.pkl')
-        datacls = FREDCLEANED_DATA
-    else:
-        raise Exception('Wrong data source.')
+    emissions = []
+    inputs = []
+    auxem_inputs = []
+    aux_data = []
+    aux_emissions = []
+    downsampled_indices = []
+    upsampled_indices = []
 
-    fps = sessions_features.get('fps', datacls.fps)
-    data_config['source'] = source
-    data_config['orig_fps'] = fps
-    data_config['input_raw_each_dim'] = 3*fps
-    data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
-    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
-    data_config["predict_window_size"] = fps//30  # averaging emission over this window size
-    data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
-    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
-    data_config['ncos'] = 4
-    data_config['emission_labels'] = OrderedDict({
-        'mFV': ['fFV', 'fLS', 'mfDist', 'fmAng_cos'],
-        'mLV': ['fFV_directedlr', 'fLS_directedlr', 'mfDist_directedlr'],
-        'mAV': ['fFV_directedlr', 'fLS_directedlr', 'mfDist_directedlr'],
-    })
-    data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
-    data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
-    print(data_config['input_labels_list'])
-    data_config['auxiliary_labels_list'] = ['fFV', 'fLS', 'mfDist', 'fmAng_cos']  # we basically need full series as well as windowed-versions of inputs
-    data_config['auxiliary_emission_labels'] = OrderedDict({
-        'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pfast_i', 'sine_i', 'tap2', ]
-    })
-    data_config['auxiliary_input_labels_list'] = [data_config['auxiliary_emission_labels'][o] for o in data_config['auxiliary_emission_labels']]
-    data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
-    print(data_config['auxiliary_input_labels_list'])
+    for s_i in range(num_sessions):
+        session_data = joblib.load(temp_dir / f'session_{s_i:04d}.pkl')
+        emissions.append(session_data['emissions'])
+        inputs.append(session_data['inputs'])
+        auxem_inputs.append(session_data['auxem_inputs'])
+        aux_data.append(session_data['aux_data'])
+        aux_emissions.append(session_data['aux_emissions'])
+        downsampled_indices.append(session_data['downsampled_indices'])
+        upsampled_indices.append(session_data['upsampled_indices'])
 
-    filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_MALE.pkl'
-    s = time.time()
-    data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
-    print("Saving at:", filename)
-    joblib.dump(data, f'../data/{filename}')
-    print("Saved at:", filename)
-    print(f"Done in {time.time() - s} seconds.")
-    return
+        if (s_i + 1) % 10 == 0:
+            print(f"Loaded {s_i + 1}/{num_sessions} sessions...")
+
+    # Convert to object arrays (original format)
+    full_data = {
+        'emissions': np.array(emissions, dtype=object),
+        'inputs': np.array(inputs, dtype=object),
+        'auxem_inputs': np.array(auxem_inputs, dtype=object),
+        'aux_data': np.array(aux_data, dtype=object),
+        'aux_emissions': np.array(aux_emissions, dtype=object),
+        'downsampled_indices': np.array(downsampled_indices, dtype=object),
+        'upsampled_indices': np.array(upsampled_indices, dtype=object),
+    }
+
+    # Add metadata
+    full_data.update(data)
+
+    print("All sessions loaded into memory")
+    return full_data
+
+
+def load_single_session(data, session_idx):
+    """Load a specific session's data"""
+    temp_dir = Path(data['temp_session_dir'])
+    session_file = temp_dir / f'session_{session_idx:04d}.pkl'
+    return joblib.load(session_file)
 
 
 def extract_female(source):
@@ -693,7 +730,7 @@ def extract_female(source):
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_60_sep5.pkl')
+        sessions_features = joblib.load('../data/wt/sessions_features_74_sep5.pkl')
         datacls = WT_DATA
     elif source == 'ac_both':
         sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
@@ -714,6 +751,7 @@ def extract_female(source):
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
+
     data_config['emission_labels'] = OrderedDict({
         'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
         'fLV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
@@ -722,6 +760,7 @@ def extract_female(source):
     data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
     data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
     print(data_config['input_labels_list'])
+
     data_config['auxiliary_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'fmAng_sin', 'wingAlign', 'pulse_i', 'sine_i', 'tap2', ]  # we basically need full series as well as windowed-versions of inputs
     data_config['auxiliary_emission_labels'] = OrderedDict({
         'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2', ]
@@ -730,8 +769,10 @@ def extract_female(source):
     data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
     print(data_config['auxiliary_input_labels_list'])
 
+    data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
+
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_0905.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_1114.pkl'
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     print("Saving at:", filename)
@@ -743,5 +784,20 @@ def extract_female(source):
 
 if __name__ == '__main__':
     src = 'wt'
-    extract_female(src)
+    # extract_female(src)
     # extract_male(src)
+
+    # data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114_metadata.pkl')
+    # full_data = load_all_sessions_into_memory(data)
+    # joblib.dump(full_data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
+
+    data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_113.pkl')
+    print(data.keys())
+    print(data['data_config'].keys())
+    data_config = data['data_config']
+    data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
+    print(data['data_config'].keys())
+    joblib.dump(data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
+
+
+

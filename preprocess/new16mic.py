@@ -3,7 +3,6 @@ import os
 import numpy as np
 import scipy.io as sio
 
-from preprocess import visual_features
 from preprocess import preproc_utils
 from preprocess.preproc_utils import h5read
 

@@ -2,7 +2,7 @@ import glob
 import numpy as np
 import h5py
 
-from preprocess import visual_features, tactile_features
+from preprocess import tactile_features
 from preprocess.preproc_utils import h5read
 from preprocess import preproc_utils
 from preprocess.trig_avg_utils import split_name, mech_feature_list
