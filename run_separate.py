@@ -22,9 +22,9 @@ import run_global
 
 
 if __name__ == '__main__':
-    dataset = 'wt_fred'
+    dataset = 'wt'
     if dataset == 'wt':
-        data_path = f'data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_0729.pkl'
+        data_path = f'data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl'
     elif dataset == 'wt_shuffled':
         data_path = f'data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_shuffled.pkl'
     elif dataset == 'wt_male':
@@ -34,10 +34,10 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Wrong dataset {dataset} specified.')
     mc = {
-        "name": 'lrhmmci',
+        "name": 'idglmhmmci',
         "seed": 3242,
-        # "datasplit_seed": 879,
-        "num_states": 2,
+        "datasplit_seed": 0,
+        "num_states": 5,
         "transition_matrix_stickiness": 100,
         "path": f'general_{dataset}_lr',
         "data_path": data_path,

@@ -21,6 +21,7 @@ from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
 from hmms.LogRHMMCustomInitFemaleFly import LogRHMMCustomInitFemaleFly
+from hmms.InputDrivenLRHMMCustomInitFemaleFly import InputDrivenLRHMMCustomInitFemaleFly
 from utilities import utils
 
 
@@ -99,6 +100,8 @@ def run(mc, enhance=False, genfig=False):
         model = LRFemaleFly1(data_config, mc)
     elif model_prefix == 'logr':
         model = LogRFemaleFly(data_config, mc)
+    elif model_prefix == 'idglmhmmci':
+        model = InputDrivenLRHMMCustomInitFemaleFly(data_config, mc)
     else:
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
@@ -123,13 +126,15 @@ def run(mc, enhance=False, genfig=False):
         if genfig:
             print(">> Making figures:")
             utils.generate_figures(dump_filepath, savefig=True, display=False)
-            utils.generate_auxem_plots(dump_filepath, savefig=True, display=False)
+            utils.generate_auxem_figures(dump_filepath, savefig=True, display=False)
+            utils.generate_together_figures(dump_filepath, savefig=True, display=False)
+            utils.generate_state_filters(dump_filepath, savefig=True, display=False)
             print(">> Done with figures.\n")
 
-            # print(">> Generating trajectories:")
-            # utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
-            # print(">> Done with trajectories.\n")
-
+            print(">> Generating trajectories:")
+            utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
+            print(">> Done with trajectories.\n")
+            #
             # print(">> Generating videos:")
             # utils.generate_state_traces(dump_filepath, savefig=True, display=False)
             # utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)

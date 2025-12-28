@@ -386,7 +386,7 @@ class BaseFemaleFly:
                 c = scipy.signal.correlate(a, b, mode='full') / (np.linalg.norm(a) * np.linalg.norm(b))
                 lags = np.arange(-len(a) + 1, len(a))
                 max_c, lag_for_max_c = np.max(c), lags[np.argmax(c)]
-                if o == 0: print(o, max_c, lag_for_max_c)
+                # if o == 0: print(o, max_c, lag_for_max_c)
                 corrs_dict[o].append(max_c)
                 lags_dict[o].append(lag_for_max_c)
             corrs_dict[o] = np.array(corrs_dict[o])
