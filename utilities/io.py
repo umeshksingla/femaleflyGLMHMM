@@ -95,6 +95,16 @@ def calculate_steady_state_p(P):
     return steady_state_vector
 
 
+def calculate_empirical_transition_matrix(state_seqs, n_states):
+    all_states = np.unique(np.concatenate(state_seqs))
+    # n_states = all_states.max() + 1
+    mat = np.zeros((n_states, n_states), dtype=int)
+    for seq in state_seqs:
+        for a, b in zip(seq[:-1], seq[1:]):
+            mat[a, b] += 1
+    return mat / mat.sum(axis=1, keepdims=True)
+
+
 def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None):
     """
     Return a dictionary of states mapped to emission values in that state.

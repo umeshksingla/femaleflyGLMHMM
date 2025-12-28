@@ -507,9 +507,9 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         #                         savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_empirical_occupancy(model_ckp['test_data']['test_stateseq'], model_config,
             title='[Test Data]', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_empirical_occupancy([*model_ckp['train_data']['train_stateseq'], *model_ckp['test_data']['test_stateseq']], model_config,
-                                title='', savefig=savefig, fig_dir=fig_dir, display=display)
+
         z_seqs = [*model_ckp['train_data']['train_stateseq'], *model_ckp['test_data']['test_stateseq']]
+        plots.plot_empirical_occupancy(z_seqs, model_config, title='', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_state_dwell_times(calc_dwell_times_by_z(z_seqs, num_states), num_states, effective_fps,
                                      savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
@@ -533,10 +533,12 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                                        xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
         if 'id' in model_prefix:
-            pass
+            emp_transition_matrix = calculate_empirical_transition_matrix(z_seqs, num_states)
+            plots.plot_transition_matrix(emp_transition_matrix, title='empirical_transition_matrix', savefig=savefig, fig_dir=fig_dir, display=display)
+            plots.plot_ethogram(emp_transition_matrix,  title='empirical_ethogram', savefig=savefig, fig_dir=fig_dir, display=display)
         else:
-            plots.plot_ethogram(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
             plots.plot_transition_matrix(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
+            plots.plot_ethogram(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
 
     # if 'hmm' in model_prefix or 'HMM' in model_prefix:
     #     weights = learned_params.emissions.weights
@@ -843,7 +845,7 @@ def generate_together_figures(model_dir, savefig=True, display=False):
 
     print(data_config['input_labels'])
 
-    for skip_states in [[0]]:
+    for skip_states in [[0], []]:
         if num_states <= 1 and skip_states:
             continue    # skip skip_states if there's only state
         plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
@@ -1039,9 +1041,9 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
             windows = get_windows_to_plot(effective_fps, num_timestamps)
             # print("windows", windows)
             plot_xlims(model_dir, windows, batch, prefix, trajs_dir, None, probs_dir, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
-            lastwindows = get_cop_window_to_plot(data_config['effective_fps'], num_timestamps)
+            lastwindows = get_cop_window_to_plot(effective_fps, num_timestamps)
             plot_xlims(model_dir, lastwindows, batch, prefix, trajs_dir, None, probs_dir, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
-            fullwindows = get_full_window_to_plot(data_config['effective_fps'], num_timestamps)
+            fullwindows = get_full_window_to_plot(effective_fps, num_timestamps)
             plot_xlims(model_dir, fullwindows, batch, prefix, trajs_dir, None, probs_dir, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
     f('train')
     f('test')

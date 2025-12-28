@@ -730,7 +730,7 @@ def plot_statetrans_filters_separate(orig_weights, data_config, input_list, inpu
             for z in range(num_states):
                 if z == z_:
                     continue
-                ax.plot(np.arange(-weights_d[z, stim].shape[-1], 0)/data_config['orig_fps'], weights_d[z, stim], color=COLORS[z], linewidth=3, label=f'State {z+1}')
+                ax.plot(np.arange(-weights_d[z, stim].shape[-1], 0)/data_config['orig_fps'], weights_d[z, stim], color=COLORS[z], linewidth=3, label=f'To State {z+1}')
 
             ax.set_title(input_labels[__])
             ax.axhline(0, ls=':', c='k', lw=0.5)
@@ -743,6 +743,8 @@ def plot_statetrans_filters_separate(orig_weights, data_config, input_list, inpu
                 ax.set_xlabel('Time (s)')
             if ax.get_subplotspec().is_last_col():
                 ax.legend(loc='upper right')
+            if ax.get_subplotspec().is_first_col():
+                ax.set_ylabel('filter amplitude')
             stim += 1
 
         fig.supylabel(f'State transition filters\nFROM State {z_+1}', ha='center')
@@ -1696,7 +1698,7 @@ def plot_prob_states_aligned(resampled_state_seq, n_le=None, uniform_filter_size
     return fig
 
 
-def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, display=True):
+def plot_transition_matrix(transition_matrix, title=None, savefig=False, fig_dir=None, display=True):
     fig = plt.figure(figsize=(5, 5))
     ax = plt.gca()
     m = transition_matrix.shape[0]
@@ -1711,13 +1713,14 @@ def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, displ
     plt.ylabel('state t-1')
     plt.yticks(rotation=0)
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, 'transition_matrix.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    filename = title if title else 'transition_matrix'
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig
 
 
-def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
+def plot_ethogram(transition_matrix, title=None, savefig=False, fig_dir=None, display=True):
     print(transition_matrix.tolist())
     fig = plt.figure()
 
@@ -1750,12 +1753,15 @@ def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
     # Draw edge labels
     edge_labels = {(u, v): f"{d['weight']:.2f}" for (u, v, d) in edges}
     # print(edge_labels, len(edge_labels))
-    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.8, rotate=False, connectionstyle='arc3,rad=0.4')
+    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.8, rotate=False,
+                                 # connectionstyle='arc3,rad=0.4'
+                                 )
 
     # plt.title("Transition Probability Graph")
     plt.tight_layout()
     plt.margins(0.1)
-    if savefig: fig.savefig(os.path.join(fig_dir, 'ethogram.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    filename = title if title else 'ethogram'
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{filename}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
