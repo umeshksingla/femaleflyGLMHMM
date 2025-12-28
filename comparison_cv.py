@@ -90,7 +90,7 @@ def loadCV_R2adjs(path, model_prefix, num_states):
     return np.array(train_r2adjs), np.array(test_r2adjs)
 
 
-def plotCV_same_model_LL(path, model_prefix, num_states_configs, filesuffix=''):
+def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix=''):
 
     _, data_config_pkl, _ = utils.load_specific_path(CHANCE_MODEL_PATH)
     # lr_pkl, data_config_pkl, _ = utils.load_specific_path(LR_MODEL_PATH)
@@ -112,7 +112,11 @@ def plotCV_same_model_LL(path, model_prefix, num_states_configs, filesuffix=''):
     lr_train_lps, lr_test_lps = loadCV_LLs(path, 'lr', 1)
     train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_lps))
     plt.plot(1+train_jitter, lr_train_lps*factor_bits_per_sec, 'ko', mfc='none', markersize=ms, label='Train')
-    plt.plot(1, (lr_test_lps[np.argmax(lr_train_lps)])*factor_bits_per_sec, 'ko', markersize=ms, label='Held-out')   # plot for the max train one
+    if plot_all_test:
+        test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_lps))
+        plt.plot(1+test_jitter, lr_test_lps*factor_bits_per_sec, 'ko', markersize=ms, label='Held-out')
+    else:
+        plt.plot(1, (lr_test_lps[np.argmax(lr_train_lps)])*factor_bits_per_sec, 'ko', markersize=ms, label='Held-out')   # plot for the max train one
 
     # Plot for num_states > 1 now
     for i, s in enumerate(num_states_configs):
@@ -122,8 +126,13 @@ def plotCV_same_model_LL(path, model_prefix, num_states_configs, filesuffix=''):
         plt.plot(s+train_jitter, hmm_train_lps*factor_bits_per_sec, 'ko', mfc='none', markersize=ms)
         # plt.errorbar(s + 0.4, np.mean(hmm_train_lps*factor_bits_per_sec), yerr=np.std(hmm_train_lps*factor_bits_per_sec), color='k', fmt='o', capsize=0)
 
-        if len(hmm_train_lps):
-            plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)])*factor_bits_per_sec, 'ko', markersize=ms)   # plot for the max train one
+
+        if plot_all_test:
+            test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_lps))
+            plt.plot(s+test_jitter, hmm_test_lps*factor_bits_per_sec, 'ko', markersize=ms)
+        else:
+            if len(hmm_train_lps):
+                plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)])*factor_bits_per_sec, 'ko', markersize=ms)   # plot for the max train one
 
     plt.ylabel('Normalized LL (bits/s)')
     plt.xlabel('Number of states')
@@ -203,7 +212,7 @@ def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, filesuff
     return
 
 
-def plotCV_same_model_R2(path, model_prefix, num_states_configs, filesuffix=''):
+def plotCV_same_model_R2(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix=''):
 
     plt.figure(figsize=(10, 6), constrained_layout=True)
     ax=plt.gca()
@@ -215,7 +224,11 @@ def plotCV_same_model_R2(path, model_prefix, num_states_configs, filesuffix=''):
     lr_train_lps, lr_test_lps = loadCV_R2s(path, 'lr', 1)
     train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_lps))
     plt.plot(1+train_jitter, lr_train_lps*100, 'ko', mfc='none', markersize=ms, label='Train')
-    plt.plot(1, (lr_test_lps[np.argmax(lr_train_lps)])*100, 'ko', markersize=ms, label='Held-out')   # plot for the max train one
+    if plot_all_test:
+        test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_lps))
+        plt.plot(1+test_jitter, lr_test_lps*100, 'ko', markersize=ms, label='Held-out')
+    else:
+        plt.plot(1, (lr_test_lps[np.argmax(lr_train_lps)])*100, 'ko', markersize=ms, label='Held-out')   # plot for the max train one
 
     # Plot for num_states > 1 now
     for i, s in enumerate(num_states_configs):
@@ -225,8 +238,12 @@ def plotCV_same_model_R2(path, model_prefix, num_states_configs, filesuffix=''):
         plt.plot(s+train_jitter, hmm_train_lps*100, 'ko', mfc='none', markersize=ms)
         # plt.errorbar(s + 0.4, np.mean(hmm_train_lps*factor_bits_per_sec), yerr=np.std(hmm_train_lps*factor_bits_per_sec), color='k', fmt='o', capsize=0)
 
-        if len(hmm_train_lps):
-            plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)])*100, 'ko', markersize=ms)   # plot for the max train one
+        if plot_all_test:
+            test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_lps))
+            plt.plot(s+test_jitter, hmm_test_lps*100, 'ko', markersize=ms)
+        else:
+            if len(hmm_train_lps):
+                plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)])*100, 'ko', markersize=ms)   # plot for the max train one
 
     plt.ylabel('Var Explained (%)')
     plt.xlabel('Number of states')
@@ -373,21 +390,22 @@ if __name__ == '__main__':
     savefig = True
     display = False
 
-    path = 'june24_wt'
+    path = 'june25_kfoldcv_wt'
     CHANCE_MODEL_PATH = f'models/{path}/chance_1_cv/20250625_001932_chord'
 
-    # path = 'june24_wt_fred'
+    # path = 'june25_kfoldcv_wt_fred'
     # CHANCE_MODEL_PATH = f'models/{path}/chance_1_cv/20250625_012323_coil'
+    plot_all_test = True
 
     num_states_configs = [ 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20]
-    plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, filesuffix='')
-    plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='')
-    plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, filesuffix='')
+    plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='')
+    # plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='')
+    plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='')
 
     num_states_configs = num_states_configs + [ 25, 30 ]
-    plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
-    plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
-    plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
+    plotCV_same_model_LL(path, 'glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='_extended')
+    # plotCV_same_model_LL_by_fly(path, 'glm-hmm', num_states_configs, filesuffix='_extended')
+    plotCV_same_model_R2(path, 'glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='_extended')
 
     # plotCV_same_model_Corr(path, 'lrhmmci', num_states_configs)   # maybe plot other metrics too
     # plotCV_same_model_R2adj(path, 'lrhmmci', num_states_configs)
