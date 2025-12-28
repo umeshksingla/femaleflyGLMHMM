@@ -122,9 +122,9 @@ if __name__ == '__main__':
 
         if len(sessions_features) % 10 == 0:
             joblib.dump(sessions_features,
-                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_sep5.pkl'))
+                        os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_oct25.pkl'))
             print(f'Temp dump.')
 
     joblib.dump(sessions_features,
-                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_sep5.pkl'))
+                os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_oct25.pkl'))
     print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(sessions_features)}")
