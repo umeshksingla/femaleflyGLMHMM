@@ -6,18 +6,6 @@
 
 ####################################
 
-import argparse
-import os.path
-import sys
-
-import joblib
-import json
-import numpy as np
-
-from hmms.LRHMMIndFemaleFly import LRHMMIndFemaleFly
-from hmms.LRFemaleFly import LRFemaleFly
-from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
-from utilities import utils
 import run_global
 
 
@@ -37,7 +25,7 @@ if __name__ == '__main__':
         "name": 'idglmhmmci',
         "seed": 3242,
         "datasplit_seed": 0,
-        "num_states": 5,
+        "num_states": 3,
         "transition_matrix_stickiness": 100,
         "path": f'general_{dataset}_lr',
         "data_path": data_path,
