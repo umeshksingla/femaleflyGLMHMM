@@ -9,6 +9,7 @@ from matplotlib.patches import FancyArrowPatch, Rectangle
 import seaborn as sns
 import os
 import networkx as nx
+import pandas as pd
 
 import numpy as np
 # import jax.numpy as jnp
@@ -39,11 +40,11 @@ mpl.rcParams['grid.linewidth'] = 0.5
 mpl.rcParams['axes.axisbelow'] = True
 mpl.rcParams['axes.linewidth'] = 0.5
 mpl.rcParams['axes.ymargin'] = 0
-mpl.rcParams["axes.labelsize"] = 16
-mpl.rcParams["xtick.labelsize"] = 16
-mpl.rcParams["ytick.labelsize"] = 16
-mpl.rcParams["legend.fontsize"] = 16
-plt.rcParams['axes.titlesize'] = 18
+mpl.rcParams["axes.labelsize"] = 20
+mpl.rcParams["xtick.labelsize"] = 20
+mpl.rcParams["ytick.labelsize"] = 20
+mpl.rcParams["legend.fontsize"] = 20
+plt.rcParams['axes.titlesize'] = 20
 
 # -- Ticks and tick labels --
 mpl.rcParams['axes.edgecolor'] = 'black'
@@ -75,6 +76,21 @@ mpl.rcParams['lines.linewidth'] = 1
 
 
 def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=True):
+
+    fig, ax = plt.subplots(figsize=(2.4, 1.7))
+    ax.plot([0, 1], [1, 1], c=COLORS[0], linewidth=6)
+    ax.text(1.2, 1, f'LEAP\ndataset', va='center', fontsize='small')
+    ax.plot([0, 1], [0, 0], c=COLORS[0], linewidth=6, linestyle='--')
+    ax.text(1.2, 0, f'16mic\ndataset', va='center', fontsize='small')
+    # ax.set_ylim([0.5, -num_states-0.5])
+    ax.axis('off')
+    plt.tight_layout()
+    if savefig:
+        plt.savefig(f'{fig_dir}/legend_datasets.pdf', dpi=300, transparent=True, bbox_inches='tight')
+    if display:
+        plt.show()
+    plt.close()
+    return
 
     fig, ax = plt.subplots(figsize=(2.25, 2.25))
 
@@ -483,17 +499,16 @@ def plot_hmm_data_whole_session_with_aux_with_states(predicted_emissions, true_e
     return
 
 
-def plot_filters_statewise(orig_weights, data_config, input_labels_list, input_labels, y_labels, prefix, axtitles=True, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
+def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_input_labels_list, input_labels, y_labels, y_aux_labels, prefix, axtitles=True, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = orig_weights.shape[0]
     emission_dim = orig_weights.shape[1]
     # filter_len = orig_weights.shape[-1]
-    # input_labels_list = data_config['input_labels_list']
     # input_labels = data_config['input_labels']
     # y_labels = data_config['emission_labels']
     directional_y_variables = data_config['directional_variables']
-    n_inputs = len(input_labels_list)
+    n_inputs = len(data_config['input_labels_list'])
     basis = data_config['basis']
 
     if not only_plot_inputs:
@@ -504,16 +519,19 @@ def plot_filters_statewise(orig_weights, data_config, input_labels_list, input_l
     print(weights.shape)
 
     eff_num_states = num_states - len(skip_states)
-    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(2.25 * eff_num_states + 3, 2.4 * len(y_labels)), sharey='row')
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(2.5 * eff_num_states + 3, 2.4 * len(y_labels)), sharey='row')
 
     n_feats = 0
     for d, _ in enumerate(y_labels):
         # print(d, _)
         w = weights[:, d]
         # w = w / np.linalg.norm(w)   # normalize across states
+        if _ in y_aux_labels:
+            n_feats = 0     # reset
         base_idx = n_feats
         s = 0
         for z in range(num_states):
+            print(z)
             if z in skip_states:
                 continue
             # if z == 0 and num_states > 1: continue
@@ -535,7 +553,12 @@ def plot_filters_statewise(orig_weights, data_config, input_labels_list, input_l
             for __ in only_plot_inputs:
                 if _ in directional_y_variables:
                     __ = __ + '_directedlr2'
-                stim = base_idx + input_labels_list[base_idx:].index(__)    # need base_idx to skip to where stim for this y start (since we have overlapping stim names for different y's)
+
+                if _ in y_aux_labels:
+                    stim = base_idx + aux_input_labels_list[base_idx:].index(__)
+                else:
+                    stim = base_idx + input_labels_list[base_idx:].index(__)       # need base_idx to skip to where stim for this y start (since we have overlapping stim names for different y's)
+
                 # print(__, "stim idx", stim, "base_idx", base_idx)
                 ax.plot(np.arange(-w[z, stim].shape[-1], 0)/data_config['orig_fps'], w[z, stim], linewidth=3, label=input_labels[__], color=input_label_colors[__])
                 ax.axhline(0, ls=':', c='k', lw=0.5)
@@ -572,7 +595,7 @@ def plot_filters(orig_weights, data_config, y_labels, filesuffix, skip_states=[]
     n_inputs = len(input_labels_list)
     assert data_config['ncos'] == filter_len // n_inputs
     basis = data_config['basis']
-    print(">>>> obtained weights", orig_weights)
+    # print(">>>> obtained weights", orig_weights)
 
     print(orig_weights.shape)
     weights = basis_invtransform_one_by_one(orig_weights, basis, n_inputs)     # shape
@@ -627,7 +650,7 @@ def plot_filters_separate_emissions(orig_weights, data_config, y_labels, input_l
 
     # input_labels = data_config['input_labels']
     basis = data_config['basis']
-    print(">>>> obtained weights", orig_weights, orig_weights.shape)
+    # print(">>>> obtained weights", orig_weights, orig_weights.shape)
 
     # input_mask_by_emission = data_config['input_mask_by_emission']
 
@@ -682,10 +705,60 @@ def plot_filters_separate_emissions(orig_weights, data_config, y_labels, input_l
 
         if display: plt.show()
         plt.close()
-    return fig
+    return
 
 
-def plot_filter_amplitudes(weights, data_config, input_labels, y_labels, prefix, skip_states=[], plot_top_k=None, savefig=False, fig_dir=None, display=True):
+def plot_statetrans_filters_separate(orig_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix, sharey=False, saveindividual=False, savefig=False, fig_dir=None, display=True):
+
+    num_states = orig_weights.shape[0]
+    print("orig_weights.shape", orig_weights.shape)
+
+    basis = data_config['basis']
+    for z_ in range(num_states):
+        print("State", z_+1)
+
+        n_inputs_d = len(input_list)
+        weights_d = orig_weights[z_][..., input_mask_by_statetrans == 1][:, None, :]
+        print("weights_d", weights_d.shape, "n_inputs_d", n_inputs_d)
+        weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=n_inputs_d)[:, 0]
+        fig, axs = plt.subplots(1, n_inputs_d, figsize=(3 * n_inputs_d, 3), sharey=sharey)
+
+        stim = 0
+        for __ in input_list:
+            ax = axs[stim]
+
+            for z in range(num_states):
+                if z == z_:
+                    continue
+                ax.plot(np.arange(-weights_d[z, stim].shape[-1], 0)/data_config['orig_fps'], weights_d[z, stim], color=COLORS[z], linewidth=3, label=f'State {z+1}')
+
+            ax.set_title(input_labels[__])
+            ax.axhline(0, ls=':', c='k', lw=0.5)
+            maxtime = weights_d[0, stim].shape[-1]//data_config['orig_fps']
+            ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime+1), labels=[-maxtime] + ['']*(maxtime-1) + [0])
+            ax.margins(y=0.05)
+            if saveindividual:
+                ax.yaxis.set_tick_params(labelleft=True)  # ensure ytick labels are shown
+            if ax.get_subplotspec().is_last_row() or saveindividual:
+                ax.set_xlabel('Time (s)')
+            if ax.get_subplotspec().is_last_col():
+                ax.legend(loc='upper right')
+            stim += 1
+
+        fig.supylabel(f'State transition filters\nFROM State {z_+1}', ha='center')
+        plt.margins(0.05)
+        plt.tight_layout()
+        fig.canvas.draw()
+
+        if savefig:
+            fig.savefig(os.path.join(fig_dir, f'{filesuffix}_filters_sharey={sharey}_separate_state{z_+1}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+
+        if display: plt.show()
+        plt.close()
+    return
+
+
+def plot_filter_amplitudes(weights, data_config, input_labels, y_labels, input_mask_by_emission, prefix, skip_states=[], plot_top_k=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = weights.shape[0]
@@ -702,15 +775,15 @@ def plot_filter_amplitudes(weights, data_config, input_labels, y_labels, prefix,
 
     # print(weights.shape)
 
-    input_mask_by_emission = data_config['input_mask_by_emission']
+    # input_mask_by_emission = data_config['input_mask_by_emission']
 
     eff_num_states = num_states-len(skip_states)
 
     if plot_top_k:
-        fig_width = 2.8*eff_num_states + 0.5
+        fig_width = 3*eff_num_states + 0.5
     else:
         fig_width = 4*eff_num_states + 0.5
-    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(fig_width, 2.5*len(y_labels)), sharey=True)
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(fig_width, 2.7*len(y_labels)), sharey=True)
 
     for d, _ in enumerate(y_labels):
         e_mask = input_mask_by_emission[d]
@@ -855,6 +928,9 @@ def plot_state_o_dists_reformatted(emissions_z, o_labels, title=None, savefig=Fa
 
 
 def plot_state_o_dists_otherfilters(all_soft_predictions_per_state, all_stateseq, num_states, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+    if num_states <= 1:
+        return
+
     emission_dim = len(o_labels)
     n_batches = len(all_soft_predictions_per_state)
 
@@ -947,7 +1023,7 @@ def plot_state_aux_dists(aux_z, a_labels, title=None, savefig=False, fig_dir=Non
 def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], title=None, savefig=False, fig_dir=None, display=True):
 
     def reformat(f_name, dt):
-        print(f_name)
+        # print(f_name)
         axtitle = None
         if f_name in ['mFV', 'mFS', 'fFV', 'fFS']:
             t = dt * config['effective_fps']
@@ -977,7 +1053,7 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
             ylabel = 'Density'
             xlim = (-2, 182)
             xticks = [0, 90, 180]
-            axtitle = 'fmAng'
+            axtitle = '|fmAng|'
         elif f_name in ['fmAng_sin']:
             t = np.rad2deg(np.arcsin(dt))
             cut = 0
@@ -987,9 +1063,9 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
             xticks = [-90, 0, 90]
             axtitle = 'male lateral position'
         elif f_name in ['pulse_i', 'sine_i', 'tap2']:
-            print(f_name, np.unique(dt, return_counts=True))
-            print(f_name, np.unique(np.round(dt, 2), return_counts=True))
-            print(f_name, np.sum(dt), len(dt))
+            # print(f_name, np.unique(dt, return_counts=True))
+            # print(f_name, np.unique(np.round(dt, 2), return_counts=True))
+            # print(f_name, np.sum(dt), len(dt))
             t = np.sum(dt) / len(dt)
             cut = None
             xlabel = None
@@ -1013,12 +1089,13 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
 
     axi = 0
     for a, al in enumerate(a_labels):
-        print(a, al)
+        print(al)
         if al in exclude_a:
             continue
         for z in list(aux_z.keys()):
             data_z = aux_z[z][:, a]
             data_z_reformatted, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z)
+            print(f'State {z+1}', np.nanmean(data_z_reformatted), xlabel)
 
             if al in ['pulse_i', 'sine_i', 'tap2']:
                 ax[axi].bar(z/2, data_z_reformatted, color=COLORS[z], alpha=0.9, width=0.3)
@@ -1028,7 +1105,7 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
                             label=f'State {z+1}',
                             alpha=1,
                             cut=cut,
-                            linewidth=2,
+                            linewidth=3,
                             )
 
         # ax[axi].axvline(0, lw=0.5, c='gray', ls=':', alpha=0.7)
@@ -1351,10 +1428,9 @@ def plot_state_aux_sorted_odists(aux_z, emissions_z, a_labels, o_labels, title=N
                 ax.text(x, 0.01, label, ha='center', va='bottom', rotation=90, fontsize=16)
             else:
                 ax.text(x, -0.01, label, ha='center', va='top', rotation=90, fontsize=16)
-        ax.text(-1.7, arrow_max-arrow_max*0.1, 'More', ha='center', va='bottom', rotation=90, fontsize=14)
-        ax.text(-1.7, -arrow_max+arrow_max*0.1, 'Less', ha='center', va='bottom', rotation=90, fontsize=14)
-        ax.text(-1.7, 0, 'Relative z-scores', ha='center', va='center', rotation=90, fontsize=14)
-        print("state", z, "setting ylim", max_y)
+        ax.text(-1.7, arrow_max-arrow_max*0.1, 'More', ha='center', va='bottom', rotation=90, fontsize=18)
+        ax.text(-1.7, -arrow_max+arrow_max*0.1, 'Less', ha='center', va='bottom', rotation=90, fontsize=18)
+        ax.text(-1.7, 0, 'Relative z-scores', ha='center', va='center', rotation=90, fontsize=18)
         ax.set_ylim(-max_y-0.05, max_y+0.05)
 
         ax = axes[ax_col2]
@@ -1491,11 +1567,10 @@ def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', s
     durations = []
     for z in range(num_states):
         d = dwell_times_z[z] / effective_fps    # in seconds
-        print(f"State {z + 1}: Mean dwell time = {np.mean(dwell_times_z[z]):.2f}, n = {len(dwell_times_z[z])}")
-        print(f"State {z + 1}: Mean dwell time = {np.mean(d):.2f}s, n = {len(d)}")
+        # print(f"State {z + 1}: Mean dwell time = {np.mean(dwell_times_z[z]):.2f}, n = {len(dwell_times_z[z])}")
+        print(f"State {z + 1}: Mean dwell time = {np.mean(d):.2f}s")
         durations.append(d.tolist())
 
-    import pandas as pd
     df = pd.DataFrame({
         "dwell_time": sum(durations, []),
         "state": sum([[z] * len(v) for z, v in enumerate(durations)], [])
@@ -1643,6 +1718,7 @@ def plot_transition_matrix(transition_matrix, savefig=False, fig_dir=None, displ
 
 
 def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
+    print(transition_matrix.tolist())
     fig = plt.figure()
 
     G = nx.DiGraph()
@@ -1674,7 +1750,7 @@ def plot_ethogram(transition_matrix, savefig=False, fig_dir=None, display=True):
     # Draw edge labels
     edge_labels = {(u, v): f"{d['weight']:.2f}" for (u, v, d) in edges}
     # print(edge_labels, len(edge_labels))
-    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.5)
+    nx.draw_networkx_edge_labels(G, pos, font_size=15, edge_labels=edge_labels, label_pos=0.8, rotate=False, connectionstyle='arc3,rad=0.4')
 
     # plt.title("Transition Probability Graph")
     plt.tight_layout()
@@ -1837,7 +1913,7 @@ def plot_pearson(train_pr, test_pr, title=None, savefig=False, fig_dir=None, dis
     fig = plt.figure(figsize=(3, 4))
     plt.plot(1, train_pr, 'ko', mfc='none', label='Train', markersize=10)
     plt.plot(1, test_pr, 'ko', label='Held-out', markersize=10)
-    plt.ylabel('Pearson correlation coefficient')
+    plt.ylabel(r"Pearson $r$")
     plt.margins(0.1)
     plt.xticks([])
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -1922,7 +1998,7 @@ def plot_pearson_by_fly(train_prs, test_prs, title=None, savefig=False, fig_dir=
     plt.plot(test_jitter+2, test_prs, 'ko', label='Held-out', markersize=7)
     plt.errorbar(2.2, np.mean(test_prs), yerr=np.std(test_prs), color='k', fmt='o', capsize=0)
 
-    plt.ylabel('Pearson correlation coefficient')
+    plt.ylabel(r"Pearson $r$")
     plt.margins(0.1)
     plt.xticks([])
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -2121,7 +2197,7 @@ def plot_pearson_by_z_by_fly(pearson_z, title=None, savefig=False, fig_dir=None,
         plt.scatter(z + jitter, pearson_z[z][sort_by], c=colors, cmap=transparent_cmap, s=SCATTERSIZE, edgecolors='none')
         plt.errorbar(z + 1.2, np.mean(pearson_z[z]), yerr=np.std(pearson_z[z]), color='k', alpha=0.5, fmt='o', capsize=0)
 
-    plt.ylabel('Pearson correlation coefficient')
+    plt.ylabel(r"Pearson $r$")
     plt.margins(0.1)
     plt.xticks(np.array(list(pearson_z.keys())).astype(int) + 1)
     plt.xlabel('State')
@@ -2165,7 +2241,7 @@ def plot_pearson_by_z_by_fly_vs_all(pearson_all, pearson_z, title=None, savefig=
         plt.scatter(z+1 + jitter, pearson_z[z][sort_by], c=colors, cmap=transparent_cmap, s=SCATTERSIZE, edgecolors='none')
         plt.errorbar(z+1 + .2, np.mean(pearson_z[z]), yerr=np.std(pearson_z[z]), color='k', alpha=0.5, fmt='o', capsize=0)
 
-    plt.ylabel('Pearson correlation coefficient')
+    plt.ylabel(r"Pearson $r$")
     plt.margins(0.1)
     # plt.xticks(np.array(list(pearson_z.keys())).astype(int) + 1)
     plt.xticks([0] + [_ + 1 for _ in list(pearson_z.keys())], ['All'] + [_ + 1 for _ in list(pearson_z.keys())])
@@ -2268,7 +2344,7 @@ def plot_correlation_by_o_by_fly(corr_o, o_labels, title=None, savefig=False, fi
         plt.errorbar(o + 0.2, np.mean(coors), yerr=np.std(coors), color='k', alpha=0.5, fmt='o', capsize=0)
 
     plt.xticks(list(corr_o.keys()), list(o_labels.values()), rotation=0)
-    plt.ylabel('Pearson correlation coefficient')
+    plt.ylabel(r"Pearson $r$")
     plt.margins(0.1)
     plt.xticks(list(corr_o.keys()))
     plt.axhline(0, c='k', ls=':', lw=2)
@@ -2747,7 +2823,7 @@ def plot_pearson_by_z_o_by_fly(pearson_z_o, o_labels, title=None, savefig=False,
         axes.margins(0.1)
 
     axes = ax[0] if len(pearson_z_o) > 1 else ax
-    axes.set_ylabel('Pearson correlation coefficient (r)')
+    axes.set_ylabel(r"Pearson $r$")
     # plt.suptitle(title)
     # plt.ylim(-10, 20)
     # plt.tight_layout()
@@ -2770,16 +2846,16 @@ def plot_loss(em_losses, savefig=False, fig_dir=None, display=True):
     return fig
 
 
-def plot_smoothed_probs(state_probs, model_config, data_config, batch, effective_fps, xlim=None, xlim_orig=None, prefix='', suffix='', savefig=False, fig_path=None, display=True):
+def plot_state_probs(state_probs, model_config, data_config, batch, effective_fps, xlim=None, xlim_orig=None, prefix='', suffix='', savefig=False, fig_path=None, display=True):
     xlim_ = np.r_[xlim[0]:xlim[1]+1]
 
-    fig = plt.figure(figsize=(10, 4))
+    fig = plt.figure(figsize=(12, 4))
     ax = plt.gca()
     for z in range(model_config['num_states']):
         plt.plot(xlim_, state_probs[batch][xlim_, z], c=COLORS[z], linewidth=3, label=f'State {z+1}')
 
     plt.ylim([-0.05, 1.05])
-    plt.yticks([0, 0.5, 1])
+    plt.yticks([0, 1])
 
     xt = np.linspace(xlim_[0], xlim_[-1], num=5)
     pws = data_config['predict_window_size']
@@ -2792,7 +2868,7 @@ def plot_smoothed_probs(state_probs, model_config, data_config, batch, effective
     plt.ylabel('P(state | data)')
     plt.title(f'{prefix.title()}:{batch} {suffix}')
     plt.xlabel('Time (s)')
-    plt.legend(loc='upper right')
+    # plt.legend(loc='upper right')
 
     plt.tight_layout()
     if savefig: fig.savefig(fig_path, dpi=300, bbox_inches='tight', transparent=True)

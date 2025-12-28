@@ -198,7 +198,7 @@ def extract_female(source):
 
     data_config = {}
 
-    sessions_features = joblib.load('../data/wt/sessions_features_78_jul29.pkl')
+    sessions_features = joblib.load('../data/wt/sessions_features_74_sep5.pkl')
     datacls = WT_DATA
 
     fps = sessions_features.get('fps', datacls.fps)
@@ -220,7 +220,7 @@ def extract_female(source):
         'fmAng_cos': r"$\it{cos}$(fmAng)",
         'fmAng_sin': r"$\it{sin}$(fmAng)",
 
-        'wingAlign': 'wingAng',
+        'wingAlign': 'wingArisAng',
         # 'pfast_i': 'pulse song',
         'pulse_i': 'pulse song',
         # 'pfast_i_directedlr': 'pulse song\nx side',
@@ -271,20 +271,20 @@ def extract_female(source):
 
     print("====", inputs_raw[0].shape)
 
-    introfigs_dir = '../paper figs/figure_behavior/datasamples_'
+    introfigs_dir = '../../paper figs/figure_behavior/datasamples'
     os.makedirs(introfigs_dir, exist_ok=True)
 
     # Plot each feature
-    batch = 4
+    batch = 2
     np.random.seed()
     i_features = inputs_raw[batch].reshape(-1, len(data_config['input_labels']), data_config['input_raw_each_dim'])
     idxs = np.random.choice(i_features.shape[0], size=100)
     for ix in idxs:
-        ix = 12942  # 190724_112816_wt_16276625_rig2.1.h5
+        ix = 15624  # 190724_112816_wt_16276625_rig2.1.h5
         print("batch", batch, "ix", ix)
         plot_inputs(batch, [ix], inputs_raw, data_config, small=False, savedir=introfigs_dir, display=False)
         plot_inputs(batch, [ix], inputs_raw, data_config, small=True, savedir=introfigs_dir, display=False)
-        # plot_emissions(batch, [ix], emissions, data_config, savedir=introfigs_dir, display=True)
+        plot_emissions(batch, [ix], emissions, data_config, savedir=introfigs_dir, display=False)
         break
 
     return

@@ -122,6 +122,16 @@ def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, 
     return emissions_z
 
 
+def get_rescaled_emissions(emissions, output_mn_std, effective_fps):
+    emissions_rescaled_b = []
+    for btch in range(len(emissions)):
+        mn_std_btch = output_mn_std[btch]
+        eez = emissions[btch] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+        eez = eez * effective_fps  # velocity (mm/s) = velocity (mm/frame) × effective_fps
+        emissions_rescaled_b.append(eez)
+    return emissions_rescaled_b
+
+
 def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False, effective_fps=None):
     """
     Return a dictionary of states mapped to emission values in that state.
@@ -147,6 +157,15 @@ def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=F
     for z in aux_data_z:
         aux_data_z[z] = np.vstack(aux_data_z[z])
     return aux_data_z
+
+
+def get_rescaled_aux(aux_data, aux_mn_std):
+    aux_data_rescaled_b = []
+    for btch in range(len(aux_data)):
+        mn_std_btch = aux_mn_std[btch]
+        eez = aux_data[btch] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
+        aux_data_rescaled_b.append(eez)
+    return aux_data_rescaled_b
 
 
 def get_feat_windows(true_feat_series, pred_feat_series, event_onsets, window_len):

@@ -4,6 +4,8 @@
 
 ####################################
 import glob
+import sys
+
 import joblib
 import os
 
@@ -14,16 +16,20 @@ if __name__  == '__main__':
 
     # Final figures use figures mostly from '20250721_185327_mushy' but some also from 20250711_032553_cheesecake and 20250714_152531_admin 20250723_030315_cenotaph
     # 20250804_211804_ride for auxem figures
-    model_pkl_path = f'models/general_wt_fred_lr/glm-hmm_2_cv/20250905_115642_satire'
+    model_pkl_path = f'models/general_wt_lr/id-glm-hmm_5_cv/20251227_144638_campaign'
 
     # utils.enhance(model_pkl_path)
-    # utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=True)
+    # utils.enhance_auxem(model_pkl_path, savefig=1, display=0)
+    # utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+    # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
+    # utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
     # utils.enhance_auxem(model_pkl_path, savefig=1, display=0)
     # utils.generate_auxem_plots(model_pkl_path, savefig=1, display=0)
-    # utils.generate_state_traces(model_pkl_path, dataset='wt_fred', savefig=1, display=0)
-    # utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
+
+    # utils.generate_state_traces(model_pkl_path, dataset='wt', savefig=1, display=0)
     # utils.generate_TAs(model_pkl_path, savefig=1, display=0)
     utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+    # utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
 
     # utils.generate_videos(model_pkl_path, override_vid_dir=True)
 

@@ -138,7 +138,7 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
 
     model_ckp = {
         'prefix': model.prefix,
-        'model': model if model.prefix != 'chance' else '',     # chance model cannot unpickle tfd distribution
+        'model': model if model.prefix not in ['chance'] else '',     # chance model cannot unpickle tfd distribution
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
@@ -477,11 +477,8 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     os.makedirs(fig_dir, exist_ok=True)
     # supp_fig_dir = os.path.join(fig_dir, 'supp_figures')
     scores_fig_dir = os.path.join(fig_dir, 'scores_figures')
-    filters_fig_dir = os.path.join(fig_dir, 'filters_figures')
     dists_fig_dir = os.path.join(fig_dir, 'dists_figures')
-    # os.makedirs(supp_fig_dir, exist_ok=True)
     os.makedirs(scores_fig_dir, exist_ok=True)
-    os.makedirs(filters_fig_dir, exist_ok=True)
     os.makedirs(dists_fig_dir, exist_ok=True)
 
     learned_params = model_ckp['learned_params']
@@ -501,24 +498,23 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     effective_fps = data_config['effective_fps']
     num_states = model_ckp['num_states']
     model_prefix = model_ckp['prefix']
+    print("model_prefix", model_prefix)
+    # model = model_ckp['model']
 
     if 'hmm' in model_prefix or 'HMM' in model_prefix:
         plots.plot_loss(learned_lps, savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
-                                savefig=savefig, fig_dir=fig_dir, display=display)
+        # plots.plot_expected_occupancy(calculate_steady_state_p(learned_params.transitions.transition_matrix),
+        #                         savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_empirical_occupancy(model_ckp['test_data']['test_stateseq'], model_config,
             title='[Test Data]', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_empirical_occupancy([*model_ckp['train_data']['train_stateseq'], *model_ckp['test_data']['test_stateseq']], model_config,
                                 title='', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_ethogram(learned_params.transitions.transition_matrix,
-                            savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_transition_matrix(learned_params.transitions.transition_matrix,
-                                     savefig=savefig, fig_dir=fig_dir, display=display)
         z_seqs = [*model_ckp['train_data']['train_stateseq'], *model_ckp['test_data']['test_stateseq']]
         plots.plot_state_dwell_times(calc_dwell_times_by_z(z_seqs, num_states), num_states, effective_fps,
                                      savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
         padded_arrays, n_le = pad_to_equal_length([*model_ckp['train_data']['train_state_probs'], *model_ckp['test_data']['test_state_probs']])
+        # print("padded_arrays", padded_arrays.shape)
         plots.plot_prob_states_aligned(padded_arrays, n_le, 300, model_config, title=f'All data',
                                        xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
@@ -536,14 +532,20 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
                                        config=model_config, title=f'All Copulation data',
                                        xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
-    if 'hmm' in model_prefix or 'HMM' in model_prefix:
-        weights = learned_params.emissions.weights
-    elif 'logrhmm' in model_prefix:
-        weights = learned_params.emissions.weights[:, np.newaxis, :]
-    elif model_prefix == 'lr':
-        weights = learned_params['w']
-    else:
-        raise Exception(f'wrong prefix={model_prefix}')
+        if 'id' in model_prefix:
+            pass
+        else:
+            plots.plot_ethogram(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
+            plots.plot_transition_matrix(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    # if 'hmm' in model_prefix or 'HMM' in model_prefix:
+    #     weights = learned_params.emissions.weights
+    # elif 'logrhmm' in model_prefix:
+    #     weights = learned_params.emissions.weights[:, np.newaxis, :]
+    # elif model_prefix == 'lr':
+    #     weights = learned_params['w']
+    # else:
+    #     raise Exception(f'wrong prefix={model_prefix}')
 
     def plot_func(prefix):
         data_key = f'{prefix}_data'
@@ -563,7 +565,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
 
         # plots.plot_pearson_by_z(model_ckp[data_key][f'{prefix}_pearson_by_z'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
         # plots.plot_pearson_by_z_vs_all(model_ckp[data_key][f'{prefix}_pearson'], model_ckp[data_key][f'{prefix}_pearson_by_z'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_pearson_by_z_by_fly(model_ckp[data_key][f'{prefix}_pearson_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
+        # plots.plot_pearson_by_z_by_fly(model_ckp[data_key][f'{prefix}_pearson_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
         plots.plot_pearson_by_z_by_fly_vs_all(model_ckp[data_key][f'{prefix}_pearson_by_fly'], model_ckp[data_key][f'{prefix}_pearson_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
         # plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_by_o_soft'], emission_labels_jr, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
         plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
@@ -574,7 +576,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
 
         # plots.plot_correlation_lags_by_o(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_soft'], emission_labels_jr, effective_fps, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_lags_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'], emission_labels_jr, effective_fps, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
+        # plots.plot_correlation_lags_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'], emission_labels_jr, effective_fps, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
 
         return
 
@@ -599,6 +601,36 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     all_output_mn_std = [*model_ckp['train_data']['train_output_mn_std'], *model_ckp['test_data']['test_output_mn_std']]
     all_aux_mn_std = [*model_ckp['train_data']['train_aux_mn_std'], *model_ckp['test_data']['test_aux_mn_std']]
 
+    #
+    # print(all_aux_data[1].shape)
+    # print(auxiliary_labels)
+
+    # Why some flies show low or negative performance?
+    # train_pearson = model_ckp['train_data']['train_pearson_by_fly']
+    # test_pearson = model_ckp['test_data']['test_pearson_by_fly']
+    # all_pearson = np.concatenate([train_pearson, test_pearson])
+    # rescaled_emissions = get_rescaled_emissions(all_emissions, all_output_mn_std, effective_fps)
+    # rescaled_aux_data = get_rescaled_aux(all_aux_data, all_aux_mn_std)
+    # print(len(all_pearson), len(rescaled_emissions), len(rescaled_aux_data))
+    #
+    # print(np.array(all_output_mn_std).shape)
+    # vel_means = np.array(all_output_mn_std)[:, 0, 0]
+    # vel_stds = np.array(all_output_mn_std)[:, 0, 1]
+    # aux_means = np.array([np.mean(b[:, 8]) for b in rescaled_aux_data])
+    # # session_lens = np.array([len(b) for b in rescaled_aux_data])
+    # # state1_dur = np.array([np.sum(b == 1)/len(b) for b in all_stateseq])
+    #
+    # plt.figure(figsize=(5, 5))
+    # plt.scatter(all_pearson, aux_means, c='r')
+    # plt.xlabel(r"Pearson $r$")
+    # # plt.ylabel('fwd_vel_means')
+    # plt.margins(0.1)
+    # plt.tight_layout()
+    # plt.show()
+    # plt.close()
+    #
+    # return
+
     plots.plot_state_aux_o_mean(
         get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
@@ -611,7 +643,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         auxiliary_labels, data_config, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_aux_dists_reformatted(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, all_aux_mn_std, rescaled=True,),
-        auxiliary_labels, data_config, exclude_a=['wingAlign', 'fmAng_sin'], title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
+         auxiliary_labels, data_config, exclude_a=['wingAlign', 'fmAng_sin'], title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_aux_sorted_odists(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
         auxiliary_labels_full, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
@@ -630,20 +662,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_state_aux_sorted_o_mean_directional(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
         auxiliary_labels_full, emission_labels_dict, directional_variables, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-
-    # plot filters for regular emissions
-    input_mask_by_emission = data_config['input_mask_by_emission']
-    input_labels = data_config['input_labels']
-    for skip_states in [[], [0]]:
-        if num_states <= 1 and skip_states:
-            continue    # skip skip_states if there's only state
-        plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=skip_states, savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filters(weights, data_config, emission_labels, filesuffix='emissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(weights, data_config, emission_labels, input_labels, input_mask_by_emission, filesuffix='emissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(weights, data_config, emission_labels, input_labels, input_mask_by_emission, filesuffix='emissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(weights, data_config, data_config['input_labels'], data_config['emission_labels'], prefix='emissions', skip_states=skip_states, savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(weights, data_config, data_config['input_labels'], data_config['emission_labels'], prefix='emissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=filters_fig_dir, display=display)
-        plots.plot_filters_statewise(weights, data_config, data_config['input_labels_list'], data_config['input_labels'], data_config['emission_labels'], prefix='emissions', only_plot_inputs=['mFV', 'pulse_i', 'sine_i', 'tap2'], skip_states=skip_states, savefig=savefig, fig_dir=filters_fig_dir, display=display)
     return
 
 
@@ -696,7 +714,7 @@ def enhance_auxem(model_dir, savefig=True, display=False):
     return
 
 
-def generate_auxem_plots(model_dir, savefig=True, display=False):
+def generate_auxem_figures(model_dir, savefig=True, display=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     auxem_model_ckp = load_specific_path_auxem(model_dir)
@@ -738,19 +756,103 @@ def generate_auxem_plots(model_dir, savefig=True, display=False):
 
     input_mask_by_auxemission = auxem_model_ckp['input_mask_by_auxemission']
     input_labels = data_config['input_labels']
-    auxiliary_emission_labels['wingFlickBin'].remove('wingAlign')
-    # plot filters for aux emissions
-    for skip_states in [[], [0]]:
+    # auxiliary_emission_labels['wingFlickBin'].remove('wingAlign')
+
+    return
+
+
+def generate_state_filters(model_dir, savefig=True, display=False):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if (model_ckp is None):
+        return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    state_fig_dir = os.path.join(fig_dir, 'state_figures')
+    os.makedirs(fig_dir, exist_ok=True)
+    os.makedirs(state_fig_dir, exist_ok=True)
+
+    update_labels(data_config)
+    input_labels = data_config['input_labels']
+    learned_params = model_ckp['learned_params']
+    reg_weights = learned_params.transitions.weights
+
+    input_mask_by_statetrans = data_config['input_mask_by_emission'][0]
+    input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
+
+    plots.plot_statetrans_filters_separate(reg_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey='row', savefig=savefig, fig_dir=state_fig_dir, display=display)
+    return
+
+
+def generate_together_figures(model_dir, savefig=True, display=False):
+    """Plots, such as filters, that need to be together for emissions and aux-emissions. """
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    auxem_model_ckp = load_specific_path_auxem(model_dir)
+    if (model_ckp is None) or (auxem_model_ckp is None):
+        return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    together_filters_fig_dir = os.path.join(fig_dir, 'together_filters_fig_dir')
+    os.makedirs(fig_dir, exist_ok=True)
+    os.makedirs(together_filters_fig_dir, exist_ok=True)
+
+    update_labels(data_config)
+    input_labels = data_config['input_labels']
+    model_prefix = model_ckp['prefix']
+    num_states = model_ckp['num_states']
+
+    # plot filters for regular+auxem emissions
+    input_mask_by_emission = data_config['input_mask_by_emission']
+    input_mask_by_auxemission = np.array(auxem_model_ckp['input_mask_by_auxemission'])
+    input_mask_by_allemission = np.concatenate((input_mask_by_emission, input_mask_by_auxemission))
+    print(input_mask_by_allemission)
+
+    print(input_mask_by_emission.shape)
+    print(input_mask_by_auxemission.shape)
+    print(input_mask_by_allemission.shape)
+
+    learned_params = model_ckp['learned_params']
+    reg_weights = learned_params.emissions.weights
+
+    logreg_params = auxem_model_ckp['logreg_params']
+    aux_weights = logreg_params['w']
+    all_weights = np.concatenate((reg_weights, aux_weights), axis=1)
+
+    print(reg_weights.shape)
+    print(aux_weights.shape)
+    print(all_weights.shape)
+
+    emission_labels = data_config['emission_labels']
+    auxiliary_emission_labels = data_config['auxiliary_emission_labels']
+
+    all_emission_labels = OrderedDict()
+    all_emission_labels.update(emission_labels)
+    all_emission_labels.update(auxiliary_emission_labels)
+    print(emission_labels)
+    print(auxiliary_emission_labels)
+    print(all_emission_labels)
+
+    input_labels_list = data_config['input_labels_list']
+    auxiliary_input_labels_list = data_config['auxiliary_input_labels_list']
+    # all_input_labels_list = data_config['input_labels_list'] + data_config['auxiliary_input_labels_list']
+
+    print(data_config['input_labels_list'])
+    print(data_config['auxiliary_input_labels_list'])
+    # print(all_input_labels_list)
+
+    print(data_config['input_labels'])
+
+    for skip_states in [[0]]:
         if num_states <= 1 and skip_states:
             continue    # skip skip_states if there's only state
-        plots.plot_filters(weights, data_config, auxiliary_emission_labels, filesuffix='aux_emissions', skip_states=skip_states, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filters(weights, data_config, auxiliary_emission_labels, filesuffix='aux_emissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(weights, data_config, auxiliary_emission_labels, input_labels, input_mask_by_auxemission, filesuffix='aux_emissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(weights, data_config, auxiliary_emission_labels, input_labels, input_mask_by_auxemission, filesuffix='aux_emissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(weights, data_config, data_config['input_labels'], auxiliary_emission_labels, prefix='aux_emissions', skip_states=skip_states, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(weights, data_config, data_config['input_labels'], auxiliary_emission_labels, prefix='aux_emissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-        plots.plot_filters_statewise(weights, data_config, data_config['input_labels_list'], data_config['input_labels'], auxiliary_emission_labels, prefix='aux_emissions', only_plot_inputs=['mFV', 'pulse_i', 'sine_i', 'tap2'], axtitles=False, skip_states=skip_states, savefig=savefig, fig_dir=auxem_filters_fig_dir, display=display)
-
+        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions', only_plot_inputs=['mFV', 'pulse_i', 'sine_i', 'tap2'], skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return
 
 
@@ -773,11 +875,12 @@ def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_
         xlim = (int(xlim_[0]), int(xlim_[1]))
         len_traj = xlim[1] - xlim[0]
         xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
-        plots.plot_smoothed_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-            # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
-        # plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_state_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
         plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
         plots.plot_trajectories_statewise(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}_perstate{suffix}', display=display)
+
+        # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
+        # plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
         # plots.plot_trajectories2D(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs2d_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
         # plots.plot_trajectories_w_partner(model_ckp, model_config, data_config, batch, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_w_partner_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
 
@@ -805,7 +908,8 @@ def generate_state_clips(model_dir, savefig=True, display=False, gen_corr_video=
         data_key = f'{prefix}_data'
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
-        for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
+        # for batch in np.random.choice(n_sessions, size=min(10, n_sessions)):
+        for batch in [9, 10, 5, 35]:
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
             stateseq = model_ckp[data_key][f'{prefix}_stateseq'][batch]
             # num_timestamps = stateseq.shape[0]
@@ -843,12 +947,12 @@ def generate_state_traces(model_dir, dataset='wt', savefig=True, display=False):
     os.makedirs(state_traces_dir, exist_ok=True)
 
     if dataset == 'wt':
-        ftracks = joblib.load('processed_ftracks.pkl')
-        mtracks = joblib.load('processed_mtracks.pkl')
+        ftracks = joblib.load('data/wt_processed_ftracks.pkl')
+        mtracks = joblib.load('data/wt_processed_mtracks.pkl')
         dataset_basepath = '/Volumes/murthy/usingla/gold_dataset/wt/h5'
     elif dataset == 'wt_fred':
-        ftracks = joblib.load('wt_fredcleaned_processed_ftracks.pkl')
-        mtracks = joblib.load('wt_fredcleaned_processed_mtracks.pkl')
+        ftracks = joblib.load('data/wt_fredcleaned_processed_ftracks.pkl')
+        mtracks = joblib.load('data/wt_fredcleaned_processed_mtracks.pkl')
         dataset_basepath = '/Volumes/fileset-mmurthy/usingla/fred_data/'
 
     print(ftracks.keys())
@@ -912,11 +1016,11 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
 
     fig_dir = os.path.join(model_dir, 'figures')
     trajs_dir = os.path.join(fig_dir, 'trajs')
-    trajs2d_dir = os.path.join(fig_dir, 'trajs2d')
+    # trajs2d_dir = os.path.join(fig_dir, 'trajs2d')
     probs_dir = os.path.join(fig_dir, 'probs')
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(trajs_dir, exist_ok=True)
-    os.makedirs(trajs2d_dir, exist_ok=True)
+    # os.makedirs(trajs2d_dir, exist_ok=True)
     os.makedirs(probs_dir, exist_ok=True)
 
     def f(prefix):
@@ -924,7 +1028,9 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
         data_key = f'{prefix}_data'
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
-        for batch in np.random.choice(n_sessions, size=min(10, n_sessions)):
+        for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
+        # for batch in [35, 5]:
+        # for batch in range(n_sessions):
             # batch = 24 if prefix == 'train' else batch
             # batch = 10 if prefix == 'test' else batch
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
@@ -932,11 +1038,11 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
             print("batch", batch, "key_b", key_b, "num_timestamps", num_timestamps)
             windows = get_windows_to_plot(effective_fps, num_timestamps)
             # print("windows", windows)
-            plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, windows, batch, prefix, trajs_dir, None, probs_dir, savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             lastwindows = get_cop_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, lastwindows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, lastwindows, batch, prefix, trajs_dir, None, probs_dir, suffix='(final 30 seconds)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
             fullwindows = get_full_window_to_plot(data_config['effective_fps'], num_timestamps)
-            plot_xlims(model_dir, fullwindows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
+            plot_xlims(model_dir, fullwindows, batch, prefix, trajs_dir, None, probs_dir, suffix='(whole session)', savefig=savefig, display=display, gen_corr_video=gen_corr_video)
     f('train')
     f('test')
     return
