@@ -93,7 +93,7 @@ def calculate_steady_state_p(P):
 
 
 def calculate_empirical_transition_matrix(state_seqs, n_states):
-    all_states = np.unique(np.concatenate(state_seqs))
+    # all_states = np.unique(np.concatenate(state_seqs))
     # n_states = all_states.max() + 1
     mat = np.zeros((n_states, n_states), dtype=int)
     for seq in state_seqs:

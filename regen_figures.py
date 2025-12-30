@@ -9,15 +9,16 @@ from utilities import utils
 
 if __name__  == '__main__':
 
-    model_pkl_path = f'models/general_wt_lr/id-glm-hmm_3_cv/20251227_210108_pineapple'
+    # model_pkl_path = f'models/final_wt/20251229_041412_rice'    # for wt
+    model_pkl_path = f'models/final_wt_fred/20251229_040811_costume'    # for wt_fred
 
     # utils.enhance(model_pkl_path)
     # utils.enhance_auxem(model_pkl_path, savefig=1, display=0)
 
-    # utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
-    # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
-    # utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
-    # utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+    utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+    utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
+    utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
+    utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
 
     # utils.enhance_auxem(model_pkl_path, savefig=1, display=0)
     # utils.generate_auxem_plots(model_pkl_path, savefig=1, display=0)

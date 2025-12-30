@@ -569,12 +569,12 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_state_aux_dists(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         auxiliary_labels, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    plots.plot_state_aux_sorted_mean_o(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
-        get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-        auxiliary_labels_full, emission_labels_dict, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    plots.plot_state_aux_sorted_o_mean_directional(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
-        get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-        auxiliary_labels_full, emission_labels_dict, directional_variables, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
+    # plots.plot_state_aux_sorted_mean_o(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
+    #     get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
+    #     auxiliary_labels_full, emission_labels_dict, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
+    # plots.plot_state_aux_sorted_o_mean_directional(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
+    #     get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
+    #     auxiliary_labels_full, emission_labels_dict, directional_variables, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     return
 
 
@@ -788,6 +788,8 @@ def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_
     key_b = model_ckp[data_key][sessions_key][batch]
 
     for i, xlim_ in enumerate(windows):
+        if len(xlim_) != 2:
+            continue
         xlim = (int(xlim_[0]), int(xlim_[1]))
         len_traj = xlim[1] - xlim[0]
         xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
@@ -944,9 +946,9 @@ def generate_trajs(model_dir, savefig=True, display=False, gen_corr_video=False)
         data_key = f'{prefix}_data'
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
-        for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
+        # for batch in np.random.choice(n_sessions, size=min(5, n_sessions)):
         # for batch in [35, 5]:
-        # for batch in range(n_sessions):
+        for batch in range(n_sessions):
             # batch = 24 if prefix == 'train' else batch
             # batch = 10 if prefix == 'test' else batch
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
