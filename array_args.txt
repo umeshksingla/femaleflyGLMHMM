@@ -1,6 +1,0 @@
-{"name": "lrhmmci", "seed": 3432, "num_states": 2, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
-{"name": "lrhmmci", "seed": 3432, "num_states": 5, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
-{"name": "lrhmmci", "seed": 356, "num_states": 2, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
-{"name": "lrhmmci", "seed": 356, "num_states": 5, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
-{"name": "lrhmmci", "seed": 2730, "num_states": 2, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
-{"name": "lrhmmci", "seed": 2730, "num_states": 5, "transition_matrix_stickiness": 100, "data_path": "/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset.pkl", "path": "june24_wt"}
