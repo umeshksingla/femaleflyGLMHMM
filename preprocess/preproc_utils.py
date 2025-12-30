@@ -1,7 +1,9 @@
 import numpy as np
 import miniball
-from scipy.signal import savgol_filter
 import h5py
+import scipy.ndimage
+from scipy.stats import zscore
+from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 
 
@@ -81,7 +83,42 @@ def signed_angle(a, b):
     return np.rad2deg(theta) * sign
 
 
-def smooth(x, smooth_window):
+def safe_zscore(x):
+    std_dev = np.std(x)
+    if np.isclose(std_dev, 0, atol=1e-2):
+        return np.zeros_like(x)
+    return zscore(x)
+
+
+def halfgaussian_kernel1d(sigma, radius):
+    """
+    Computes a 1-D Half-Gaussian convolution kernel.
+    """
+    sigma2 = sigma * sigma
+    x = np.arange(0, radius+1)
+    phi_x = np.exp(-0.5 / sigma2 * x ** 2)
+    phi_x = phi_x / phi_x.sum()
+    return phi_x
+
+
+def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
+                      mode="constant", cval=0.0, truncate=4.0):
+    """
+    Convolves a 1-D Half-Gaussian convolution kernel.
+    """
+    sd = float(sigma)
+    # make the radius of the filter equal to 'truncate' standard deviations
+    lw = int(truncate * sd + 0.5)
+    weights = halfgaussian_kernel1d(sigma, lw)
+    origin = -lw // 2
+    return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
+
+
+def smooth_gaussian(x, sigma):
+    return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
+
+
+def smooth_savgol(x, smooth_window):
     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
 
 

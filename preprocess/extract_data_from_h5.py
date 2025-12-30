@@ -11,7 +11,7 @@ import time
 
 from preprocess.leaprig import WT_DATA, AC_BOTH, AC_LEFT, AC_RIGHT, BLIND_BOTH
 from preprocess.new16mic import FREDCLEANED_DATA
-from preprocess.preproc_utils import smooth, fill_missing_tracks_SR
+from preprocess.preproc_utils import smooth_savgol, fill_missing_tracks_SR
 from preprocess import visual_features, female_features
 
 
@@ -21,13 +21,13 @@ def get_features(DATA, expt_path, cop_start_frame):
     fTrx_, mTrx_ = DATA.get_tracks(expt_path, cop_start_frame)
     fly_nodes = DATA.get_fly_nodes()
 
-    # Smooth those raw tracks
-    fTrx_ = smooth(fTrx_, DATA.smooth_window)
-    mTrx_ = smooth(mTrx_, DATA.smooth_window)
-
     # Fill missing values
     fTrx = fill_missing_tracks_SR(fTrx_, kind="cubic")
     mTrx = fill_missing_tracks_SR(mTrx_, kind="cubic")   # TODO: PROBABLY DO IT BEFORE SMOOTHING?
+
+    # # Smooth those raw tracks
+    fTrx_ = smooth_savgol(fTrx_, DATA.smooth_window)
+    mTrx_ = smooth_savgol(mTrx_, DATA.smooth_window)
 
     all_session_features = dict()
 

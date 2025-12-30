@@ -14,16 +14,14 @@ import time
 from scipy.stats import zscore
 import scipy
 from collections import OrderedDict
-from scipy.signal import savgol_filter
-from scipy.ndimage import uniform_filter1d, gaussian_filter1d
-import scipy.ndimage
 from scipy.linalg import block_diag
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
-from preprocess.leaprig import WT_DATA, AC_BOTH
+from preprocess.preproc_utils import smooth_gaussian, safe_zscore
+from preprocess.leaprig import WT_DATA
 from preprocess.new16mic import FREDCLEANED_DATA
 
 
@@ -51,40 +49,40 @@ def transform_single_session(s_i, s, basis, input_raw_each_dim):
 #     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
 
 
-def halfgaussian_kernel1d(sigma, radius):
-    """
-    Computes a 1-D Half-Gaussian convolution kernel.
-    """
-    sigma2 = sigma * sigma
-    x = np.arange(0, radius+1)
-    phi_x = np.exp(-0.5 / sigma2 * x ** 2)
-    phi_x = phi_x / phi_x.sum()
+# def halfgaussian_kernel1d(sigma, radius):
+#     """
+#     Computes a 1-D Half-Gaussian convolution kernel.
+#     """
+#     sigma2 = sigma * sigma
+#     x = np.arange(0, radius+1)
+#     phi_x = np.exp(-0.5 / sigma2 * x ** 2)
+#     phi_x = phi_x / phi_x.sum()
 
-    return phi_x
-
-
-def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
-                      mode="constant", cval=0.0, truncate=4.0):
-    """
-    Convolves a 1-D Half-Gaussian convolution kernel.
-    """
-    sd = float(sigma)
-    # make the radius of the filter equal to truncate standard deviations
-    lw = int(truncate * sd + 0.5)
-    weights = halfgaussian_kernel1d(sigma, lw)
-    origin = -lw // 2
-    return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
+#     return phi_x
 
 
-def smooth_gaussian(x, sigma):
-    return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
+# def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
+#                       mode="constant", cval=0.0, truncate=4.0):
+#     """
+#     Convolves a 1-D Half-Gaussian convolution kernel.
+#     """
+#     sd = float(sigma)
+#     # make the radius of the filter equal to truncate standard deviations
+#     lw = int(truncate * sd + 0.5)
+#     weights = halfgaussian_kernel1d(sigma, lw)
+#     origin = -lw // 2
+#     return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
 
 
-def safe_zscore(x):
-    std_dev = np.std(x)
-    if np.isclose(std_dev, 0, atol=1e-2):
-        return np.zeros_like(x)
-    return zscore(x)
+# def smooth_gaussian(x, sigma):
+#     return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
+
+
+# def safe_zscore(x):
+#     std_dev = np.std(x)
+#     if np.isclose(std_dev, 0, atol=1e-2):
+#         return np.zeros_like(x)
+#     return zscore(x)
 
 
 def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0):
@@ -731,9 +729,6 @@ def extract_female(source):
     if source == 'wt':
         sessions_features = joblib.load('../../data/wt/sessions_features_74_sep5.pkl')
         datacls = WT_DATA
-    elif source == 'ac_both':
-        sessions_features = joblib.load('../../data/ac_both/sessions_features_21_may9.pkl')
-        datacls = AC_BOTH
     elif source == 'wt_fred':
         sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
         datacls = FREDCLEANED_DATA
@@ -790,14 +785,3 @@ if __name__ == '__main__':
     data = joblib.load(filepath)
     full_data = load_all_sessions_into_memory(data)
     joblib.dump(full_data, filepath.__str__().replace('_metadata', ''))
-
-    # data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_113.pkl')
-    # print(data.keys())
-    # print(data['data_config'].keys())
-    # data_config = data['data_config']
-    # data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
-    # print(data['data_config'].keys())
-    # joblib.dump(data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
-
-
-
