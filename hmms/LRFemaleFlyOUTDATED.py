@@ -1,0 +1,176 @@
+"""
+LRFemaleFlyOUTDATED model class. It doesn't support input masking per output dimension.
+This file is kept for reference only; please use LRFemaleFly class instead.
+"""
+
+import tensorflow_probability.substrates.jax.distributions as tfd
+import jax
+import numpy as np
+from jax import vmap
+import jax.numpy as jnp
+
+from sklearn.linear_model import LinearRegression
+
+from hmms.BaseFemaleFly import BaseFemaleFly
+from utilities.io import get_chance_logprob
+
+# print("jax.config", jax.config.values)
+jax.config.update("jax_enable_x64", True)
+
+
+class LRFemaleFlyOUTDATED(BaseFemaleFly):
+
+    prefix = 'lr'
+
+    def __init__(self, data_config, model_config):
+        """
+        model_config in Linear Regression is unused.
+        :param data_config:
+        :param model_config:
+        """
+        self.data_config = data_config
+        self.model_config = model_config
+        self.num_states = 1
+        self.model_config['num_states'] = self.num_states
+        self.model = LinearRegression(fit_intercept=True)
+        self.learned_params = None
+        self.learned_lps = None
+        super().__init__()
+
+    def fit(self, emissions, inputs, output_mn_std=None):
+        print(f'Begin fitting {self.__class__.__name__}...')
+        X_tr = np.concatenate(inputs, axis=0)
+        print(X_tr.shape)
+        Y_tr = np.concatenate(emissions, axis=0)
+        print(Y_tr.shape)
+        self.model.fit(X_tr, Y_tr)          # OUTDATED OUTDATED
+        self.learned_params = {
+            'w': np.expand_dims(self.model.coef_, 0),
+            'b': np.expand_dims(self.model.intercept_, 0)
+        }
+        self.update_status()
+        print(f'End fitting {self.__class__.__name__}...')
+        return
+
+    def check_nan_in_fit_params(self):
+        return ~np.any(np.isnan(self.learned_params['w']))
+
+    def predict(self, emissions, inputs):
+        """ emissions is unused """
+        y_preds = []
+        z_seqs = []
+        y_preds_per_state = []
+        for _ in inputs:
+            y_preds_ = self.model.predict(_)
+            z_seqs_ = np.zeros(_.shape[0])
+            y_preds.append(y_preds_)
+            y_preds_per_state.append(y_preds_[:, None])
+            z_seqs.append(z_seqs_)
+        return y_preds, z_seqs, y_preds_per_state
+
+    def predict_v3(self, emissions, inputs):
+        return self.predict(emissions, inputs)[:2]
+
+    def get_data_logprob_old(self, emissions, inputs):
+        """
+        OUTDATED: Linear regression P(Y|X, w), relative to chance.
+        """
+        def fit_normal_residuals(fit_y, true_y):
+            residuals = fit_y - true_y
+            sigma = jnp.cov(residuals.T)
+            mu = jnp.zeros(residuals.shape[-1])
+            p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).log_prob(residuals)
+            log_Y_given_wx = jnp.sum(p)
+            return log_Y_given_wx
+
+        emissions_pred = self.predict(None, inputs)[0]
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        lp = fit_normal_residuals(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
+        # print("LR lp calc tog", lp)
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        relative_lp = lp - chance_lp
+        # print("chance_lp", chance_lp)
+        # print("relative_lp", relative_lp)
+        return relative_lp
+
+    def get_data_logprob(self, emissions, inputs):
+        def calc(y_pred, y_true):
+            """
+            Compute frequentist log-likelihood of linear regression model.
+            Assumes: Gaussian noise, independent across output dimensions.
+            Parameters:
+                y_true: (N, D) observed
+                y_pred: (N, D) predicted
+            Returns:
+                log_likelihood: float (total over N and D)
+            """
+            residuals = y_true - y_pred
+            N = len(residuals)
+            var = np.var(residuals, axis=0, ddof=1)  # (D,) # Estimate variance per dimension (ddof=1 for unbiased)
+
+            # Avoid log(0). ideally the variance should be close to 1 as each session is zscored
+            # (separately, that's why var not 1 but close to 1)
+            var = np.maximum(var, 1e-15)
+            log_likelihood_c = -0.5 * np.sum(N * np.log(2 * np.pi * var) - np.sum((residuals ** 2) / var, axis=0))
+            return log_likelihood_c
+
+        emissions_pred = self.predict(None, inputs)[0]
+        total_emissions_size = np.sum([len(_) for _ in emissions])
+        lp = calc(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
+        # print("lp", lp)
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        # print("chance_lp", chance_lp)
+        relative_lp = lp - chance_lp
+        # print("relative_lp", relative_lp)
+        return relative_lp
+
+    def get_data_logprob_by_fly_old(self, emissions, inputs):
+        """
+        OUTDATED: Linear regression P(Y|X, w), by fly
+        """
+        def fit_normal_residuals(fit_y, true_y):
+            residuals = fit_y - true_y
+            sigma = jnp.cov(residuals.T)
+            mu = jnp.zeros(residuals.shape[-1])
+            p = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=sigma).prob(residuals)
+            p = jnp.maximum(p, 1e-15)
+            log_Y_given_wx = jnp.sum(jnp.log(p))
+            return log_Y_given_wx
+
+        emissions_pred = self.predict(None, inputs)[0]
+        lps = np.array([fit_normal_residuals(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
+        # print("LR lps by fly", lps)
+
+        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions]) # chance model per fly. "How much better does my model predict behavior than a naive, non-informative model — for this specific session?"
+        # print("chance_lps", chance_lps)
+        return lps - chance_lps
+
+    def get_data_logprob_by_fly(self, emissions, inputs):
+        """
+        Linear regression P(Y|X, w), by fly
+        """
+
+        def calc(y_pred, y_true):
+            residuals = y_true - y_pred
+            N = len(residuals)
+            var = np.var(residuals, axis=0, ddof=1)  # (D,)
+            var = np.maximum(var, 1e-15)
+            log_likelihood_c = -0.5 * np.sum(N * np.log(2 * np.pi * var) - np.sum((residuals ** 2) / var, axis=0))
+            return log_likelihood_c
+
+        emissions_pred = self.predict(None, inputs)[0]
+        lps = np.array([calc(yp, yt)/len(yt) for yp, yt in zip(emissions_pred, emissions)])
+        # print("LR lps by fly", lps)
+
+        # chance model per fly. "How much better does my model predict behavior
+        # than a naive, non-informative model — for this specific session?"
+        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
+        # print("chance_lps", chance_lps)
+        return lps - chance_lps
+
+    def get_state_probs(self, emissions, inputs=None):
+        z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in emissions]
+        return z_probs
+
+    def get_forward_state_probs(self, emissions, inputs=None):
+        return self.get_state_probs(emissions, inputs)
