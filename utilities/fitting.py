@@ -52,11 +52,11 @@ def fitEMInputDrivenCustomInit(key, hmm, train_emissions, train_inputs,
                                          emission_weights=emission_weights,
                                          emission_biases=emission_biases,
                                          )
-    em_params, em_losses = hmm.fit_em_original(em_params,
+    em_params, em_losses = hmm.fit_em(em_params,
                                         em_props,
                                         train_emissions,
                                         train_inputs,
-                                        num_iters=3, verbose=True)
+                                        num_iters=50, verbose=True)
     train_emissions_size = np.sum([e.size for e in train_emissions])
     em_lps = -em_losses / train_emissions_size
     print("em_lps:", em_lps)

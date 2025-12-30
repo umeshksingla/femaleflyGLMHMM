@@ -18,95 +18,6 @@ from utilities.io import *
 from utilities.logreg import train_logreg_aux_emissions
 
 
-# def save_single(model, emissions, inputs, copulation_bool, trained_bool, output_dir):
-#     """Save single session fit."""
-#
-#     os.makedirs(output_dir, exist_ok=True)
-#
-#     emission_predictions, z_seq = model.predict(emissions, inputs)
-#     model_ckp = {
-#         'prefix': model.prefix,
-#         'copulation_bool': copulation_bool,
-#         'trained_bool': trained_bool,
-#         'num_states': model.num_states,
-#         'learned_params': model.learned_params,
-#         'learned_lps': model.learned_lps,
-#         'emissions': emissions,
-#         'inputs': inputs,
-#         'state_probs': model.get_state_probs(emissions, inputs),
-#         'fwd_state_probs': model.get_forward_state_probs(emissions, inputs),
-#         'emission_predictions': emission_predictions,
-#         'z_seq': z_seq,
-#         'score': model.score(emissions, inputs),
-#         'score_by_o': model.score_by_o(emissions, inputs),
-#     }
-#
-#     joblib.dump(model_ckp, os.path.join(output_dir, 'model_ind.pkl'))
-#     joblib.dump(model.data_config, os.path.join(output_dir, 'data_config.pkl'))
-#     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
-#     plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
-#     return
-
-
-# def generate_figures_single(model_dir, savefig=True, display=False, override_fig_dir=True):
-#
-#     ind_model_ckp, data_config, model_config = load_specific_path_single(model_dir)
-#     if ind_model_ckp is None: return
-#
-#     fig_dir = os.path.join(model_dir, 'figures')
-#     if os.path.exists(fig_dir) and override_fig_dir:
-#         shutil.rmtree(fig_dir)
-#     os.makedirs(fig_dir, exist_ok=True)
-#
-#     learned_params = ind_model_ckp['learned_params']
-#
-#     plots.plot_var_explained(ind_model_ckp['score'], ind_model_ckp['score'], savefig=savefig, fig_dir=fig_dir, display=display)
-#     plots.plot_var_explained_by_o(ind_model_ckp['score_by_o'], data_config['emission_labels'],
-#                                   title='Session', savefig=savefig, fig_dir=fig_dir, display=display)
-#     plots.plot_prob_states(ind_model_ckp['z_seq'], model_config, title='Session', savefig=savefig, fig_dir=fig_dir, display=display)
-#     plots.plot_filters(learned_params.emissions.weights, data_config,
-#                        savefig=savefig, fig_dir=fig_dir, display=display)
-#     plots.plot_filter_amplitudes(learned_params.emissions.weights, data_config,
-#                                  savefig=savefig, fig_dir=fig_dir, display=display)
-#     return
-
-
-# def generate_figures_all_singles_merged(model_dir, savefig=True, display=False, override_fig_dir=True):
-#     model_pkls, data_config_pkl, model_config = load_all_singles(model_dir)
-#
-#     if not model_pkls: return
-#
-#     fig_dir = os.path.join(model_dir, 'figures')
-#     if os.path.exists(fig_dir) and override_fig_dir:
-#         shutil.rmtree(fig_dir)
-#     os.makedirs(fig_dir, exist_ok=True)
-#
-#     scores = np.array([mckp['score'] for mckp in model_pkls]) * 200
-#     print("scores", scores)
-#     plots.plot_var_explained_ind(scores, title='All sessions', savefig=savefig, fig_dir=fig_dir, display=display)
-#
-#     fwd_state_probs = [mckp['state_probs'][0] for mckp in model_pkls]
-#     padded_arrays, n_le = pad_to_equal_length(fwd_state_probs)
-#     plots.plot_prob_states_aligned(padded_arrays, n_le, 200, model_config, title='All',
-#                                    xticks=['0', '30'],
-#                                    xlabel='Time (min)',
-#                                    savefig=savefig, fig_dir=fig_dir, display=display)
-#
-#     fwd_state_probs = [mckp['state_probs'][0][:-1] for mckp in model_pkls if mckp['copulation_bool'] is True]
-#     plots.plot_prob_states_aligned(normalize_to_equal_length(fwd_state_probs, GRID=50000), None, 200, config=model_config, title='All Copulation',
-#                                    xticks=['Start', 'Copulation'],
-#                                    xlabel='Time (in courtship)',
-#                                    savefig=savefig, fig_dir=fig_dir, display=display)
-#
-#     fwd_state_probs = [mckp['state_probs'][0] for mckp in model_pkls if mckp['copulation_bool'] is False]
-#     plots.plot_prob_states_aligned(normalize_to_equal_length(fwd_state_probs, GRID=50000), None, 200, config=model_config, title='All No Copulation',
-#                                    xticks=['0', '30'],
-#                                    xlabel='Time (min)',
-#                                    savefig=savefig, fig_dir=fig_dir, display=display)
-#
-#     return
-
-
 def save(model, data, train_session_indices, test_session_indices, output_dir):
 
     os.makedirs(output_dir, exist_ok=False)
@@ -131,10 +42,12 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     train_aux_emissions = [aux_emissions[e] for e in train_session_indices]
     test_aux_emissions = [aux_emissions[e] for e in test_session_indices]
 
+    print("Calculating train and test logprobs...")
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
     train_lps_by_fly = model.get_data_logprob_by_fly(train_emissions, train_inputs)
     test_lp = model.get_data_logprob(test_emissions, test_inputs)
     test_lps_by_fly = model.get_data_logprob_by_fly(test_emissions, test_inputs)
+    print("Train logprob:", train_lp, "Test logprob:", test_lp)
 
     model_ckp = {
         'prefix': model.prefix,
@@ -206,10 +119,8 @@ def enhance(output_dir=None, model_ckp=None):
         inputs = model_ckp[data_key][f'{prefix}_inputs']
         print(f"Calculating enhanced stats etc on {prefix} data...")
 
-        # emission_predictions, _ = model.predict_v3(emissions, inputs)
-        soft_emission_predictions, z_seqs, soft_emission_predictions_per_state = model.predict(emissions, inputs)
-        z_probs = model.get_state_probs(emissions, inputs)
-        fwd_z_probs = model.get_forward_state_probs(emissions, inputs)
+        soft_emission_predictions, z_seqs, soft_emission_predictions_per_state, z_probs, fwd_z_probs = model.predict(emissions, inputs)
+        # z_probs, fwd_z_probs = model.get_state_probs(emissions, inputs)
 
         # model_ckp[data_key][f'{prefix}_predictions'] = emission_predictions
         # model_ckp[data_key][f'{prefix}_lp_again'] = model.get_data_logprob(emissions, inputs)
@@ -671,6 +582,9 @@ def enhance_auxem(model_dir, savefig=True, display=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
+        return
+
+    if model_ckp['prefix'] == 'chance': # Skip auxem predictions etc on the Chance model
         return
 
     num_states = model_ckp['num_states']

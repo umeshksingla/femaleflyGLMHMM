@@ -152,7 +152,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             # jax.debug.print("sum_yyT={x} Absum_x1yT={y}", x=sum_yyT, y=Ab @ sum_x1yT)
             # jax.debug.print("sum_x1yT={x} Ab={y}", x=sum_x1yT, y=Ab)
             Sigma = 0.5 * (Sigma + Sigma.T)                 # for numerical stability
-            Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-8      # diagonal
+            Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-6      # diagonal
             return Ab[:, :-1], Ab[:, -1], Sigma
 
         emission_stats = pytree_sum(batch_stats, axis=0)

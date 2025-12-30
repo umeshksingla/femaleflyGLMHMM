@@ -15,7 +15,6 @@ import numpy as np
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LogRHMMFemaleFly import LogRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
-from hmms.LRFemaleFly1 import LRFemaleFly1
 from hmms.LogRFemaleFly import LogRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
@@ -96,8 +95,6 @@ def run(mc, enhance=False, genfig=False):
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
         model = LRFemaleFly(data_config, mc)
-    elif model_prefix == 'lr1':
-        model = LRFemaleFly1(data_config, mc)
     elif model_prefix == 'logr':
         model = LogRFemaleFly(data_config, mc)
     elif model_prefix == 'idglmhmmci':
@@ -106,6 +103,7 @@ def run(mc, enhance=False, genfig=False):
         raise Exception(f'Unsupported model "{model_prefix}" for cross validation.')
 
     dump_filepath = utils.getafilepath(f'{mc["path"]}/{model.prefix}_{model.model_config["num_states"]}_cv')
+    print(">> Model dump folder:", dump_filepath)
 
     print(">> Fitting")
     model.fit(train_emissions, train_inputs, train_output_mn_std)

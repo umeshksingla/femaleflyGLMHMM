@@ -11,7 +11,7 @@ import itertools
 import subprocess
 
 
-def create_array_file(model_configs):
+def create_array_file(model_configs, arrayfilename):
 
     arrays = []
 
@@ -21,7 +21,7 @@ def create_array_file(model_configs):
         combo_dict = dict(zip(keys, combo))
         arrays.append(json.dumps(combo_dict) + '\n')
 
-    with open('array_args.txt', 'w') as w:
+    with open(arrayfilename, 'w') as w:
         w.writelines(arrays)
 
     return arrays
@@ -29,28 +29,37 @@ def create_array_file(model_configs):
 
 if __name__ == '__main__':
 
-    src = sys.argv[1]
+    src = sys.argv[1]   # Specify src = 'wt' or 'wt_fred'
 
     if src == 'wt':
         data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl'
+        init_seeds = [5427, 4787, 7896, 5627, 5131]
+        datasplit_seeds = [6244, 6400, 3733, 2582]  # [1326, 6244, 6400, 3733, 2582]
     elif src == 'wt_fred':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=2_smoothed_stdset.pkl'
-    else:
+        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl'
+        init_seeds = [1818, 65, 8206, 8471, 2734]
+        datasplit_seeds = [8644, 3930, 7401, 8116, 4335]
+    else:   
         raise Exception(f'Incorrect data source specified "{src}".')
 
-    path = f'dec25_kfoldcv_{src}'
+    path = f'dec25_kfoldcv_{src}_extra'
+    init_seeds = [0]
+    # datasplit_seeds = [random.randint(1, 10000) for _ in range(5)]  #[0]
+
     model_configs = {
         'name': ['idglmhmmci'],
-        'seed': [40],
-        'datasplit_seed': [random.randint(1, 10000) for _ in range(2)],
+        'seed': [random.randint(1, 10000) for _ in range(5)],
+        'datasplit_seed': datasplit_seeds,  #
         'num_states': [
-            2, 3, #4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30
+            10
+            # 2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
         ],
-        'transition_matrix_stickiness': [100],
+        # 'transition_matrix_stickiness': [100],
         'data_path': [data_path],
         'path': [path],
     }
-    job_configs = create_array_file(model_configs)
+    arrayfilename = f'{path}_array_args.txt'        # CAUTION!! Running this script will overwrite existing array_args file.
+    job_configs = create_array_file(model_configs, arrayfilename=arrayfilename)
     NUM_ARRAY_JOBS = len(job_configs)
     JOB_SCRIPT = 'run_slurm.sh'
 
@@ -60,8 +69,13 @@ if __name__ == '__main__':
         f"1-{NUM_ARRAY_JOBS}",
         "-J nstates",
         f"{JOB_SCRIPT}",
-        f"array_args.txt",
+        f"{arrayfilename}",
     ]
     print(">>> SLURM COMMAND ran:", " ".join(command))
     subprocess.run(command)
 
+
+#SBATCH --mem=64GB
+#SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
+#SBATCH --constraint=gpu80

@@ -1,3 +1,10 @@
+"""
+Docstring for hmms.LRFemaleFly. Supports input masking per output dimension.
+"""
+
+import sys
+
+import scipy.linalg
 import tensorflow_probability.substrates.jax.distributions as tfd
 import jax
 import numpy as np
@@ -24,27 +31,53 @@ class LRFemaleFly(BaseFemaleFly):
         :param model_config:
         """
         self.data_config = data_config
-        self.model_config = {}
+        self.model_config = model_config
         self.num_states = 1
         self.model_config['num_states'] = self.num_states
-        self.model = LinearRegression(fit_intercept=True)
         self.learned_params = None
         self.learned_lps = None
+        self.emission_dim = len(self.data_config['emission_labels'])
+        self.input_mask_by_emission = self.data_config['input_mask_by_emission'].astype(int)
+        self.model = [LinearRegression(fit_intercept=True) for o in range(self.emission_dim)]
         super().__init__()
 
     def fit(self, emissions, inputs, output_mn_std=None):
         print(f'Begin fitting {self.__class__.__name__}...')
         X_tr = np.concatenate(inputs, axis=0)
-        print(X_tr.shape)
+        # print(X_tr.shape)
         Y_tr = np.concatenate(emissions, axis=0)
-        print(Y_tr.shape)
-        self.model.fit(X_tr, Y_tr)
+        # print(Y_tr.shape)
+        w = []
+        b = []
+        for o in range(self.emission_dim):
+            # print(o, self.input_mask_by_emission[o], X_tr.shape, Y_tr.shape)
+            mask = self.input_mask_by_emission[o] == 1
+            # if o == 0: r = np.r_[0:28]
+            # if o == 1: r = np.r_[28:28+24]
+            # if o == 2: r = np.r_[28+24:]
+            # print(o, mask, mask.sum(), np.where(mask)[0])
+            x = X_tr[:, mask]
+            y = Y_tr[:, o]
+            # print(o, "X_tr", X_tr[0], X_tr[0].shape)
+            # print(o, "x", x[0], x.shape, y.shape)
+            m = self.model[o]
+            m.fit(x, y)
+            w_ = m.coef_
+            b_ = m.intercept_
+            # print(o, "w_", w_, w_.shape, b_)
+            w.append(w_)
+            b.append(b_)
+
+        w = scipy.linalg.block_diag(*w)
+        # print(w, w.shape)
         self.learned_params = {
-            'w': np.expand_dims(self.model.coef_, 0),
-            'b': np.expand_dims(self.model.intercept_, 0)
+            'w': np.expand_dims(w, 0),
+            'b': np.expand_dims(b, 0)
         }
+        # print(self.learned_params['w'].shape, self.learned_params['b'].shape)
         self.update_status()
         print(f'End fitting {self.__class__.__name__}...')
+        # sys.exit(0)
         return
 
     def check_nan_in_fit_params(self):
@@ -55,16 +88,23 @@ class LRFemaleFly(BaseFemaleFly):
         y_preds = []
         z_seqs = []
         y_preds_per_state = []
+        z_probs = []
+        fwd_z_probs = []
         for _ in inputs:
-            y_preds_ = self.model.predict(_)
-            z_seqs_ = np.zeros(_.shape[0])
+            y_preds_ = []
+            for o in range(self.emission_dim):
+                mask = self.input_mask_by_emission[o] == 1
+                y_preds_o = self.model[o].predict(_[:, mask])
+                y_preds_.append(y_preds_o)
+            y_preds_ = np.array(y_preds_).T
+            # print(y_preds_.shape)
             y_preds.append(y_preds_)
             y_preds_per_state.append(y_preds_[:, None])
+            z_seqs_ = np.zeros(_.shape[0])
             z_seqs.append(z_seqs_)
-        return y_preds, z_seqs, y_preds_per_state
-
-    def predict_v3(self, emissions, inputs):
-        return self.predict(emissions, inputs)[:2]
+        z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in inputs]
+        fwd_z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in inputs]
+        return y_preds, z_seqs, y_preds_per_state, z_probs, fwd_z_probs
 
     def get_data_logprob_old(self, emissions, inputs):
         """
@@ -162,10 +202,3 @@ class LRFemaleFly(BaseFemaleFly):
         chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
         # print("chance_lps", chance_lps)
         return lps - chance_lps
-
-    def get_state_probs(self, emissions, inputs=None):
-        z_probs = [np.ones(_.shape[0]).reshape(-1, 1) for _ in emissions]
-        return z_probs
-
-    def get_forward_state_probs(self, emissions, inputs=None):
-        return self.get_state_probs(emissions, inputs)

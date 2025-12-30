@@ -30,16 +30,13 @@ def load_latest(model_name):
 
 def load_specific_path(model_path):
     print('Loading:', model_path)
-    # print(os.listdir(model_path))
-    # print(glob.glob(f'{model_path}/*.pkl'))
-    data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
-    # print(data_config_pkl)
-    model_pkl = joblib.load(os.path.join(model_path, 'model.pkl'))
-    with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
     with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
     if fit_success != 'True':
         print(Warning(f'Unsuccessful model loaded. {model_path}'))
         return None, None, None
+    with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
+    data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
+    model_pkl = joblib.load(os.path.join(model_path, 'model.pkl'))
     return model_pkl, data_config_pkl, model_config
 
 
@@ -282,7 +279,7 @@ def get_cop_window_to_plot(effective_fps, num_timestamps):
     if num_timestamps > last_window_size:
         last_window = np.array([[num_timestamps - last_window_size, num_timestamps - 1]])
     else:
-        last_window = np.empty((0, 2), dtype=int)
+        last_window = [[]]
     windows = np.vstack((last_window)).astype(int)
     return windows
 
@@ -299,7 +296,6 @@ def get_chance_logprob(y):
     mu = jnp.mean(y, axis=0)
     cov = jnp.cov(y.T)
     cov = jnp.atleast_2d(cov)
-    print(mu, cov)
     model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
     p = model.prob(y)
     p = jnp.maximum(p, 1e-15)

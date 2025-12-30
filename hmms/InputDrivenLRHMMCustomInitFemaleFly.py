@@ -3,7 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 import jax.random as jr
 from hmms.InputDrivenLRHMMFemaleFly import InputDrivenLRHMMFemaleFly
-from hmms.LRFemaleFly1 import LRFemaleFly1
+from hmms.LRFemaleFly import LRFemaleFly
 
 from utilities import fitting
 
@@ -48,7 +48,7 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
         emissions_to_fit = chunk_data(batched_emissions, chunk_size=5000)
         inputs_to_fit = chunk_data(batched_inputs, chunk_size=5000)
 
-        lr = LRFemaleFly1(self.data_config, self.model_config)
+        lr = LRFemaleFly(self.data_config, self.model_config)
         lr.fit(emissions_to_fit, inputs_to_fit)
         W = np.repeat(lr.learned_params['w'], repeats=self.num_states, axis=0)
         b = np.repeat(lr.learned_params['b'], repeats=self.num_states, axis=0)

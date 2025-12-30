@@ -37,8 +37,8 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         """Reindex states by some metric"""
 
         # OR Reindex by the activity index
-        _, zseq, _ = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, zseq, self.num_states, output_mn_std)
+        _, z_seqs, _, _, _ = self.predict(emissions, inputs)
+        emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
         state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
         new_index = np.argsort(state_activity_index)[::-1]
         # print("state_tot_activity_mean", state_activity_index)
@@ -89,6 +89,8 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         y_preds = []
         z_seqs = []
         preds_per_states = []
+        z_probs = []
+        fwd_z_probs = []
         for btch in range(len(emissions)):
             y_true = emissions[btch]    # shape: (T, D)
             x = inputs[btch]            # shape: (T, I)
@@ -105,8 +107,10 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
             y_preds.append(y_pred)
             z_seqs.append(z_seq)
             preds_per_states.append(preds_per_state)
+            z_probs.append(post.smoothed_probs)
+            fwd_z_probs.append(post.predicted_probs)
             print("nan?", btch, np.sum(np.isnan(y_pred)), np.sum(np.isnan(preds_per_state)))
-        return y_preds, z_seqs, preds_per_states
+        return y_preds, z_seqs, preds_per_states, z_probs, fwd_z_probs
 
     def get_data_logprob(self, emissions, inputs=None):
         """Evaluate the log probability of the data under the given model and model parameters"""
@@ -136,21 +140,3 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         # print("chance_lps", chance_lps)
         relative_lps = lps - chance_lps
         return relative_lps
-
-    def get_state_probs(self, emissions, inputs=None):
-        z_probs = []
-        for btch in range(len(emissions)):
-            z_prob = self.model.smoother(self.learned_params, emissions[btch], inputs[btch])
-            # print(z_prob.smoothed_probs.shape)
-            z_probs.append(z_prob.smoothed_probs)
-        # z_probs = np.array(z_probs)
-        return z_probs
-
-    def get_forward_state_probs(self, emissions, inputs=None):
-        z_probs = []
-        for btch in range(len(emissions)):
-            z_prob = self.model.filter(self.learned_params, emissions[btch], inputs[btch])
-            # print(z_prob.filtered_probs.shape)
-            z_probs.append(z_prob.predicted_probs)
-        # z_probs = np.array(z_probs)
-        return z_probs

@@ -25,8 +25,8 @@ class ChanceFemaleFly(BaseFemaleFly):
         :param model_config:
         """
         self.data_config = data_config
-        self.model_config = {}
-        self.num_states = 1
+        self.model_config = model_config
+        self.num_states = 0
         self.model_config['num_states'] = self.num_states
         # self.model = tfd.MultivariateNormalFullCovariance(loc=np.zeros(data_config['emission_dim']), covariance_matrix=np.identity(data_config['emission_dim']))
         self.learned_params = None
