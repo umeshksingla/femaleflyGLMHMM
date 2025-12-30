@@ -1,11 +1,10 @@
 """
-
-
-Written by Claude AI.
+Original script adapted by Claude AI to support session-by-session dump, load and transform.
 """
 
 
 import gc
+import os
 import joblib
 import numpy as np
 from pathlib import Path
@@ -437,8 +436,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     print("Basis created.")
 
     # Create temporary directory for session files
-    temp_dir = Path('../data/temp_sessions')
-    temp_dir.mkdir(exist_ok=True)
+    temp_dir = Path('../../data/temp_sessions')
+    os.makedirs(temp_dir, exist_ok=True)
     print(f"Temporary session files will be saved to: {temp_dir}")
 
     # Metadata to collect
@@ -730,13 +729,13 @@ def extract_female(source):
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../data/wt/sessions_features_74_sep5.pkl')
+        sessions_features = joblib.load('../../data/wt/sessions_features_74_sep5.pkl')
         datacls = WT_DATA
     elif source == 'ac_both':
-        sessions_features = joblib.load('../data/ac_both/sessions_features_21_may9.pkl')
+        sessions_features = joblib.load('../../data/ac_both/sessions_features_21_may9.pkl')
         datacls = AC_BOTH
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
+        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
         datacls = FREDCLEANED_DATA
     else:
         raise Exception('Wrong data source.')
@@ -772,32 +771,33 @@ def extract_female(source):
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_1114.pkl'
+               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_1114_metadata.pkl'
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
+    filepath = os.path.join('../../data/', filename)
     print("Saving at:", filename)
-    joblib.dump(data, f'../data/{filename}')
-    print("Saved at:", filename)
+    joblib.dump(data, filepath)
+    print("Saved at:", filepath)
     print(f"Done in {time.time() - s} seconds.")
-    return
+    return filepath
 
 
 if __name__ == '__main__':
-    src = 'wt'
-    # extract_female(src)
+    src = 'wt_fred'
+    filepath = extract_female(src)
     # extract_male(src)
 
-    # data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114_metadata.pkl')
-    # full_data = load_all_sessions_into_memory(data)
-    # joblib.dump(full_data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
+    data = joblib.load(filepath)
+    full_data = load_all_sessions_into_memory(data)
+    joblib.dump(full_data, filepath.__str__().replace('_metadata', ''))
 
-    data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_113.pkl')
-    print(data.keys())
-    print(data['data_config'].keys())
-    data_config = data['data_config']
-    data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
-    print(data['data_config'].keys())
-    joblib.dump(data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
+    # data = joblib.load('../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_113.pkl')
+    # print(data.keys())
+    # print(data['data_config'].keys())
+    # data_config = data['data_config']
+    # data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
+    # print(data['data_config'].keys())
+    # joblib.dump(data, '../data/wt_fly_data_cos=4_ortho_o=5_smoothed_stdset_auxem_1114.pkl')
 
 
 
