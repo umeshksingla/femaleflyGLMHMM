@@ -1714,7 +1714,7 @@ def plot_transition_matrix(transition_matrix, title=None, savefig=False, fig_dir
     plt.yticks(rotation=0)
     plt.tight_layout()
     filename = title if title else 'transition_matrix'
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{filename}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig

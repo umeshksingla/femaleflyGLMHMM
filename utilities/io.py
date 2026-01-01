@@ -360,3 +360,24 @@ def basis_invtransform_one_by_one(weights, basis, n_inputs):
         new_weights.append(z_)
     new_weights = np.array(new_weights)
     return new_weights.reshape(num_states, emission_dim, n_inputs, -1)
+
+
+def chunk_data(data_list, chunk_size):
+    # chop long sequences into multiple shorter "chunks" of fixed length.
+    chunked_data = []
+    for seq in data_list:
+        # Calculate how many full chunks we can make
+        n_chunks = len(seq) // chunk_size
+        if n_chunks > 0:
+            # Keep only the part that fits perfectly into chunks
+            cutoff = n_chunks * chunk_size
+            # Reshape: (N_chunks, chunk_size, Features)
+            reshaped = seq[:cutoff].reshape(n_chunks, chunk_size, -1)
+            chunked_data.append(reshaped)
+        else:
+            print("Skipped.")
+
+    # Stack all chunks from all sequences into one massive batch
+    chunked_data = jnp.concatenate(chunked_data, axis=0)
+    print("Data shapes (orig, chunked): ", len(data_list), chunked_data.shape)
+    return chunked_data

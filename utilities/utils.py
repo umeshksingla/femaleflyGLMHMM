@@ -638,14 +638,9 @@ def generate_auxem_figures(model_dir, savefig=True, display=False):
         return
 
     fig_dir = os.path.join(model_dir, 'auxem_figures')
-    auxem_filters_fig_dir = os.path.join(fig_dir, 'auxem_filters_fig_dir')
+    # auxem_filters_fig_dir = os.path.join(fig_dir, 'auxem_filters_fig_dir')
     os.makedirs(fig_dir, exist_ok=True)
-    os.makedirs(auxem_filters_fig_dir, exist_ok=True)
-
-    # train_aux_emissions = model_ckp['train_data'][f'train_aux_emissions']
-    # test_aux_emissions = model_ckp['test_data'][f'test_aux_emissions']
-    # train_stateseq = model_ckp['train_data'][f'train_stateseq']
-    # test_stateseq = model_ckp['test_data'][f'test_stateseq']
+    # os.makedirs(auxem_filters_fig_dir, exist_ok=True)
 
     train_predict_probas = auxem_model_ckp['train_data']['train_probs_z_and_auxo']
     train_f1score_z_and_auxo = auxem_model_ckp['train_data']['train_f1score_z_and_auxo']
@@ -656,24 +651,13 @@ def generate_auxem_figures(model_dir, savefig=True, display=False):
     test_preds_z_and_auxo = auxem_model_ckp['test_data']['test_preds_z_and_auxo']
     test_true_z_and_auxo = auxem_model_ckp['test_data']['test_true_z_and_auxo']
 
-    logreg_params = auxem_model_ckp['logreg_params']
-
     update_labels(data_config)
-    model_prefix = model_ckp['prefix']
-    num_states = model_ckp['num_states']
     auxiliary_emission_labels = data_config['auxiliary_emission_labels']
 
     plots.plot_auxem_frac_full_precomputed(train_true_z_and_auxo, test_true_z_and_auxo, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_auxem_frac_by_z_o_traintest_precomputed(train_true_z_and_auxo, test_true_z_and_auxo, model_config, auxiliary_emission_labels, skip_states=[], title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_auxem_acc_full_precomputed(train_true_z_and_auxo, train_preds_z_and_auxo, test_true_z_and_auxo, test_preds_z_and_auxo, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     plots.plot_auxem_acc_by_z_o_traintest_precomputed(train_f1score_z_and_auxo, test_f1score_z_and_auxo, model_config, auxiliary_emission_labels, skip_states=[], title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
-
-    weights = logreg_params['w']
-
-    input_mask_by_auxemission = auxem_model_ckp['input_mask_by_auxemission']
-    input_labels = data_config['input_labels']
-    # auxiliary_emission_labels['wingFlickBin'].remove('wingAlign')
-
     return
 
 
@@ -681,6 +665,11 @@ def generate_state_filters(model_dir, savefig=True, display=False):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if (model_ckp is None):
+        return
+
+    model_prefix = model_ckp['prefix']
+    print('model_prefix', model_prefix)
+    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_']:
         return
 
     fig_dir = os.path.join(model_dir, 'figures')
@@ -729,7 +718,13 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     print(input_mask_by_allemission.shape)
 
     learned_params = model_ckp['learned_params']
-    reg_weights = learned_params.emissions.weights
+
+    if 'hmm' in model_prefix or 'HMM' in model_prefix:
+        reg_weights = learned_params.emissions.weights
+    elif model_prefix == 'lr':
+        reg_weights = learned_params['w']
+    else:
+        raise Exception(f'wrong prefix={model_prefix}')
 
     logreg_params = auxem_model_ckp['logreg_params']
     aux_weights = logreg_params['w']

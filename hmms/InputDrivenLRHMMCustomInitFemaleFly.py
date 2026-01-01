@@ -5,30 +5,9 @@ import jax.random as jr
 from hmms.InputDrivenLRHMMFemaleFly import InputDrivenLRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
 
-from utilities import fitting
+from utilities import fitting, io
 
 jax.config.update("jax_enable_x64", True)
-
-
-def chunk_data(data_list, chunk_size):
-    # chop long sequences into multiple shorter "chunks" of fixed length.
-    chunked_data = []
-    for seq in data_list:
-        # Calculate how many full chunks we can make
-        n_chunks = len(seq) // chunk_size
-        if n_chunks > 0:
-            # Keep only the part that fits perfectly into chunks
-            cutoff = n_chunks * chunk_size
-            # Reshape: (N_chunks, chunk_size, Features)
-            reshaped = seq[:cutoff].reshape(n_chunks, chunk_size, -1)
-            chunked_data.append(reshaped)
-        else:
-            print("Skipped.")
-
-    # Stack all chunks from all sequences into one massive batch
-    chunked_data = jnp.concatenate(chunked_data, axis=0)
-    print("Data shapes (orig, chunked): ", len(data_list), chunked_data.shape)
-    return chunked_data
 
 
 class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
@@ -45,8 +24,8 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
         key = jr.PRNGKey(self.seed)
 
         # since the sessions are variable length, chunk the sessions.
-        emissions_to_fit = chunk_data(batched_emissions, chunk_size=5000)
-        inputs_to_fit = chunk_data(batched_inputs, chunk_size=5000)
+        emissions_to_fit = io.chunk_data(batched_emissions, chunk_size=5000)
+        inputs_to_fit = io.chunk_data(batched_inputs, chunk_size=5000)
 
         lr = LRFemaleFly(self.data_config, self.model_config)
         lr.fit(emissions_to_fit, inputs_to_fit)

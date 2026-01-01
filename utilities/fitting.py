@@ -20,7 +20,7 @@ def fitEMCustomInit(key, hmm, train_emissions, train_inputs,
                                          emission_weights=emission_weights,
                                          emission_biases=emission_biases,
                                          )
-    em_params, em_losses = hmm.fit_em_lrhmm_custom(em_params,
+    em_params, em_losses = hmm.fit_em(em_params,
                                         em_props,
                                         train_emissions,
                                         train_inputs,

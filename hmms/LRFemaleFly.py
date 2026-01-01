@@ -31,7 +31,7 @@ class LRFemaleFly(BaseFemaleFly):
         :param model_config:
         """
         self.data_config = data_config
-        self.model_config = model_config
+        self.model_config = model_config.copy()
         self.num_states = 1
         self.model_config['num_states'] = self.num_states
         self.learned_params = None
