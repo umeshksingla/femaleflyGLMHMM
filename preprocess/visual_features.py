@@ -77,7 +77,7 @@ def compute_visual_features(fTrx, mTrx, FLY_SKELETON):
 
     # Angle made by the body axis with the x-axis.
     mTheta = np.rad2deg(np.arctan2(mDir[:, 1], mDir[:, 0]))
-    fTheta = np.rad2deg(np.arctan2(fDir[:, 1], fDir[:, 0]))
+    fTheta = np.rad2deg(np.arctan2(fDir[:, 1], fDir[:, 0])) # -180/180
 
     # Forward velocity - magnitude of the velocity in the direction of heading.
     mFV = np.sum(mV_vec * mDir_unit, axis=1)

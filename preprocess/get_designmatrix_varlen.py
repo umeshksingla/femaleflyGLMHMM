@@ -8,19 +8,20 @@ import os
 import joblib
 import numpy as np
 from pathlib import Path
-from scipy.linalg import block_diag
 import time
 
 from scipy.stats import zscore
 import scipy
 from collections import OrderedDict
 from scipy.linalg import block_diag
+from scipy.ndimage import median_filter
 
 from glm_utils.preprocessing import BasisProjection
 from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
-from preprocess.preproc_utils import smooth_gaussian, safe_zscore
+from preprocess.preproc_utils import safe_zscore
+from preprocess.preproc_utils import halfgaussian_filter
 from preprocess.leaprig import WT_DATA
 from preprocess.new16mic import FREDCLEANED_DATA
 
@@ -39,50 +40,6 @@ def transform_single_session(s_i, s, basis, input_raw_each_dim):
         transform_single_input(inp, basis, input_raw_each_dim)
         for inp in s
     ])
-
-
-# def smooth_moving_average(x, smooth_window):
-#     return np.convolve(x, np.ones(smooth_window), 'valid') / smooth_window
-#
-#
-# def smooth_savgol(x, smooth_window):
-#     return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
-
-
-# def halfgaussian_kernel1d(sigma, radius):
-#     """
-#     Computes a 1-D Half-Gaussian convolution kernel.
-#     """
-#     sigma2 = sigma * sigma
-#     x = np.arange(0, radius+1)
-#     phi_x = np.exp(-0.5 / sigma2 * x ** 2)
-#     phi_x = phi_x / phi_x.sum()
-
-#     return phi_x
-
-
-# def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
-#                       mode="constant", cval=0.0, truncate=4.0):
-#     """
-#     Convolves a 1-D Half-Gaussian convolution kernel.
-#     """
-#     sd = float(sigma)
-#     # make the radius of the filter equal to truncate standard deviations
-#     lw = int(truncate * sd + 0.5)
-#     weights = halfgaussian_kernel1d(sigma, lw)
-#     origin = -lw // 2
-#     return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
-
-
-# def smooth_gaussian(x, sigma):
-#     return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
-
-
-# def safe_zscore(x):
-#     std_dev = np.std(x)
-#     if np.isclose(std_dev, 0, atol=1e-2):
-#         return np.zeros_like(x)
-#     return zscore(x)
 
 
 def create_x_and_y_windows(length, x_size=1, y_size=1, x_overlap=1, y_gap_size=0):
@@ -118,7 +75,6 @@ def get_input_feat(sessions_features, s, f_name):
     sf = sessions_features[s]
     if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall', 'fFV', 'fLS', 'fLV']:
         ts = sf[f_name]
-        ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(ts)
     elif f_name in ['song', 'sine_i', 'pulse_i', 'song_i', 'tap2']:
 
@@ -136,11 +92,9 @@ def get_input_feat(sessions_features, s, f_name):
         feat = safe_zscore(sf[f_name]).astype(float)
     elif f_name in ['fmAng_cos']:
         ts = np.radians(np.abs(sf['fmAng']))
-        ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(np.cos(ts))    # cos: front to back
     elif f_name in ['fmAng_sin']:
         ts = np.radians(sf['fmAng'])
-        ts = smooth_gaussian(ts, sigma=3)
         feat = zscore(np.sin(ts))    # sin: left or right of the fly
     elif f_name in ['wingAlign_song_i_directedlr2']:
         ts = np.min([sf['wingLAristaLAlignAng'],
@@ -151,7 +105,6 @@ def get_input_feat(sessions_features, s, f_name):
         # cos makes 0 deg to 1 (best alignment) and 180 degrees to -1 (worst alignment).
         # Multiplied by binary song, when song is 0, this variable is 0 (so equivalent to the worst alignment).
         # Multiplied by -1/1 direction, cos gets divided into negative and positive.
-        ts = smooth_gaussian(ts, sigma=3)
         feat = safe_zscore(ts)     # it is okay to zscore these alignment angles as if they are being treated linearly
     elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pulse_i_directedlr', 'song_i_directedlr', 'tap2_directedlr']:  # directedlr using male position from fmAng
         f_name_ = f_name.split('_directed')[0]
@@ -185,7 +138,6 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
     sf = sessions_features[s]
     if f_name in ['mFV', 'mFS', 'mLS', 'mLV', 'mFA', 'mfDist', 'fFV', 'fFS', 'fLS', 'fLV']:
         ts = sf[f_name]
-        ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
@@ -197,15 +149,13 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
     elif f_name in ['fmAng_cos']:
         ts_abs = np.abs(sf['fmAng'])
         ts_rad = np.radians(ts_abs)
-        ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
-        ts = np.cos(ts_smoothed)  # cos: front (180deg) to back (0deg)
+        ts = np.cos(ts_rad)  # cos: front (180deg) to back (0deg)
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
     elif f_name in ['fmAng_sin']:
         ts_rad = np.radians(sf['fmAng'])
-        ts_smoothed = smooth_gaussian(ts_rad, sigma=3)
-        ts = np.sin(ts_smoothed)  # sin: left <-> right
+        ts = np.sin(ts_rad)  # sin: left <-> right
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
@@ -214,7 +164,6 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
                        sf['wingRAristaRAlignAng'],
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)     # positive
-        ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
@@ -236,23 +185,39 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
     if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
-        ts = smooth_gaussian(ts, sigma=3)
         mn = ts.mean()
         std = ts.std()
         f = np.mean(zscore(ts)[output_windows], axis=1)
-    elif f_name in ['fAV']:
-        ts = sf['fTheta']
-        ts = smooth_gaussian(ts, sigma=3)
-        fTheta = ts[output_windows]
-        dfTheta = fTheta[:, -1] - fTheta[:, 0]
-        dfTheta = np.where(np.abs(dfTheta) > 90, 0, dfTheta)
-        mn = dfTheta.mean()
-        std = dfTheta.std()
-        dfTheta = zscore(dfTheta)
-        f = dfTheta
+    elif f_name in ['fAV', 'mAV']:
+        ts = sf['mTheta'] if f_name == 'mAV' else sf['fTheta']
+        # OR
+        ts_rad = np.deg2rad(ts)
+        ts_unwrapped = np.unwrap(ts_rad, axis=0)    # Removes seemingly 360deg like large angle changes
+        ts_unwrapped = median_filter(ts_unwrapped, size=5, mode="nearest", origin=-(5 // 2))    # median_filter ensures that the end-points aren't too spiky
+        ts_unwrapped = halfgaussian_filter(ts_unwrapped, sigma=2)  # half_gaussian filter ensures information from other points in the middle when we take output windows/downsample
+        fTheta_win = ts_unwrapped[output_windows]
+        dfTheta_ = fTheta_win[:, -1] - fTheta_win[:, 0]
+        dfTheta_ = np.rad2deg(dfTheta_)
+        mn = 0.     # so left and right signs stays the same
+        std = dfTheta_.std()
+        # f = zscore(dfTheta_)
+        f = dfTheta_ / (std + 1e-6)
+
+        # plt.figure(figsize=(18, 7))
+        # slice = np.r_[:min(50000, len(f_))]
+        # plt.plot(sf['fTheta'][slice], 'k.-', label='fTheta')
+        # # plt.plot(sf['mTheta'][slice], 'b.-', label='mTheta')
+        # plt.plot(dfTheta[slice], 'r.-', label='df_prev')
+        # plt.plot(dfTheta_[slice], 'g.-', label='df_new')
+        # plt.xlabel('time')
+        # plt.ylabel('degree')
+        # plt.legend(loc='upper right')
+        # plt.tight_layout()
+        # plt.show()
+        # plt.close()
+
     elif f_name in ['fAS']:
         ts = sf['fTheta']
-        ts = smooth_gaussian(ts, sigma=3)
         fTheta = ts[output_windows]
         dfTheta_abs = np.abs(fTheta[:, -1] - fTheta[:, 0])
         dfTheta_abs = np.where(dfTheta_abs > 90, 0, dfTheta_abs)
@@ -262,7 +227,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         f = dfTheta_abs
     elif f_name in ['mAV']:
         ts = sf['mTheta']
-        ts = smooth_gaussian(ts, sigma=3)
         mTheta = ts[output_windows]
         dmTheta = mTheta[:, -1] - mTheta[:, 0]
         dmTheta = np.where(np.abs(dmTheta) > 90, 0, dmTheta)
@@ -272,7 +236,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         f = dmTheta
     elif f_name in ['dfmAng']:
         ts = sf['fmAng']
-        ts = smooth_gaussian(ts, sigma=3)
         fmAng = np.abs(ts)     # abs to make left and right male positions symmetric
         dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
         dfmAng = np.mean(dfmAng, axis=1)             # signed changes in orientation
@@ -281,7 +244,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         f = zscore(dfmAng)
     elif f_name in ['dfmAng_abs']:
         ts = sf['fmAng']
-        ts = smooth_gaussian(ts, sigma=3)
         fmAng = np.abs(ts)     # abs to make left and right symmetric
         dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
         dfmAng_abs = np.abs(np.mean(dfmAng, axis=1))     # unsigned changes in orientation
@@ -290,7 +252,7 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         f = zscore(dfmAng_abs)
     # elif f_name in ['wingFlickTheta']:
     #     ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
-    #     ts = smooth_gaussian(ts, sigma=3)
+    #     ts = smooth(ts, sigma=3)
     #     wingFlickTheta = ts * sf['wingFlick']
     #     wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
     #     mn = 0  # no zscoring for wing flick angles, as most of them are zeros
@@ -569,7 +531,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         gc.collect()
 
         num_sessions += 1
-        print(f"Completed session {num_sessions}")
+        print(f"Completed {num_sessions} sessions.")
         print("============")
 
         # if num_sessions == 25:
@@ -727,7 +689,7 @@ def extract_female(source):
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../../data/wt/sessions_features_74_sep5.pkl')
+        sessions_features = joblib.load('../../data/wt/sessions_features_81_dec30.pkl')
         datacls = WT_DATA
     elif source == 'wt_fred':
         sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
@@ -766,7 +728,8 @@ def extract_female(source):
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_smoothed_stdset_auxem_1114_metadata.pkl'
+               f'o={data_config["predict_window_size"]}_today=1231_metadata.pkl'
+
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
     filepath = os.path.join('../../data/', filename)
@@ -778,9 +741,9 @@ def extract_female(source):
 
 
 if __name__ == '__main__':
-    src = 'wt_fred'
+    src = 'wt'
     filepath = extract_female(src)
-    # extract_male(src)
+    # filepath = extract_male(src)
 
     data = joblib.load(filepath)
     full_data = load_all_sessions_into_memory(data)

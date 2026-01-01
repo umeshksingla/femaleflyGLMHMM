@@ -2,6 +2,7 @@ import numpy as np
 import miniball
 import h5py
 import scipy.ndimage
+from scipy.signal import savgol_coeffs, lfilter
 from scipy.stats import zscore
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
@@ -90,39 +91,61 @@ def safe_zscore(x):
     return zscore(x)
 
 
-def halfgaussian_kernel1d(sigma, radius):
+def halfgaussian_kernel(sigma, radius):
     """
-    Computes a 1-D Half-Gaussian convolution kernel.
+    Computes a Half-Gaussian convolution kernel.
     """
     sigma2 = sigma * sigma
+    # The half-gaussian is just the right side of the bell curve
     x = np.arange(0, radius+1)
     phi_x = np.exp(-0.5 / sigma2 * x ** 2)
     phi_x = phi_x / phi_x.sum()
     return phi_x
 
 
-def halfgaussian_filter1d(input, sigma, axis=-1, output=None,
-                      mode="constant", cval=0.0, truncate=4.0):
+def halfgaussian_filter(input, sigma, axis=0, output=None,
+                      mode="nearest", cval=0.0, truncate=4.0):
     """
     Convolves a 1-D Half-Gaussian convolution kernel.
     """
     sd = float(sigma)
     # make the radius of the filter equal to 'truncate' standard deviations
     lw = int(truncate * sd + 0.5)
-    weights = halfgaussian_kernel1d(sigma, lw)
+    weights = halfgaussian_kernel(sigma, lw)
     origin = -lw // 2
     return scipy.ndimage.convolve1d(input, weights, axis, output, mode, cval, origin)
 
 
-def smooth_gaussian(x, sigma):
-    return halfgaussian_filter1d(x, sigma=sigma, mode='nearest')
+def smooth_savgol_noncausal(x, window_length):
+    """
+    Smoothes using Savitzky-Golay filter. Uses future data points to smooth.
+    """
+    return savgol_filter(x, window_length=window_length, polyorder=1, axis=0)
 
 
-def smooth_savgol(x, smooth_window):
-    return savgol_filter(x, window_length=smooth_window, polyorder=1, axis=0)
+def smooth_savgol_causal(data, window_length):
+    """
+    Smoothes raw tracks using a causal Savitzky-Golay filter. No future data is used.
+    """
+
+    # Get coefficients for the CURRENT point (pos = the edge of the window)
+    coeffs = savgol_coeffs(window_length, polyorder=1, deriv=0, pos=window_length-1)
+
+    # Apply lfilter. Equivalent to a weighted moving average of the last 'window_length' points
+    smoothed_signal = lfilter(coeffs[::-1], [1.0], data, axis=0)
+
+    # Set the first (window_length-1) points to the raw data or NaN as the filter hasn't filled its buffer yet.
+    smoothed_signal[:window_length - 1] = data[:window_length - 1]
+    return smoothed_signal
 
 
 def fill_missing_tracks_SR(Y, kind="linear"):
+    """
+    Methods to interpolate missing tracking points using scipy.interpolate.interp1d
+    A mixture of linear and cubic spline interpolators are used.
+
+    Code by Shruthi Ravindranathan.
+    """
     initial_shape = Y.shape
 
     # Flatten after first dim.
@@ -163,6 +186,8 @@ def fill_missing_tracks_SR(Y, kind="linear"):
 
 def circle_estimator_helper(trxM, trxF):
     """
+    Estimate approximate chamber radius and center coordinates by building the smallest bounding ball around extreme
+    fly tracking coordinates. Used to approximate the distance of flies from the chamber walls/edges at any time.
     """
 
     fr, malexminbodypart = np.unravel_index(np.nanargmin(trxM[..., 0]), trxM[..., 0].shape)
