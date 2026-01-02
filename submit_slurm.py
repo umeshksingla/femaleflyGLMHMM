@@ -52,21 +52,24 @@ if __name__ == '__main__':
         raise Exception(f'Incorrect data source specified "{src}".')
 
     path = f'jan1_kfoldcv_{src}_{animal}'
+    model_name = 'chance'
     init_seeds = [0]
     # datasplit_seeds = [random.randint(1, 10000) for _ in range(5)]  #[0]
 
     model_configs = {
-        'name': ['idglmhmmci'],
+        'name': [model_name],
         'seed': init_seeds,
         'datasplit_seed': datasplit_seeds,  #
         'num_states': [
-            2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
+            0,      # uncomment for chance
+            # 1,    # uncomment for lr
+            # 2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
         ],
         # 'transition_matrix_stickiness': [100],
         'data_path': [data_path],
         'path': [path],
     }
-    arrayfilename = f'{path}_array_args.txt'        # CAUTION!! Running this script will overwrite existing array_args file.
+    arrayfilename = f'{path}_{model_name}_array_args.txt'        # CAUTION!! Running this script will overwrite existing array_args file.
     job_configs = create_array_file(model_configs, arrayfilename=arrayfilename)
     NUM_ARRAY_JOBS = len(job_configs)
     JOB_SCRIPT = 'run_slurm.sh'

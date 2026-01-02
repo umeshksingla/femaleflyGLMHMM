@@ -42,6 +42,8 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     train_aux_emissions = [aux_emissions[e] for e in train_session_indices]
     test_aux_emissions = [aux_emissions[e] for e in test_session_indices]
 
+    print("model.learned_params", model.learned_params)
+
     print("Calculating train and test logprobs...")
     train_lp = model.get_data_logprob(train_emissions, train_inputs)
     train_lps_by_fly = model.get_data_logprob_by_fly(train_emissions, train_inputs)

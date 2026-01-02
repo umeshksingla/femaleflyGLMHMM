@@ -118,12 +118,12 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             # print("max sum_xxT:", jnp.abs(sum_xxT).max())
 
             # L2 Regularization
-            # lambdaL2 = 1e-6  # L2 penalty strength
-            # D = sum_xxT.shape[1]  # number of features
-            # regL2 = jnp.eye(D + 1)  # (D+1)x(D+1), includes bias term
-            # regL2 = regL2.at[-1, -1].set(0.0)
+            lambdaL2 = 1e-6  # L2 penalty strength
+            D = sum_xxT.shape[1]  # number of features
+            I = jnp.eye(D + 1)  # (D+1)x(D+1), includes bias term
+            I = I.at[-1, -1].set(0.0)   # set l2 for bias term to 0
 
-            # Or, Laplacian Smoothing Regularization (Not implemented; Not applicable in basis transformed space.)
+            # Or, Laplacian Smoothing Regularization (Not implemented; Not needed in basis transformed space.)
 
             # Make block matrices for stacking features (x) and bias (1)
             sum_x1x1T = jnp.block(
@@ -134,8 +134,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             # print(sum_x1x1T.shape, sum_x1yT.shape)
 
             # Solve for the optimal A, b, and Sigma
-            # Ab = jnp.linalg.solve(sum_x1x1T + lambdaL2 * regL2, sum_x1yT).T
-            Ab = jnp.linalg.solve(sum_x1x1T, sum_x1yT).T
+            Ab = jnp.linalg.solve(sum_x1x1T + lambdaL2 * I, sum_x1yT).T
 
             # jax.debug.print("sum_x1x1T={x} anynans={y} anynans={z}", x=sum_x1x1T, y=jnp.isnan(sum_x1x1T).any(), z=jnp.isnan(sum_x1yT).any())
             # Ab = jnp.linalg.solve(sum_x1x1T, sum_x1yT).T
@@ -146,7 +145,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             # jax.debug.print("sum_yyT={x} Absum_x1yT={y}", x=sum_yyT, y=Ab @ sum_x1yT)
             # jax.debug.print("sum_x1yT={x} Ab={y}", x=sum_x1yT, y=Ab)
             Sigma = 0.5 * (Sigma + Sigma.T)                 # for numerical stability
-            Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-6      # diagonal
+            Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-4      # diagonal
             return Ab[:, :-1], Ab[:, -1], Sigma
 
         emission_stats = pytree_sum(batch_stats, axis=0)
