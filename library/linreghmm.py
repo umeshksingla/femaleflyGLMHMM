@@ -116,21 +116,14 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
 
             # print(sum_xxT.shape, sum_x.shape)
             # print("max sum_xxT:", jnp.abs(sum_xxT).max())
-            #
-            lambdaL2 = 1e-6  # L2 penalty strength
-            # lambdaT = 1.0 * sum_w  # L2-smoothing strength
-            D = sum_xxT.shape[1]  # number of features
-            #
-            regL2 = jnp.eye(D + 1)  # (D+1)x(D+1), includes bias term
-            regL2 = regL2.at[-1, -1].set(0.0)
-            #
-            # L = 4  # e.g., 4
-            # T = jnp.eye(L) - jnp.roll(jnp.eye(L), -1, axis=0)
-            # T = T[:-1]  # shape (L-1, L)
-            # smooth_penalty = T.T @ T
-            # T_full = jnp.kron(jnp.eye(sum_x.shape[0]//L), smooth_penalty)  # shape (D, D)
-            # regT = jnp.zeros((D + 1, D + 1))
-            # regT = regT.at[:D, :D].set(T_full)
+
+            # L2 Regularization
+            # lambdaL2 = 1e-6  # L2 penalty strength
+            # D = sum_xxT.shape[1]  # number of features
+            # regL2 = jnp.eye(D + 1)  # (D+1)x(D+1), includes bias term
+            # regL2 = regL2.at[-1, -1].set(0.0)
+
+            # Or, Laplacian Smoothing Regularization (Not implemented; Not applicable in basis transformed space.)
 
             # Make block matrices for stacking features (x) and bias (1)
             sum_x1x1T = jnp.block(
@@ -141,7 +134,8 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             # print(sum_x1x1T.shape, sum_x1yT.shape)
 
             # Solve for the optimal A, b, and Sigma
-            Ab = jnp.linalg.solve(sum_x1x1T + lambdaL2 * regL2, sum_x1yT).T
+            # Ab = jnp.linalg.solve(sum_x1x1T + lambdaL2 * regL2, sum_x1yT).T
+            Ab = jnp.linalg.solve(sum_x1x1T, sum_x1yT).T
 
             # jax.debug.print("sum_x1x1T={x} anynans={y} anynans={z}", x=sum_x1x1T, y=jnp.isnan(sum_x1x1T).any(), z=jnp.isnan(sum_x1yT).any())
             # Ab = jnp.linalg.solve(sum_x1x1T, sum_x1yT).T
