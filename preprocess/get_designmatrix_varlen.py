@@ -35,7 +35,6 @@ def transform_single_input(inp, basis, input_raw_each_dim):
 
 
 def transform_single_session(s_i, s, basis, input_raw_each_dim):
-    print(s_i)
     return np.array([
         transform_single_input(inp, basis, input_raw_each_dim)
         for inp in s
@@ -77,24 +76,18 @@ def get_input_feat(sessions_features, s, f_name):
         ts = sf[f_name]
         feat = zscore(ts)
     elif f_name in ['song', 'sine_i', 'pulse_i', 'song_i', 'tap2']:
-
-        # print(f_name, np.mean(sf[f_name]), np.std(sf[f_name]))
-
-        # fig, ax = plt.subplots(2, 1, figsize=(20, 6), sharex=True)
-        # ax[0].plot(sf[f_name], label=f'{f_name}')
-        # ax[1].plot(safe_zscore(sf[f_name]), label=f'z-{f_name}')
-        # ax[0].legend()
-        # ax[1].legend()
-        # plt.suptitle(s)
-        # plt.tight_layout()
-        # plt.show()
-
         feat = safe_zscore(sf[f_name]).astype(float)
     elif f_name in ['fmAng_cos']:
         ts = np.radians(np.abs(sf['fmAng']))
         feat = zscore(np.cos(ts))    # cos: front to back
     elif f_name in ['fmAng_sin']:
         ts = np.radians(sf['fmAng'])
+        feat = zscore(np.sin(ts))    # sin: left or right of the fly
+    elif f_name in ['mfAng_cos']:
+        ts = np.radians(np.abs(sf['mfAng']))
+        feat = zscore(np.cos(ts))    # cos: front to back
+    elif f_name in ['mfAng_sin']:
+        ts = np.radians(sf['mfAng'])
         feat = zscore(np.sin(ts))    # sin: left or right of the fly
     elif f_name in ['wingAlign_song_i_directedlr2']:
         ts = np.min([sf['wingLAristaLAlignAng'],
@@ -159,6 +152,19 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
         mn = ts.mean()
         std = ts.std()
         feat = np.mean(zscore(ts)[aux_windows], axis=1)
+    elif f_name in ['mfAng_cos']:
+        ts_abs = np.abs(sf['mfAng'])
+        ts_rad = np.radians(ts_abs)
+        ts = np.cos(ts_rad)  # cos: front (180deg) to back (0deg)
+        mn = ts.mean()
+        std = ts.std()
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
+    elif f_name in ['mfAng_sin']:
+        ts_rad = np.radians(sf['mfAng'])
+        ts = np.sin(ts_rad)  # sin: left <-> right
+        mn = ts.mean()
+        std = ts.std()
+        feat = np.mean(zscore(ts)[aux_windows], axis=1)
     elif f_name in ['wingAlign']:
         ts = np.min([sf['wingLAristaLAlignAng'],
                        sf['wingRAristaRAlignAng'],
@@ -172,15 +178,6 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
     return feat, mn, std
 
 
-# def wavelet_denoise(signal):
-#     coeffs = pywt.wavedec(signal, 'db4', level=4)
-#     print(len(coeffs), [len(_) for _ in coeffs])
-#     threshold = 0.25 * np.max(coeffs[-1])  # Set small wavelet coefficients to zero
-#     coeffs = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
-#     denoised_signal = pywt.waverec(coeffs, 'db4')
-#     return denoised_signal
-
-
 def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
     if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
@@ -190,7 +187,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         f = np.mean(zscore(ts)[output_windows], axis=1)
     elif f_name in ['fAV', 'mAV']:
         ts = sf['mTheta'] if f_name == 'mAV' else sf['fTheta']
-        # OR
         ts_rad = np.deg2rad(ts)
         ts_unwrapped = np.unwrap(ts_rad, axis=0)    # Removes seemingly 360deg like large angle changes
         ts_unwrapped = median_filter(ts_unwrapped, size=5, mode="nearest", origin=-(5 // 2))    # median_filter ensures that the end-points aren't too spiky
@@ -215,49 +211,6 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         # plt.tight_layout()
         # plt.show()
         # plt.close()
-
-    elif f_name in ['fAS']:
-        ts = sf['fTheta']
-        fTheta = ts[output_windows]
-        dfTheta_abs = np.abs(fTheta[:, -1] - fTheta[:, 0])
-        dfTheta_abs = np.where(dfTheta_abs > 90, 0, dfTheta_abs)
-        mn = dfTheta_abs.mean()
-        std = dfTheta_abs.std()
-        dfTheta_abs = zscore(dfTheta_abs)
-        f = dfTheta_abs
-    elif f_name in ['mAV']:
-        ts = sf['mTheta']
-        mTheta = ts[output_windows]
-        dmTheta = mTheta[:, -1] - mTheta[:, 0]
-        dmTheta = np.where(np.abs(dmTheta) > 90, 0, dmTheta)
-        mn = dmTheta.mean()
-        std = dmTheta.std()
-        dmTheta = zscore(dmTheta)
-        f = dmTheta
-    elif f_name in ['dfmAng']:
-        ts = sf['fmAng']
-        fmAng = np.abs(ts)     # abs to make left and right male positions symmetric
-        dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
-        dfmAng = np.mean(dfmAng, axis=1)             # signed changes in orientation
-        mn = dfmAng.mean()
-        std = dfmAng.std()
-        f = zscore(dfmAng)
-    elif f_name in ['dfmAng_abs']:
-        ts = sf['fmAng']
-        fmAng = np.abs(ts)     # abs to make left and right symmetric
-        dfmAng = np.diff(fmAng, prepend=fmAng[0])[output_windows]
-        dfmAng_abs = np.abs(np.mean(dfmAng, axis=1))     # unsigned changes in orientation
-        mn = dfmAng_abs.mean()
-        std = dfmAng_abs.std()
-        f = zscore(dfmAng_abs)
-    # elif f_name in ['wingFlickTheta']:
-    #     ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
-    #     ts = smooth(ts, sigma=3)
-    #     wingFlickTheta = ts * sf['wingFlick']
-    #     wingFlickTheta = np.mean(wingFlickTheta[output_windows], axis=1)    # mean can be taken for these angles as they are bounded between 10 and 30 degrees
-    #     mn = 0  # no zscoring for wing flick angles, as most of them are zeros
-    #     std = 1
-    #     f = wingFlickTheta
     elif f_name in ['wingFlickBin']:
         wing_sep = sf['wingFL'] - sf['wingFR']      # right wing angle is generally -ve
         ts = (np.abs(wing_sep) > 20).astype(int)    # 20 degrees difference between left and right wing extensions
@@ -396,7 +349,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     print("Basis created.")
 
     # Create temporary directory for session files
-    temp_dir = Path('../../data/temp_sessions')
+    temp_dir = Path(f'../../data/{datacls.dataset}_temp_sessions')
     os.makedirs(temp_dir, exist_ok=True)
     print(f"Temporary session files will be saved to: {temp_dir}")
 
@@ -537,7 +490,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         # if num_sessions == 25:
         #     break
 
-    print(f"\nPhase 1 complete: {num_sessions} sessions saved to disk")
+    print(f"\nPhase 1 complete: {num_sessions} sessions saved to disk.")
 
     # PHASE 2: Basis transformation (load one at a time)
     print("\n=== PHASE 2: Applying basis transformation ===")
@@ -566,9 +519,9 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         joblib.dump(session_data, session_file)
         del session_data
         gc.collect()
-        print(f"Session {s_i} transformed and saved")
+        print(f"Session {s_i} transformed and saved.")
 
-    print("\nPhase 2 complete: All sessions transformed")
+    print("\nPhase 2 complete: All sessions basis-transformed.")
 
     # Get dimensions from first session
     first_session = joblib.load(temp_dir / 'session_0000.pkl')
@@ -582,14 +535,19 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     blocks = [np.ones(s) for s in input_sizes_by_emission]
     input_mask_by_emission = block_diag(*blocks).astype(int)
     print(n_inputs_by_emission, input_sizes_by_emission)
-    print("input_mask_by_emission", input_mask_by_emission)
+    print("input_mask_by_emission", input_mask_by_emission, input_mask_by_emission.shape)
 
     n_inputs_by_auxemission = [len(config['auxiliary_emission_labels'][o]) for o in config['auxiliary_emission_labels']]
+
+    # IMPORTANT. Does not support total number of inputs for aux-emissions more than total number of inputs for regular emissions
+    # IMPORTANT. That also means, aux-emissions' inputs have to be in the list of regular-emissions inputs.
+    assert np.sum(n_inputs_by_auxemission) <= np.sum(n_inputs_by_emission)
     input_sizes_by_auxemission = [_ * input_each_dim for _ in n_inputs_by_auxemission]
     blocks = [np.ones(s) for s in input_sizes_by_auxemission]
     input_mask_by_auxemission = block_diag(*blocks).astype(int)
+    input_mask_by_auxemission = np.pad(input_mask_by_auxemission, ((0, 0), (0, np.sum(input_sizes_by_emission) - np.sum(input_sizes_by_auxemission))))  # Pad to make it same width as input mask for regular emissions
     print(n_inputs_by_auxemission, input_sizes_by_auxemission)
-    print("input_mask_by_auxemission", input_mask_by_auxemission)
+    print("input_mask_by_auxemission", input_mask_by_auxemission, input_mask_by_auxemission.shape)
 
     # Update config
     config['input_dim'] = input_dim
@@ -627,14 +585,14 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     return data
 
 
-def load_all_sessions_into_memory(data):
+def load_all_sessions_into_memory(metadata):
     """
     Load all session data into memory in the original format.
     Only use this if you have sufficient RAM!
     """
-    print(data.keys())
-    num_sessions = data['num_sessions']
-    temp_dir = Path(data['temp_session_dir'])
+    print(metadata.keys())
+    num_sessions = metadata['num_sessions']
+    temp_dir = Path(metadata['temp_session_dir'])
 
     print(f"Loading {num_sessions} sessions into memory...")
 
@@ -671,28 +629,27 @@ def load_all_sessions_into_memory(data):
     }
 
     # Add metadata
-    full_data.update(data)
-
-    print("All sessions loaded into memory")
+    full_data.update(metadata)
+    print(f"All {num_sessions} sessions loaded into memory.")
     return full_data
 
 
-def load_single_session(data, session_idx):
+def load_single_session(metadata, session_idx):
     """Load a specific session's data"""
-    temp_dir = Path(data['temp_session_dir'])
+    temp_dir = Path(metadata['temp_session_dir'])
     session_file = temp_dir / f'session_{session_idx:04d}.pkl'
     return joblib.load(session_file)
 
 
-def extract_female(source):
+def extract_male(source):
 
     data_config = {}
 
     if source == 'wt':
-        sessions_features = joblib.load('../../data/wt/sessions_features_81_dec30.pkl')
+        sessions_features = joblib.load('../../data/wt/sessions_features_81_jan1.pkl')
         datacls = WT_DATA
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_sep5.pkl')
+        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_jan1.pkl')
         datacls = FREDCLEANED_DATA
     else:
         raise Exception('Wrong data source.')
@@ -702,12 +659,79 @@ def extract_female(source):
     data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
-    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms (TODO keep this same as predict window size?)
+    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms
     data_config["predict_window_size"] = fps//30  # averaging emission over this window size
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
     data_config['ncos'] = 4
 
+    # emissions to fit, along with female inputs for each
+    data_config['emission_labels'] = OrderedDict({
+        'mFV': ['fFV', 'fLS', 'mfDist', 'mfAng_cos'],
+        'mLV': ['fFV_directedlr2', 'fLS_directedlr2', 'mfDist_directedlr2'],
+        'mAV': ['fFV_directedlr2', 'fLS_directedlr2', 'mfDist_directedlr2'],
+    })
+    data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
+    data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
+    print(data_config['input_labels_list'])
+
+    # female inputs, to use for plotting segmented distributions by state
+    data_config['auxiliary_labels_list'] = ['fFV', 'fLS', 'mfDist', 'mfAng_cos', 'mfAng_sin']  # we basically need full series as well as windowed-versions of inputs
+
+    # extra emissions post-model fitting, such as wing flick
+    data_config['auxiliary_emission_labels'] = OrderedDict({
+        'wingFlickBin': ['fFV', 'fLS', 'mfDist', 'mfAng_cos']
+    })
+    data_config['auxiliary_input_labels_list'] = [data_config['auxiliary_emission_labels'][o] for o in data_config['auxiliary_emission_labels']]
+    data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
+    print(data_config['auxiliary_input_labels_list'])
+
+    # male inputs, to use for inputs to drive state transitions
+    data_config['statetrans_input_labels_list'] = ['fFV', 'fLS', 'mfDist', 'mfAng_cos']
+
+    filename = f'{source}_male_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
+               f'o={data_config["predict_window_size"]}_today=jan1_metadata.pkl'
+
+    s = time.time()
+    data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
+    metadata_filepath = os.path.join('../../data/', filename)
+    print("Saving at:", metadata_filepath)
+    joblib.dump(data, metadata_filepath)
+    print("Saved at:", metadata_filepath)
+
+    # Use metadata to load all session data into memory and dump in the original format.
+    metadata = joblib.load(metadata_filepath)
+    full_data = load_all_sessions_into_memory(metadata)
+    joblib.dump(full_data, metadata_filepath.__str__().replace('_metadata', ''))
+    print(f"Done in {time.time() - s} seconds.")
+    return
+
+
+def extract_female(source):
+
+    data_config = {}
+
+    if source == 'wt':
+        sessions_features = joblib.load('../../data/wt/sessions_features_81_jan1.pkl')
+        datacls = WT_DATA
+    elif source == 'wt_fred':
+        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_jan1.pkl')
+        datacls = FREDCLEANED_DATA
+    else:
+        raise Exception('Wrong data source.')
+
+    fps = sessions_features.get('fps', datacls.fps)
+    data_config['source'] = source
+    data_config['orig_fps'] = fps
+    data_config['input_raw_each_dim'] = 3*fps
+    data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
+    data_config['input_raw_overlap'] = fps//30    # move input window forward by 33ms
+    data_config["predict_window_size"] = fps//30  # averaging emission over this window size
+    data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
+    data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
+    data_config['ncos'] = 4
+
+    # emissions to fit, along with male inputs for each
     data_config['emission_labels'] = OrderedDict({
         'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
         'fLV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
@@ -717,7 +741,10 @@ def extract_female(source):
     data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
     print(data_config['input_labels_list'])
 
+    # male inputs, to use for plotting segmented distributions by state
     data_config['auxiliary_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'fmAng_sin', 'wingAlign', 'pulse_i', 'sine_i', 'tap2', ]  # we basically need full series as well as windowed-versions of inputs
+
+    # extra emissions post-model fitting, such as wing flick
     data_config['auxiliary_emission_labels'] = OrderedDict({
         'wingFlickBin': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2', ]
     })
@@ -725,26 +752,28 @@ def extract_female(source):
     data_config['auxiliary_input_labels_list'] = [__ for _ in data_config['auxiliary_input_labels_list'] for __ in _]  # unroll
     print(data_config['auxiliary_input_labels_list'])
 
+    # male inputs, to use for inputs to drive state transitions
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_today=1231_metadata.pkl'
+               f'o={data_config["predict_window_size"]}_today=jan1_metadata.pkl'
 
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
-    filepath = os.path.join('../../data/', filename)
-    print("Saving at:", filename)
-    joblib.dump(data, filepath)
-    print("Saved at:", filepath)
+    metadata_filepath = os.path.join('../../data/', filename)
+    print("Saving at:", metadata_filepath)
+    joblib.dump(data, metadata_filepath)
+    print("Saved at:", metadata_filepath)
+
+    # Use metadata to load all session data into memory and dump in the original format.
+    metadata = joblib.load(metadata_filepath)
+    full_data = load_all_sessions_into_memory(metadata)
+    joblib.dump(full_data, metadata_filepath.__str__().replace('_metadata', ''))
     print(f"Done in {time.time() - s} seconds.")
-    return filepath
+    return
 
 
 if __name__ == '__main__':
-    src = 'wt'
-    filepath = extract_female(src)
-    # filepath = extract_male(src)
-
-    data = joblib.load(filepath)
-    full_data = load_all_sessions_into_memory(data)
-    joblib.dump(full_data, filepath.__str__().replace('_metadata', ''))
+    src = 'wt_fred'
+    extract_female(src)
+    # extract_male(src)

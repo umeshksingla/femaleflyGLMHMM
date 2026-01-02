@@ -183,6 +183,9 @@ def update_labels(data_config):
         'fmAng_sin': 'sin(fmAng)',
         'fmAng_cos': 'cos(fmAng)',
 
+        'mfAng_sin': 'sin(mfAng)',
+        'mfAng_cos': 'cos(mfAng)',
+
         'wingAlign': 'wingAng',
         'wingAlign_song_i_directedlr2': 'wing x side',
         'pfast_i': 'pulse',
@@ -214,6 +217,9 @@ def update_labels(data_config):
 
         'fmAng_sin': 'sin(fmAng)',
         'fmAng_cos': 'cos(fmAng)',
+
+        'mfAng_sin': 'sin(mfAng)',
+        'mfAng_cos': 'cos(mfAng)',
 
         'wingAlign': 'wingAng',
         'wingAlign_song_i_directedlr2': 'wing (s)',
@@ -307,6 +313,8 @@ def update_labels(data_config):
         'tap2': 'tap',
         'fmAng_cos': 'front \u2194 back',
         'fmAng_sin': 'right \u2194 left',
+        'mfAng_cos': 'front \u2194 back',
+        'mfAng_sin': 'right \u2194 left',
         'wingAlign': 'wing',
     })
     auxiliary_labels_full_text = ({
@@ -321,7 +329,9 @@ def update_labels(data_config):
         'tap2': 'tap',
         'fmAng_cos': 'male positioned behind',
         'fmAng_sin': 'male lateral position',
-        'wingAlign': 'wing',
+        'mfAng_cos': 'female positioned behind',
+        'mfAng_sin': 'female lateral position',
+        'wingAlign': 'wing align',
     })
     auxiliary_labels_jr_text = ({
         'mFV': 'mFV',
@@ -335,7 +345,9 @@ def update_labels(data_config):
         'tap2': 'tap',
         'fmAng_cos': 'cos(fmAng)',
         'fmAng_sin': 'sin(fmAng)',
-        'wingAlign': 'wing',
+        'mfAng_sin': 'sin(mfAng)',
+        'mfAng_cos': 'cos(mfAng)',
+        'wingAlign': 'wing align',
     })
     auxiliary_emission_labels_text = ({
         'wingFlickBin': 'wing_flick',
@@ -556,7 +568,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         auxiliary_labels, data_config, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_aux_dists_reformatted(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, all_aux_mn_std, rescaled=True,),
-         auxiliary_labels, data_config, exclude_a=['wingAlign', 'fmAng_sin'], title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
+         auxiliary_labels, data_config, exclude_a=['wingAlign', 'fmAng_sin', 'mfAng_sin'], title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_aux_sorted_odists(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
         auxiliary_labels_full, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
@@ -600,15 +612,7 @@ def enhance_auxem(model_dir, savefig=True, display=False):
         'test_data': {},
     }
 
-    # input_mask_by_auxemission = data_config['input_mask_by_auxemission']
-
-    # HACK !!!
-    # input_mask_by_auxemission = input_mask_by_auxemission[0][:28]
-    input_dim = train_inputs[0].shape[-1]
-    mask_for_first_auxemission = np.zeros(input_dim)
-    mask_for_first_auxemission[:28] = 1
-
-    input_mask_by_auxemission = [mask_for_first_auxemission.astype(int)]
+    input_mask_by_auxemission = data_config['input_mask_by_auxemission']
     print("input_mask_by_auxemission", input_mask_by_auxemission, len(input_mask_by_auxemission[0]))
 
     w, b, train_predict_probas, test_predict_probas, train_f1score, test_f1score, train_preds, test_preds, train_true, test_true = train_logreg_aux_emissions(train_inputs, test_inputs, train_aux_emissions, test_aux_emissions, train_stateseq, test_stateseq, num_states, input_mask_by_auxemission)
@@ -711,11 +715,9 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     input_mask_by_emission = data_config['input_mask_by_emission']
     input_mask_by_auxemission = np.array(auxem_model_ckp['input_mask_by_auxemission'])
     input_mask_by_allemission = np.concatenate((input_mask_by_emission, input_mask_by_auxemission))
-    print(input_mask_by_allemission)
-
-    print(input_mask_by_emission.shape)
-    print(input_mask_by_auxemission.shape)
-    print(input_mask_by_allemission.shape)
+    print("input_mask_by_emission", input_mask_by_emission, input_mask_by_emission.shape)
+    print("input_mask_by_auxemission", input_mask_by_auxemission, input_mask_by_auxemission.shape)
+    print("input_mask_by_allemission", input_mask_by_allemission, input_mask_by_allemission.shape)
 
     learned_params = model_ckp['learned_params']
 
@@ -761,7 +763,8 @@ def generate_together_figures(model_dir, savefig=True, display=False):
         plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions', only_plot_inputs=['mFV', 'pulse_i', 'sine_i', 'tap2'], skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions',
+                                     only_plot_inputs=['fFV', 'mfDist', 'mFV', 'pulse_i', 'sine_i', 'tap2'][2:], skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return

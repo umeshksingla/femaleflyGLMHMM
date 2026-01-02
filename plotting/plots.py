@@ -1064,6 +1064,22 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
             xlim = (-92, 92)
             xticks = [-90, 0, 90]
             axtitle = 'male lateral position'
+        elif f_name in ['mfAng_cos']:
+            t = np.rad2deg(np.arccos(dt))
+            cut = 0
+            xlabel = '(deg)'
+            ylabel = 'Density'
+            xlim = (-2, 182)
+            xticks = [0, 90, 180]
+            axtitle = '|mfAng|'
+        elif f_name in ['mfAng_sin']:
+            t = np.rad2deg(np.arcsin(dt))
+            cut = 0
+            xlabel = '(deg)'
+            ylabel = 'Density'
+            xlim = (-92, 92)
+            xticks = [-90, 0, 90]
+            axtitle = 'female lateral position'
         elif f_name in ['pulse_i', 'sine_i', 'tap2']:
             # print(f_name, np.unique(dt, return_counts=True))
             # print(f_name, np.unique(np.round(dt, 2), return_counts=True))
@@ -1086,7 +1102,7 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
             raise Exception(f'Unsupported aux feature: {f_name}.')
         return t, cut, xlabel, ylabel, xlim, xticks, axtitle
 
-    len_eff_a_labels = len(a_labels) - len(exclude_a)
+    len_eff_a_labels = len([_ for _ in a_labels if _ not in exclude_a])
     fig, ax = plt.subplots(1, len_eff_a_labels, figsize=(3.5 * len_eff_a_labels, 4))
 
     axi = 0
