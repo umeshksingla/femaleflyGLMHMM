@@ -341,6 +341,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     predict_window_size = config['predict_window_size']
     input_raw_overlap = config['input_raw_overlap']
     predict_gap_size = config['predict_gap_size']
+    source = config['source']
+    animal = config['animal']
 
     # Cosine basis transformation of inputs
     input_each_dim = config['ncos']
@@ -349,7 +351,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     print("Basis created.")
 
     # Create temporary directory for session files
-    temp_dir = Path(f'../../data/{datacls.dataset}_temp_sessions')
+    temp_dir = Path(f'../../data/{source}_{animal}_temp_sessions')
     os.makedirs(temp_dir, exist_ok=True)
     print(f"Temporary session files will be saved to: {temp_dir}")
 
@@ -656,6 +658,7 @@ def extract_male(source):
 
     fps = sessions_features.get('fps', datacls.fps)
     data_config['source'] = source
+    data_config['animal'] = 'male'
     data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
@@ -722,6 +725,7 @@ def extract_female(source):
 
     fps = sessions_features.get('fps', datacls.fps)
     data_config['source'] = source
+    data_config['animal'] = 'female'
     data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
@@ -774,6 +778,6 @@ def extract_female(source):
 
 
 if __name__ == '__main__':
-    src = 'wt_fred'
+    src = 'wt'
     extract_female(src)
-    # extract_male(src)
+    extract_male(src)

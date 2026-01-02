@@ -710,6 +710,7 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     input_labels = data_config['input_labels']
     model_prefix = model_ckp['prefix']
     num_states = model_ckp['num_states']
+    animal = model_config['animal']
 
     # plot filters for regular+auxem emissions
     input_mask_by_emission = data_config['input_mask_by_emission']
@@ -756,6 +757,8 @@ def generate_together_figures(model_dir, savefig=True, display=False):
 
     print(data_config['input_labels'])
 
+    only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2']
+
     for skip_states in [[0], []]:
         if num_states <= 1 and skip_states:
             continue    # skip skip_states if there's only state
@@ -764,7 +767,7 @@ def generate_together_figures(model_dir, savefig=True, display=False):
         plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions',
-                                     only_plot_inputs=['fFV', 'mfDist', 'mFV', 'pulse_i', 'sine_i', 'tap2'][2:], skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+                                     only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return
