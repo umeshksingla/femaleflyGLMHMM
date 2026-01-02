@@ -5,7 +5,7 @@
 ####################################
 
 import glob
-import joblib
+import random
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -85,6 +85,7 @@ def loadCV_Scores(path, model_prefix, num_states, score_type):
     :param score_type: 'r2' or 'pearson' or 'll'
     """
     model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_prefix}_{num_states}_cv/**/'))
+    random.shuffle(model_pkl_paths)
     train_scores = []
     test_scores = []
     for _ in model_pkl_paths:
@@ -101,6 +102,11 @@ def loadCV_Scores(path, model_prefix, num_states, score_type):
             factor_bits_per_sec = data_config_pkl['effective_fps']/np.log(2)
             train_score = pkl['train_data']['train_lp'].item() * factor_bits_per_sec
             test_score = pkl['test_data']['test_lp'].item() * factor_bits_per_sec
+        elif score_type == 'll_fly':
+            factor_bits_per_sec = data_config_pkl['effective_fps']/np.log(2)
+            train_score = pkl['train_data']['train_lps_by_fly'] * factor_bits_per_sec
+            test_score = pkl['test_data']['test_lps_by_fly'] * factor_bits_per_sec
+            return np.array(train_score), np.array(test_score)   # One split is enough for scores by fly
         else:
             raise Exception(f'Unsupported score type "{score_type}".')
         train_scores.append(train_score)
@@ -177,6 +183,72 @@ def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=F
     return
 
 
+def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, plot_only_test=False, filesuffix=''):
+
+    plt.figure(figsize=(10, 6), constrained_layout=True)
+    ax=plt.gca()
+    ms = 5
+
+    # Plot for num_states=0 i.e. chance
+    s = 0
+    chance_train_lps, chance_test_lps = loadCV_Scores(path, 'chance', 0, score_type='ll_fly')
+
+    if not plot_only_test:
+        train_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_train_lps))
+        plt.plot(s+train_jitter, np.zeros_like(chance_train_lps), 'ko', mfc='none', markersize=ms)  # plot 0s for chance as chance_lps stored are not relative to chance.
+
+    test_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_test_lps))
+    plt.plot(s+test_jitter, np.zeros_like(chance_test_lps), 'ko', markersize=ms)
+
+    # Plot for num_states=1 i.e. linear regression
+    s = 1
+    lr_train_lps, lr_test_lps = loadCV_Scores(path, 'lr', 1, score_type='ll_fly')
+
+    if not plot_only_test:
+        train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_lps))
+        plt.plot(s+train_jitter, lr_train_lps, 'ko', mfc='none', markersize=ms, label='Train')
+
+    test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_lps))
+    plt.plot(s+test_jitter, lr_test_lps, 'ko', markersize=ms, label='Held-out')
+    plt.errorbar(s + 0.4, np.mean(lr_test_lps), yerr=np.std(lr_test_lps), color='k', fmt='o', capsize=0)
+
+
+    # Plot for num_states > 1 now
+    for i, s in enumerate(num_states_configs):
+        hmm_train_lps, hmm_test_lps = loadCV_Scores(path, model_prefix, s, score_type='ll_fly')
+        print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_lps)} Test:{len(hmm_test_lps)}")
+
+        if not plot_only_test:
+            train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_lps))
+            plt.plot(s+train_jitter, hmm_train_lps, 'ko', mfc='none', markersize=ms)
+        # plt.errorbar(s + 0.4, np.mean(hmm_train_lps), yerr=np.std(hmm_train_lps), color='k', fmt='o', capsize=0)
+
+        test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_lps))
+        plt.plot(s+test_jitter, hmm_test_lps, 'ko', markersize=ms)
+        plt.errorbar(s + 0.4, np.mean(hmm_test_lps), yerr=np.std(hmm_test_lps), color='k', fmt='o', capsize=0)
+
+
+    plt.ylabel('Normalized LL (bits/s)')
+    plt.xlabel('Number of states')
+    plt.xticks([0, 1] + num_states_configs, labels=['Chance', 'GLM'] + num_states_configs)
+
+    # Rotate only the first 2 tick labels
+    for i, label in enumerate(ax.get_xticklabels()):
+        if i < 2:
+            label.set_rotation(90)
+    # plt.title(model_prefix.upper())
+    plt.title('GLM-HMM')
+    plt.legend(loc='lower right')
+    plt.margins(0.1)
+    plt.grid(alpha=0.15)
+    # plt.tight_layout()
+    if savefig:
+        plt.savefig(f'models/{path}/{model_prefix}_{path}_ll_by_fly_cv{filesuffix}.pdf', bbox_inches='tight', dpi=300)
+    if display:
+        plt.show()
+    return
+
+
 def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
     """
     :param score_type: 'r2' or 'pearson'
@@ -247,11 +319,11 @@ if __name__ == '__main__':
     savefig = True
     display = False
 
-    # path = 'dec25_initseedscv_wt_fred'
-    path = 'dec25_kfoldcv_wt'
-    plot_all_test = True
+    # path = 'jan1_initseedscv_wt_female'
+    path = 'jan1_kfoldcv_wt_female'
 
     num_states_configs = [ 2, 3, 4, 5, 6, 7, 8, 10 ]
-    plotCV_same_model_LL(path, 'id-glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='')
-    plotCV_same_model_Score(path, 'id-glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='', score_type='r2')
-    plotCV_same_model_Score(path, 'id-glm-hmm', num_states_configs, plot_all_test=plot_all_test, filesuffix='', score_type='pearson')
+    plotCV_same_model_LL_by_fly(path, 'id-glm-hmm', num_states_configs, plot_only_test=True, filesuffix='plot_only_test')
+    # plotCV_same_model_LL(path, 'id-glm-hmm', num_states_configs, plot_all_test=True, filesuffix='')
+    # plotCV_same_model_Score(path, 'id-glm-hmm', num_states_configs, plot_all_test=True, filesuffix='', score_type='r2')
+    # plotCV_same_model_Score(path, 'id-glm-hmm', num_states_configs, plot_all_test=True, filesuffix='', score_type='pearson')

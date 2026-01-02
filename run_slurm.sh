@@ -23,4 +23,4 @@ model_config=$(sed -n "$linenum p" $array_args_file)
 
 source activate /home/us3519/miniconda3/envs/mydecenv
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
-python "$PY_SCRIPT" --mc "$model_config" --enhance
+python "$PY_SCRIPT" --mc "$model_config" --enhance --genfig

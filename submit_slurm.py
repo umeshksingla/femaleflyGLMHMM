@@ -31,39 +31,45 @@ if __name__ == '__main__':
 
     src = sys.argv[1]       # Specify src = 'wt' or 'wt_fred'
     animal = sys.argv[2]    # Specify animal = 'female' or 'male'
+    cvtype = sys.argv[3]    # Specify cvtype = 'kfold' or 'initseeds'
 
     if src == 'wt':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
-        init_seeds = [5427, 4787, 7896, 5627, 5131, 1818, 65, 8206, 8471, 2734]
-        datasplit_seeds = [1326, 6244, 6400, 3733, 2582, 8644, 3930, 7401, 8116, 4335]
-    elif src == 'wt_male':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_male_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
-        init_seeds = [5427, 4787, 7896, 5627, 5131, 1818, 65, 8206, 8471, 2734]
-        datasplit_seeds = [1326, 6244, 6400, 3733, 2582, 8644, 3930, 7401, 8116, 4335]
+        if animal == 'female':
+            data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
+            init_seeds = [5427, 4787, 7896, 5627, 5131, 1818, 65, 8206, 8471, 2734]
+            datasplit_seeds = [1326, 6244, 6400, 3733, 2582, 8644, 3930, 7401, 8116, 4335]
+        elif animal == 'male':
+            data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_male_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
+            init_seeds = [5427, 4787, 7896, 5627, 5131, 1818, 65, 8206, 8471, 2734]
+            datasplit_seeds = [1326, 6244, 6400, 3733, 2582, 8644, 3930, 7401, 8116, 4335]
     elif src == 'wt_fred':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
-        init_seeds = [1818, 65, 8206, 8471, 2734]
-        datasplit_seeds = [8644, 3930, 7401, 8116, 4335]
-    elif src == 'wt_fred_male':
-        data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_male_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
-        init_seeds = [1818, 65, 8206, 8471, 2734]
-        datasplit_seeds = [8644, 3930, 7401, 8116, 4335]
-    else:   
+        if animal == 'female':
+            data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_fly_data_cos=4_ortho_o=2_today=jan1.pkl'
+            init_seeds = [1818, 65, 8206, 8471, 2734, 5427, 4787, 7896, 5627, 5131]
+            datasplit_seeds = [8644, 3930, 7401, 8116, 4335, 1326, 6244, 6400, 3733, 2582]
+        elif animal == 'male':
+            data_path = '/scratch/gpfs/MMURTHY/usingla/data/wt_fred_male_fly_data_cos=4_ortho_o=2_today=jan1.pkl'
+            init_seeds = [1818, 65, 8206, 8471, 2734, 5427, 4787, 7896, 5627, 5131]
+            datasplit_seeds = [8644, 3930, 7401, 8116, 4335, 1326, 6244, 6400, 3733, 2582]
+    else:
         raise Exception(f'Incorrect data source specified "{src}".')
 
-    path = f'jan1_kfoldcv_{src}_{animal}'
-    model_name = 'chance'
-    init_seeds = [0]
-    # datasplit_seeds = [random.randint(1, 10000) for _ in range(5)]  #[0]
+    path = f'jan1_{cvtype}cv_{src}_{animal}'
+    model_name = 'idglmhmmci'
+
+    if cvtype == 'kfold':
+        init_seeds = [0]        # fix init seed
+    elif cvtype == 'initseeds':
+        datasplit_seeds = [0]   # fix data split seed
 
     model_configs = {
         'name': [model_name],
         'seed': init_seeds,
         'datasplit_seed': datasplit_seeds,  #
         'num_states': [
-            0,      # uncomment for chance
-            # 1,    # uncomment for lr
-            # 2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
+            # 1      # uncomment for chance or lr
+            2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
+            # 8, 10
         ],
         # 'transition_matrix_stickiness': [100],
         'data_path': [data_path],
