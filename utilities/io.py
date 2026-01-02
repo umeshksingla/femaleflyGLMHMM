@@ -93,13 +93,26 @@ def calculate_steady_state_p(P):
 
 
 def calculate_empirical_transition_matrix(state_seqs, n_states):
-    # all_states = np.unique(np.concatenate(state_seqs))
-    # n_states = all_states.max() + 1
     mat = np.zeros((n_states, n_states), dtype=int)
-    for seq in state_seqs:
-        for a, b in zip(seq[:-1], seq[1:]):
-            mat[a, b] += 1
-    return mat / mat.sum(axis=1, keepdims=True)
+
+    # 1. Collect all transitions from all sequences
+    # We create two lists: all 'current' states and all 'next' states
+    sources = [seq[:-1] for seq in state_seqs]
+    targets = [seq[1:] for seq in state_seqs]
+
+    # 2. Concatenate them into single 1D arrays
+    flat_sources = np.concatenate(sources)
+    flat_targets = np.concatenate(targets)
+
+    # 3. Use unbuffered addition to count occurrences at indices
+    np.add.at(mat, (flat_sources, flat_targets), 1)
+    
+    # 4. Normalize (handling potential division by zero)
+    row_sums = mat.sum(axis=1, keepdims=True)
+    # Avoid dividing by zero for states that never appeared as sources
+    row_sums[row_sums == 0] = 1 
+    
+    return mat / row_sums
 
 
 def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None):
