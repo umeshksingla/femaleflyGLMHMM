@@ -276,7 +276,7 @@ def get_windows_to_plot(effective_fps, num_timestamps):
 
     window_size = effective_fps * 1  # 1 second windows
     windows1 = make_windows(window_size, n_windows=20)  # 1 sec
-    windows2 = make_windows(window_size * 30, n_windows=10)  # 30 sec
+    windows2 = make_windows(window_size * 30, n_windows=50)  # 30 sec
     windows3 = make_windows(window_size * 60, n_windows=10)  # 1 min
     windows4 = make_windows(window_size * 60 * 5, n_windows=5)  # 5 min
 

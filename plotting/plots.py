@@ -336,9 +336,18 @@ def plot_hmm_data_whole_session_with_states(predicted_emissions, true_emissions,
 
 
 def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emissions, predicted_states, config, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
-
+    print(predicted_states.shape)
     emission_dim = predicted_emissions.shape[-1]
-    fig, axs = plt.subplots(emission_dim+1, 1, figsize=(12, 1.65*emission_dim+0.1), sharex=True, gridspec_kw={'height_ratios': [0.25] + [1]*emission_dim })
+
+    lent = xlim[1] - xlim[0]
+    if lent > 8000:
+        fig_width = 24
+    elif lent < 600:
+        fig_width = 8
+    elif 600 < lent and lent < 8000:
+        fig_width = 15
+
+    fig, axs = plt.subplots(emission_dim+1, 1, figsize=(fig_width, 2.1*emission_dim+0.1), sharex=True, gridspec_kw={'height_ratios': [0.25] + [1]*emission_dim })
 
     xlim_ = np.r_[xlim[0]:xlim[1] + 1].astype(int)
 
@@ -352,7 +361,7 @@ def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emi
         ax = axs[d+1]
         ax.plot(xlim_, true_emissions[xlim_, d], '-', color="gray", label='Data')
         ax.plot(xlim_, predicted_emissions[xlim_, d], '-', color=EC, linewidth=2, label=f'{model_label}')
-        ax.set_ylabel(y_labels[_], c=EC)
+        # ax.set_ylabel(y_labels[_], c=EC)
         # ax.margins(y=0.05)
         d += 1
 
@@ -721,11 +730,12 @@ def plot_statetrans_filters_separate(orig_weights, data_config, input_list, inpu
         weights_d = orig_weights[z_][..., input_mask_by_statetrans == 1][:, None, :]
         print("weights_d", weights_d.shape, "n_inputs_d", n_inputs_d)
         weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=n_inputs_d)[:, 0]
-        fig, axs = plt.subplots(1, n_inputs_d, figsize=(3 * n_inputs_d, 3), sharey=sharey)
+        fig, axs = plt.subplots(2, n_inputs_d-2, figsize=(3 * (n_inputs_d-2), 3+3), sharey=sharey)  # Split in 2 rows
 
         stim = 0
+        i, j = 0, 0
         for __ in input_list:
-            ax = axs[stim]
+            ax = axs[i][j]
 
             for z in range(num_states):
                 if z == z_:
@@ -742,12 +752,23 @@ def plot_statetrans_filters_separate(orig_weights, data_config, input_list, inpu
             if ax.get_subplotspec().is_last_row() or saveindividual:
                 ax.set_xlabel('Time (s)')
             if ax.get_subplotspec().is_last_col():
-                ax.legend(loc='upper right')
+                # ax.legend(loc='upper right')
+                ax.legend(loc='upper right', bbox_to_anchor=(3, 1), borderaxespad=0.)
             if ax.get_subplotspec().is_first_col():
                 ax.set_ylabel('filter amplitude')
             stim += 1
+            j = stim % 5
+            i = stim // 5
+
+        while i < 2:
+            while j < 5:
+                ax = axs[i][j]
+                ax.axis('off')
+                j += 1
+            i += 1
 
         fig.supylabel(f'State transition filters\nFROM State {z_+1}', ha='center')
+        fig.align_ylabels()
         plt.margins(0.05)
         plt.tight_layout()
         fig.canvas.draw()
@@ -885,15 +906,15 @@ def plot_state_o_dists_reformatted(emissions_z, o_labels, title=None, savefig=Fa
     fig, axes = plt.subplots(1, len(o_labels), figsize=(16, 5))
 
     def reformat(f_name, dt):
-        if f_name in ['fFV', 'mFV']:
+        if f_name in ['fFV', 'fFA', 'mFV']:
             t = dt
             xlim = (-1.5, 4.5)
             ylim = (0, 2)
-        elif f_name in ['fLV', 'mLV']:
+        elif f_name in ['fLV', 'fLA', 'mLV']:
             t = dt
             xlim = (-2.5, 2.5)
             ylim = (0, 2)
-        elif f_name in ['fAV', 'mAV']:
+        elif f_name in ['fAV', 'fAA', 'mAV']:
             t = dt
             xlim = (-110, 110)
             ylim = (0, 0.1)
@@ -1734,6 +1755,91 @@ def plot_transition_matrix(transition_matrix, title=None, savefig=False, fig_dir
     if display: plt.show()
     plt.close()
     return fig
+
+
+def draw_ethogram(transition_matrix):
+    """
+    Generates a transition diagram (ethogram).
+    - Node size proportional to self-transition probability.
+    - Edge width proportional to transition probability.
+    """
+
+    num_states = transition_matrix.shape[0]
+    states = [f'State {_+1}' for _ in range(num_states)]
+
+    # Create a directed graph
+    G = nx.DiGraph()
+
+    # Lists to store attributes for plotting
+    node_sizes = []
+    edge_widths = []
+    edge_colors = []
+
+    # 1. SETUP NODES
+    # We define a base size and a scaling factor for visibility
+    base_node_size = 1000
+    node_scale_factor = 5000
+
+    for i, state in enumerate(states):
+        # Get self-transition probability (diagonal of the matrix)
+        self_prob = transition_matrix[i][i]
+
+        # Calculate size: Base + (Probability * Scaling Factor)
+        size = base_node_size + (self_prob * node_scale_factor)
+
+        G.add_node(state, size=size)
+        node_sizes.append(size)
+
+    # 2. SETUP EDGES
+    # We define a scaling factor for edge thickness
+    edge_scale_factor = 10
+
+    for i, origin in enumerate(states):
+        for j, target in enumerate(states):
+            prob = transition_matrix[i][j]
+
+            # Threshold: Only draw edges if probability > 0.05 to reduce clutter
+            if prob >= 0.02:
+                if i == j:
+                    # Self-transitions affect node size (handled above),
+                    # but we can also add a small loop edge if desired.
+                    # For this visual, we often omit the self-loop edge to keep it clean
+                    # since the node size already represents it.
+                    continue
+                else:
+                    G.add_edge(origin, target, weight=prob)
+                    edge_widths.append(prob * edge_scale_factor)
+                    edge_colors.append('gray')
+
+    # 3. DRAWING
+    plt.figure(figsize=(6, 6))
+
+    # Layout - Spring layout usually works best for ethograms
+    seed = np.random.randint(1, 1e6)
+    print("seed", seed)
+    pos = nx.spring_layout(G, k=2, seed=seed)
+
+    # Draw Nodes
+    nx.draw_networkx_nodes(G, pos,
+                           node_size=node_sizes,
+                           node_color=[COLORS[_] for _ in range(num_states)],
+                           edgecolors=None)
+
+    # Draw Labels
+    nx.draw_networkx_labels(G, pos)
+
+    # Draw Edges (Curved to show bidirectional flow clearly)
+    nx.draw_networkx_edges(G, pos,
+                           width=edge_widths,
+                           edge_color=edge_colors,
+                           arrowstyle='->',
+                           arrowsize=20,
+                           connectionstyle="arc3,rad=0.1")  # Curvature
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+    return
 
 
 def plot_ethogram(transition_matrix, title=None, savefig=False, fig_dir=None, display=True):

@@ -156,7 +156,7 @@ def enhance(output_dir=None, model_ckp=None):
         # model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_soft'] = max_lags
 
         max_c, max_lags = model.correlation_max_by_o_by_fly(emissions, soft_emission_predictions)
-        model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'] = max_c
+        model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'] = max_c   # This is pearson_by_o
         model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'] = max_lags
         return
 
@@ -240,9 +240,12 @@ def update_labels(data_config):
     })
     emission_labels_text = ({
         'fFV': 'forward velocity',
+        'fFA': 'forward acc',
         'fLV': 'lateral velocity',
+        'fLA': 'lateral acc',
         'fLS': 'lateral speed',
         'fAV': 'angular velocity',
+        'fAA': 'angular acc',
         'fAS': 'angular speed',
         'mFV': 'forward velocity',
         'mLV': 'lateral velocity',
@@ -253,9 +256,12 @@ def update_labels(data_config):
     })
     emission_labels_jr_text = ({
         'fFV': 'forward\nvelocity',
+        'fFA': 'forward\nacc',
         'fLV': 'lateral\nvelocity',
+        'fLA': 'lateral\nacc',
         'fLS': 'lateral\nspeed',
         'fAV': 'angular\nvelocity',
+        'fAA': 'angular\nacc',
         'fAS': 'angular\nspeed',
         'mFV': 'forward\nvelocity',
         'mLV': 'lateral\nvelocity',
@@ -266,9 +272,12 @@ def update_labels(data_config):
     })
     emission_labels_jr_jr_text = ({
         'fFV': 'forward',
+        'fFA': 'forward-a',
         'fLV': 'lateral',
+        'fLA': 'lateral-a',
         'fLS': 'lateral',
         'fAV': 'angular',
+        'fAA': 'angular-a',
         'fAS': 'angular',
         'mFV': 'forward',
         'mLV': 'lateral',
@@ -279,8 +288,11 @@ def update_labels(data_config):
     })
     emission_labels_units_text = ({
         'fFV': 'forward velocity\n(mm/s)',
+        'fFA': 'forward acc\n(mm/s2)',
         'fLV': 'lateral velocity\n(mm/s)',
+        'fLA': 'lateral acc\n(mm/s2)',
         'fAV': 'angular velocity\n(deg/s)',
+        'fAA': 'angular acc\n(deg/s2)',
         'fLS': 'lateral speed\n(mm/s)',
         'fAS': 'angular speed\n(deg/s)',
         'mFV': 'forward velocity\n(mm/s)',
@@ -292,8 +304,11 @@ def update_labels(data_config):
     })
     emission_labels_zscored_text = ({
         'fFV': 'forward velocity\n(zscored)',
+        'fFA': 'forward acc\n(zscored)',
         'fLV': 'lateral velocity\n(zscored)',
+        'fLA': 'lateral acc\n(zscored)',
         'fAV': 'angular velocity\n(zscored)',
+        'fAA': 'angular acc\n(zscored)',
         'fLS': 'lateral speed\n(zscored)',
         'fAS': 'angular speed\n(zscored)',
         'mFV': 'forward velocity\n(zscored)',
@@ -358,7 +373,9 @@ def update_labels(data_config):
     directional_variables = ({
         # 'fmAng_sin': '|male lateral position|',
         'fLV': '|lateral velocity|',
+        'fLA': '|lateral acc|',
         'fAV': '|angular velocity|',
+        'fAA': '|angular acc|',
         'mLV': '|lateral velocity|',
         'mAV': '|angular velocity|',
     })
@@ -691,7 +708,7 @@ def generate_state_filters(model_dir, savefig=True, display=False):
     input_mask_by_statetrans = data_config['input_mask_by_emission'][0]
     input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
-    plots.plot_statetrans_filters_separate(reg_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey='row', savefig=savefig, fig_dir=state_fig_dir, display=display)
+    plots.plot_statetrans_filters_separate(reg_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey=True, savefig=savefig, fig_dir=state_fig_dir, display=display)
     return
 
 
@@ -712,7 +729,9 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     input_labels = data_config['input_labels']
     model_prefix = model_ckp['prefix']
     num_states = model_ckp['num_states']
-    animal = model_config['animal']
+    animal = data_config['animal']
+
+    print("model_prefix", model_prefix)
 
     # plot filters for regular+auxem emissions
     input_mask_by_emission = data_config['input_mask_by_emission']
@@ -725,6 +744,8 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     learned_params = model_ckp['learned_params']
 
     if 'hmm' in model_prefix or 'HMM' in model_prefix:
+        if 'ghmm' in model_prefix:
+            return
         reg_weights = learned_params.emissions.weights
     elif model_prefix == 'lr':
         reg_weights = learned_params['w']
@@ -807,8 +828,6 @@ def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_
 
         if gen_corr_video:
             clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")), xlim_orig, output_path=f'{trajs_dir}/{prefix}{batch}_xlim_orig={xlim_orig}_xlim={xlim}{suffix}.mp4')
-        break
-
     return
 
 
@@ -854,6 +873,9 @@ def generate_state_clips(model_dir, savefig=True, display=False, gen_corr_video=
 
 
 def generate_state_traces(model_dir, dataset='wt', savefig=True, display=False):
+    """
+    2d trajectories from data. 9 clips in a grid.
+    """
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
@@ -868,15 +890,9 @@ def generate_state_traces(model_dir, dataset='wt', savefig=True, display=False):
     os.makedirs(state_traces_dir, exist_ok=True)
 
     if dataset == 'wt':
-        ftracks = joblib.load('data/wt_processed_ftracks.pkl')
-        mtracks = joblib.load('data/wt_processed_mtracks.pkl')
-        dataset_basepath = '/Volumes/murthy/usingla/gold_dataset/wt/h5'
+        smoothed_track_data = joblib.load('../data/wt/smoothed_track_data_81_jan1.pkl')
     elif dataset == 'wt_fred':
-        ftracks = joblib.load('data/wt_fredcleaned_processed_ftracks.pkl')
-        mtracks = joblib.load('data/wt_fredcleaned_processed_mtracks.pkl')
-        dataset_basepath = '/Volumes/fileset-mmurthy/usingla/fred_data/'
-
-    print(ftracks.keys())
+        smoothed_track_data = joblib.load('../data/wt_fredcleaned/smoothed_track_data_11_jan1.pkl')
 
     def f(prefix):
 
@@ -902,17 +918,8 @@ def generate_state_traces(model_dir, dataset='wt', savefig=True, display=False):
                     xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
                     windows_orig.append(xlim_orig)
 
-                if dataset == 'wt':
-                    expt_path = os.path.join(dataset_basepath, key_b)
-                elif dataset == 'wt_fred':
-                    expt_path = os.path.join(dataset_basepath, key_b, key_b.split('_')[-1], '000000.mp4.inference.000_000000.analysis.h5')
-
-                if expt_path not in ftracks:
-                    print("not processed.")
-                    return
-
-                fTrx = ftracks[expt_path]
-                mTrx = mtracks[expt_path]
+                fTrx = smoothed_track_data[key_b]['fTrx']
+                mTrx = smoothed_track_data[key_b]['mTrx']
 
                 plots.plot_traces_session(fTrx, mTrx,
                                           windows_orig, z=z,
