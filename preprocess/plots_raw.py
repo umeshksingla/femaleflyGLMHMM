@@ -1,22 +1,17 @@
+"""
+Script to plot raw sensory input or behavioral output traces for Figure 1 (behavior).
+Not used otherwise.
+"""
+
 import os
 
 import joblib
 import numpy as np
-from scipy.stats import zscore
-import scipy
 from collections import OrderedDict
-from scipy.signal import savgol_filter
-from scipy.ndimage import uniform_filter1d, gaussian_filter1d
-import scipy.ndimage
-import pywt
-
-from glm_utils.preprocessing import BasisProjection
-from glm_utils.bases import identity, raised_cosine, multifeature_basis
 import matplotlib.pyplot as plt
 
-from leaprig import WT_DATA, AC_BOTH
-from new16mic import FREDCLEANED_DATA
-from preprocess.get_designmatrix_varlen import smooth_gaussian, safe_zscore, create_x_and_y_windows
+from leaprig import WT_DATA
+from preprocess.get_designmatrix_varlen import create_x_and_y_windows
 from preprocess.colors import *
 
 
@@ -24,42 +19,34 @@ def get_feat(sessions_features, s, f_name):
     sf = sessions_features[s]
     if f_name in ['mFV', 'mLS', 'mFA', 'mLA', 'mLV', 'mfDist', 'fDistWall', 'fFV', 'fLS', 'fLV', 'fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
-        ts = smooth_gaussian(ts, sigma=3)
     elif f_name in ['song', 'sine_i', 'pulse_i', 'song_i', 'tap2']:
         ts = sf[f_name]
     elif f_name in ['fmAng']:
         ts = np.radians(sf['fmAng'])
-        ts = smooth_gaussian(ts, sigma=3)
     elif f_name in ['fmAng_cos']:
         ts = np.radians(np.abs(sf['fmAng']))
-        ts = smooth_gaussian(ts, sigma=3)
         ts = np.cos(ts)    # cos: front to back
     elif f_name in ['fmAng_sin']:
         ts = np.radians(sf['fmAng'])
-        ts = smooth_gaussian(ts, sigma=3)
         ts = np.sin(ts)    # sin: left or right of the fly
     elif f_name in ['wingAlign']:
         ts = np.min([sf['wingLAristaLAlignAng'],
                        sf['wingRAristaRAlignAng'],
                        sf['wingLAristaRAlignAng'],
                        sf['wingRAristaLAlignAng']], axis=0)
-        ts = smooth_gaussian(ts, sigma=3)
     elif f_name in ['song_directedlr', 'sine_i_directedlr', 'pulse_i_directedlr2', 'song_i_directedlr2', 'tap2_directedlr']:
         f_name_ = f_name.split('_directed')[0]
         ts = sf[f_name_] * np.sign(np.sin(np.radians(sf['fmAng'])))
     elif f_name in ['fAV']:
         ts = sf['fTheta']
-        ts = smooth_gaussian(ts, sigma=3)
         dfTheta = np.diff(ts, prepend=ts[0])
         ts = np.where(np.abs(dfTheta) > 90, 0, dfTheta)
     elif f_name in ['mAV']:
         ts = sf['mTheta']
-        ts = smooth_gaussian(ts, sigma=3)
         dmTheta = np.diff(ts, prepend=ts[0])
         ts = np.where(np.abs(dmTheta) > 90, 0, dmTheta)
     elif f_name in ['wingFlickTheta']:
         ts = sf.get('wingFlickAngle', sf.get('wingMaxAngle'))
-        ts = smooth_gaussian(ts, sigma=3)
         ts = ts * sf['wingFlick']
     elif f_name in ['wingFlickBin']:
         ts = sf['wingFlick']

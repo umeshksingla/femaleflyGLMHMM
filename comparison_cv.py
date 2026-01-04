@@ -82,7 +82,7 @@ mpl.rcParams['lines.linewidth'] = 1
 
 def loadCV_Scores(path, model_prefix, num_states, score_type):
     """
-    :param score_type: 'r2' or 'pearson' or 'll'
+    :param score_type: 'r2' or 'pearson' or 'll' or 'll_fly'
     """
     model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_prefix}_{num_states}_cv/**/'))
     random.shuffle(model_pkl_paths)

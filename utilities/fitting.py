@@ -109,11 +109,11 @@ def fitEM(key, hmm, train_emissions, train_inputs):
     s = time.time()
     fbgd_key, key = jr.split(key)
     em_params, em_props = hmm.initialize(key)
-    em_params, em_losses = hmm.fit_em_lrhmm_custom(em_params,
+    em_params, em_losses = hmm.fit_em(em_params,
                                         em_props,
                                         train_emissions,
                                         train_inputs,
-                                        num_iters=200, verbose=True)
+                                        num_iters=50, verbose=True)
     train_emissions_size = np.sum([e.size for e in train_emissions])
     em_lps = -em_losses / train_emissions_size
     ll_diff = np.diff(em_lps)
