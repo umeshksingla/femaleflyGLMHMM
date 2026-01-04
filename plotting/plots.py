@@ -587,7 +587,7 @@ def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_inp
         fig.align_ylabels(axs[:])
     # fig.supylabel('Filter amplitude (a.u.)')
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filters_statewise_skip_states={skip_states}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{prefix}_filters_statewise_skip_states={skip_states}_new.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return fig

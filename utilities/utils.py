@@ -780,7 +780,70 @@ def generate_together_figures(model_dir, savefig=True, display=False):
 
     print(data_config['input_labels'])
 
-    only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2']
+    only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2', 'mfDist']
+
+    for skip_states in [[0], []]:
+        if num_states <= 1 and skip_states:
+            continue    # skip skip_states if there's only state
+        plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions',
+                                     only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+    return
+
+
+def generate_together_figures_filters_given(model_dir, all_weights, savefig=True, display=False):
+    """Plots, such as filters, that need to be together for emissions and aux-emissions. """
+
+    model_ckp, data_config, _ = load_specific_path(model_dir)
+    auxem_model_ckp = load_specific_path_auxem(model_dir)
+    if (model_ckp is None) or (auxem_model_ckp is None):
+        return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    together_filters_fig_dir = os.path.join(fig_dir, 'together_filters_avgd_fig_dir')
+    os.makedirs(fig_dir, exist_ok=True)
+    os.makedirs(together_filters_fig_dir, exist_ok=True)
+
+    update_labels(data_config)
+    input_labels = data_config['input_labels']
+    # model_prefix = model_ckp['prefix']
+    num_states = model_ckp['num_states']
+    animal = data_config['animal']
+
+    # plot filters for regular+auxem emissions
+    input_mask_by_emission = data_config['input_mask_by_emission']
+    input_mask_by_auxemission = np.array(auxem_model_ckp['input_mask_by_auxemission'])
+    input_mask_by_allemission = np.concatenate((input_mask_by_emission, input_mask_by_auxemission))
+    print("input_mask_by_emission", input_mask_by_emission, input_mask_by_emission.shape)
+    print("input_mask_by_auxemission", input_mask_by_auxemission, input_mask_by_auxemission.shape)
+    print("input_mask_by_allemission", input_mask_by_allemission, input_mask_by_allemission.shape)
+
+    emission_labels = data_config['emission_labels']
+    auxiliary_emission_labels = data_config['auxiliary_emission_labels']
+
+    all_emission_labels = OrderedDict()
+    all_emission_labels.update(emission_labels)
+    all_emission_labels.update(auxiliary_emission_labels)
+    print(emission_labels)
+    print(auxiliary_emission_labels)
+    print(all_emission_labels)
+
+    input_labels_list = data_config['input_labels_list']
+    auxiliary_input_labels_list = data_config['auxiliary_input_labels_list']
+    # all_input_labels_list = data_config['input_labels_list'] + data_config['auxiliary_input_labels_list']
+
+    print(data_config['input_labels_list'])
+    print(data_config['auxiliary_input_labels_list'])
+    # print(all_input_labels_list)
+
+    print(data_config['input_labels'])
+
+    only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2', 'mfDist']
 
     for skip_states in [[0], []]:
         if num_states <= 1 and skip_states:
@@ -794,6 +857,7 @@ def generate_together_figures(model_dir, savefig=True, display=False):
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return
+
 
 
 def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='', savefig=True, display=False, gen_corr_video=False):
