@@ -180,24 +180,27 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
 
 def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
-    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'mFV', 'mFS', 'mLS', 'mLV']:
+    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'fLA', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
         mn = ts.mean()
         std = ts.std()
         f = np.mean(zscore(ts)[output_windows], axis=1)
     elif f_name in ['fAV', 'mAV']:
-        ts = sf['mTheta'] if f_name == 'mAV' else sf['fTheta']
+        if f_name == 'mAV':
+            ts = sf['mTheta']
+        elif f_name == 'fAV':
+            ts = sf['fTheta']
         ts_rad = np.deg2rad(ts)
         ts_unwrapped = np.unwrap(ts_rad, axis=0)    # Removes seemingly 360deg like large angle changes
         ts_unwrapped = median_filter(ts_unwrapped, size=5, mode="nearest", origin=-(5 // 2))    # median_filter ensures that the end-points aren't too spiky
         ts_unwrapped = halfgaussian_filter(ts_unwrapped, sigma=2)  # half_gaussian filter ensures information from other points in the middle when we take output windows/downsample
-        fTheta_win = ts_unwrapped[output_windows]
-        dfTheta_ = fTheta_win[:, -1] - fTheta_win[:, 0]
-        dfTheta_ = np.rad2deg(dfTheta_)
+        Theta_win = ts_unwrapped[output_windows]
+        dTheta_ = Theta_win[:, -1] - Theta_win[:, 0]
+        dTheta_ = np.rad2deg(dTheta_)
         mn = 0.     # so left and right signs stays the same
-        std = dfTheta_.std()
+        std = dTheta_.std()
         # f = zscore(dfTheta_)
-        f = dfTheta_ / (std + 1e-6)
+        f = dTheta_ / (std + 1e-6)
 
         # plt.figure(figsize=(18, 7))
         # slice = np.r_[:min(50000, len(f_))]
@@ -211,6 +214,24 @@ def get_output_feat(sessions_features, s, f_name, output_windows):
         # plt.tight_layout()
         # plt.show()
         # plt.close()
+    elif f_name in ['fAA', 'mAA']:
+        if f_name == 'mAA':
+            ts = sf['mTheta']
+        elif f_name == 'fAA':
+            ts = sf['fTheta']
+        ts_rad = np.deg2rad(ts)
+        ts_unwrapped = np.unwrap(ts_rad, axis=0)    # Removes seemingly 360deg like large angle changes
+        ts_unwrapped = median_filter(ts_unwrapped, size=5, mode="nearest", origin=-(5 // 2))    # median_filter ensures that the end-points aren't too spiky
+        ts_unwrapped = halfgaussian_filter(ts_unwrapped, sigma=2)  # half_gaussian filter ensures information from other points in the middle when we take output windows/downsample
+        Theta_win = ts_unwrapped[output_windows]
+        dTheta_ = Theta_win[:, -1] - Theta_win[:, 0]
+        ddTheta_ = np.diff(dTheta_, prepend=dTheta_[0])
+        ddTheta_ = np.rad2deg(ddTheta_)
+
+        mn = 0.     # so left and right signs stays the same
+        std = ddTheta_.std()
+        # f = zscore(dfTheta_)
+        f = ddTheta_ / (std + 1e-6)
     elif f_name in ['wingFlickBin']:
         wing_sep = sf['wingFL'] - sf['wingFR']      # right wing angle is generally -ve
         ts = (np.abs(wing_sep) > 20).astype(int)    # 20 degrees difference between left and right wing extensions
@@ -343,6 +364,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     predict_gap_size = config['predict_gap_size']
     source = config['source']
     animal = config['animal']
+    shuffle_inputs = config['shuffle_inputs']
 
     # Cosine basis transformation of inputs
     input_each_dim = config['ncos']
@@ -352,7 +374,7 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
 
     # Create temporary directory for session files
     temp_dir = Path(f'../../data/{source}_{animal}_temp_sessions')
-    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs(temp_dir, exist_ok=False)
     print(f"Temporary session files will be saved to: {temp_dir}")
 
     # Metadata to collect
@@ -399,6 +421,8 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
         feats = []
         for label in x_labels:
             f_ = get_input_feat(sessions_features, s, label)
+            if shuffle_inputs:
+                f_ = np.random.permutation(f_)
             f = f_[s_input_windows]
             feats.append(f)
         s_inputs_raw = np.hstack(feats)
@@ -710,7 +734,7 @@ def extract_male(source):
     return
 
 
-def extract_female(source):
+def extract_female(source, shuffle_inputs=False):
 
     data_config = {}
 
@@ -726,6 +750,7 @@ def extract_female(source):
     fps = sessions_features.get('fps', datacls.fps)
     data_config['source'] = source
     data_config['animal'] = 'female'
+    data_config['shuffle_inputs'] = shuffle_inputs
     data_config['orig_fps'] = fps
     data_config['input_raw_each_dim'] = 3*fps
     data_config['predict_gap_size'] = 0     # any gap between x inputs and y output
@@ -737,9 +762,9 @@ def extract_female(source):
 
     # emissions to fit, along with male inputs for each
     data_config['emission_labels'] = OrderedDict({
-        'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
-        'fLV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
-        'fAV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
+        'fFA': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
+        'fLA': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
+        'fAA': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
     })
     data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
     data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
@@ -760,7 +785,7 @@ def extract_female(source):
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_today=jan1_metadata.pkl'
+               f'o={data_config["predict_window_size"]}_shuffle_inputs={shuffle_inputs}_accelerations_today=jan1_metadata.pkl'
 
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
@@ -779,5 +804,5 @@ def extract_female(source):
 
 if __name__ == '__main__':
     src = 'wt'
-    extract_female(src)
-    extract_male(src)
+    extract_female(src, shuffle_inputs=False)
+    # extract_male(src)
