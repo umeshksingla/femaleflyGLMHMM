@@ -10,9 +10,13 @@ import run_global
 
 
 if __name__ == '__main__':
-    dataset = 'wt_fred'
-    if dataset == 'wt' or dataset == 'wt_shuffled':
+    dataset = 'wt'
+    if dataset == 'wt':
         data_path = f'../data/wt_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
+    elif dataset == 'wt_acc':
+        data_path = f'../data/wt_fly_data_cos=4_ortho_o=5_shuffle_inputs=False_accelerations_today=jan1.pkl'
+    elif dataset == 'wt_shuffled':
+        data_path = f'../data/wt_fly_data_cos=4_ortho_o=5_shuffle_inputs=True_today=jan1.pkl'
     elif dataset == 'wt_male':
         data_path = f'data/wt_male_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
     elif dataset == 'wt_fred':
@@ -32,5 +36,5 @@ if __name__ == '__main__':
     }
 
     print(">> Fitting global fit")
-    global_dump_filepath = run_global.run(mc, enhance=True, genfig=True)
+    global_dump_filepath = run_global.run(mc, enhance=True, genfig=False)
     print("Global model dumped at:", global_dump_filepath)
