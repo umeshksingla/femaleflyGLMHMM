@@ -82,7 +82,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
     def predict_v4(self, emissions, inputs):
         """Soft predictions"""
 
-        W = self.learned_params.emissions.weights   # shape: (K, D, I)
+        W = self.learned_params.emissions.weights   # shape: (K, D, I) (K=nstates, D=emission_dim, I=input_dim)
         b = self.learned_params.emissions.biases    # shape: (K, D)
         K = self.num_states
 
