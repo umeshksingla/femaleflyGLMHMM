@@ -27,6 +27,27 @@ def get_raw_track_data(DATA, expt_path, cop_start_frame):
     return data
 
 
+def get_smoothed_raw_track_data(raw_track_data):
+    data = dict()
+    for p in raw_track_data:
+        print(p)
+        # Fill missing values
+        fTrx_ = fill_missing_tracks_SR(raw_track_data[p]['fTrx'], kind="cubic")
+        mTrx_ = fill_missing_tracks_SR(raw_track_data[p]['mTrx'], kind="cubic")
+
+        # Smooth those raw tracks
+        fTrx = halfgaussian_filter(fTrx_, sigma=2)
+        mTrx = halfgaussian_filter(mTrx_, sigma=2)
+
+        data[p] = {
+            'fTrx': fTrx,
+            'mTrx': mTrx,
+            'fly_nodes': raw_track_data[p]['fly_nodes'],
+        }
+
+    return data
+
+
 def get_features(DATA, expt_path, cop_start_frame):
 
     # Get raw tracks in mm space up to copulation
@@ -90,19 +111,21 @@ def get_features(DATA, expt_path, cop_start_frame):
 
 if __name__ == '__main__':
 
-    DATA = WT_DATA
+    # DATA = WT_DATA
     # DATA = AC_BOTH
-    # DATA = FREDCLEANED_DATA
+    DATA = FREDCLEANED_DATA
 
     BASE_FOLDER = f'../../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
 
-    # raw_track_data = joblib.load(os.path.join(BASE_FOLDER, 'raw_track_data_81_dec30.pkl'))
+    raw_track_data = joblib.load(os.path.join(BASE_FOLDER, 'raw_track_data_11_jan1.pkl'))
+    smoothed_track_data = get_smoothed_raw_track_data(raw_track_data)
     # for s in raw_track_data:
     #     nan_count = np.count_nonzero(np.isnan(raw_track_data[s]['fTrx']))
     #     siz = raw_track_data[s]['fTrx'].size
     #     print(s, nan_count, raw_track_data[s]['fTrx'].size, nan_count/siz * 100)
-    # sys.exit(0)
+    joblib.dump(smoothed_track_data, os.path.join(BASE_FOLDER, f'smoothed_track_data_{len(raw_track_data)}_jan1.pkl'))
+    sys.exit(0)
 
     st1 = time.time()
     # Calculate features from all sessions in a dict and dump
@@ -142,10 +165,10 @@ if __name__ == '__main__':
             continue
 
         if len(raw_track_data) % 10 == 0:
-            joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_dec30.pkl'))
-            joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_dec30.pkl'))
+            joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jan1.pkl'))
+            joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_jan1.pkl'))
             print(f'Temp dump.')
 
-    joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_dec30.pkl'))
-    joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_dec30.pkl'))
+    joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jan1.pkl'))
+    joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_jan1.pkl'))
     print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(raw_track_data)}")
