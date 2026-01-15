@@ -36,5 +36,5 @@ if __name__ == '__main__':
     }
 
     print(">> Fitting global fit")
-    global_dump_filepath = run_global.run(mc, enhance=True, genfig=False)
+    global_dump_filepath = run_global.run(mc, enhance=True, genfig=True)
     print("Global model dumped at:", global_dump_filepath)
