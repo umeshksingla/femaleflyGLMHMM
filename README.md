@@ -56,7 +56,7 @@ The `library/` folder contains critical modifications to the relevant HMM classe
 * **Bug Fix**: Corrects the `t−1` index issue in the `hmm_backward_filter` (See this [commit](https://github.com/probml/dynamax/commit/19330338a25510e88388686eef9a41648c05c895)). Note that this was manually modified in the local installation of dynamax directly.
 
 #### Usage Pipeline
-#### 0. Configuration
+##### 0. Configuration
 Before running, update the paths to your raw data (e.g., cluster paths like /cup or /tigress) in:
 * `preprocess/leaprig.py`
 * `preprocess/new16mic.py`
@@ -77,7 +77,7 @@ Change source to ```wt``` or ```wt_fred```. It will generate a pkl file of name 
 python preprocess/get_designmatrix.py
 ```
 
-#### 3. Model Training
+##### 3. Model Training
 Use `run_global.py` or `run_separate.py` to train the model and generate the figures. Trained models and figures are saved to `models/<path>/<model_name>_<numstates>/` folder.
 
 #### Slurm Support (running on HPC clusters)
