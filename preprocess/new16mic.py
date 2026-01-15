@@ -56,6 +56,9 @@ class FREDCLEANED_DATA:
 
     @staticmethod
     def get_all_song(expt_path):
+        """
+        Credits: Talmo Pereira
+        """
         def __load_song__(fname):
             seg = sio.loadmat(fname)
 

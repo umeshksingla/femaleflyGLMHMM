@@ -187,170 +187,6 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
     return
 
 
-def plot_hmm_data(emissions, states, extra_data=None, xlim=None, y_labels=None, extra_data_labels=None, title=None):
-    """Plot emissions vs. time with background colored by true state"""
-    num_timesteps = len(emissions)
-    emission_dim = emissions.shape[-1]
-    extra_data_dim = extra_data.shape[-1] if extra_data is not None else 0
-
-    # Plot the data superimposed on the generating state sequence
-    fig, axs = plt.subplots(emission_dim+extra_data_dim, 1, sharex=True)
-
-    d = 0
-    for _ in y_labels:
-        ax = axs[d]
-        lim = 1.05 * abs(emissions[:, d]).max()
-        ax.imshow(states[None, :], aspect="auto", interpolation="none", cmap=CMAP, vmin=0, vmax=len(COLORS) - 1,
-                  extent=(0, num_timesteps, -lim, lim))
-        # bounds = np.unique(states).astype(int)
-        # norm = colors.BoundaryNorm(bounds, CMAP.N)
-        # plt.colorbar(img, boundaries=bounds, ax=ax)
-        # ax.legend(bounds, [f'State {s}' for s in bounds], loc='upper left')
-        ax.plot(emissions[:, d], "-k")
-        # axs[d].plot(means[:, d], ":k")
-        if y_labels is not None:
-            ax.set_ylabel(f'${{{y_labels[_]}_t}}$', fontsize='medium')
-        d += 1
-        # ax.xaxis.set_visible(False)
-        # axs[d].set_ylabel("$y_{{t,{} }}$".format(d + 1))
-
-    # for d in range(extra_data_dim):
-    #     ax = axs[d+emission_dim]
-    #     lim = 1.05 * abs(extra_data[:, d]).max()
-    #     ax.imshow(states[None, :], aspect="auto", interpolation="none", cmap=CMAP,
-    #                   vmin=0, vmax=len(COLORS) - 1,
-    #                   extent=(0, num_timesteps, -lim, lim)
-    #                   )
-    #     ax.plot(extra_data[:, d], "-k")
-    #     if extra_data is not None:
-    #         ax.plot(extra_data[:, d], ":k")
-    #     if extra_data_labels is not None:
-    #         ax.set_ylabel(f'${{{extra_data_labels[d]}_t}}$')
-    #     if d == 0:
-    #         ax.set_title('Extra series not used for training model.')
-
-    if xlim is None:
-        plt.xlim(0, num_timesteps)
-    else:
-        plt.xlim(xlim)
-
-    # axs[0].set_xticks([0, len(emissions[:, 0])], [0, 15], fontsize='medium')
-    # axs[-1].set_xlabel("Time (min)")
-    axs[0].set_title('State segmentation on one example session')
-    plt.tight_layout()
-    fig.align_ylabels()
-    return fig
-
-
-def plot_hmm_data3(sampled_emissions, true_emissions, states, xlim=None, y_labels=None, title=None):
-    """Plot emissions vs. time with background colored by true state"""
-    num_timesteps = len(sampled_emissions)
-    emission_dim = sampled_emissions.shape[-1]
-
-    # Plot the data superimposed on the generating state sequence
-    fig, axs = plt.subplots(emission_dim, 1, sharex=True)
-
-    d = 0
-    for _ in y_labels:
-        ax = axs[d]
-        max_value = max(abs(sampled_emissions[:, d]).max(), abs(true_emissions[:, d]).max())
-        lim = 1.05 * max_value
-        ax.imshow(states[None, :], aspect="auto", interpolation="none", cmap=CMAP, vmin=0, vmax=len(COLORS) - 1,
-                  extent=(0, num_timesteps, -lim, lim)
-                  )
-
-        ax.plot(true_emissions[:, d], "k-", label='True')
-        ax.plot(sampled_emissions[:, d], "m-", label='Predicted')
-        ax.set_ylabel(f'${{{y_labels[_]}_t}}$', fontsize='medium')
-        d += 1
-
-    plt.yticks([])
-
-    if xlim is None:
-        plt.xlim(0, num_timesteps)
-    else:
-        plt.xlim(xlim)
-
-    # plt.xticks([0, len(sampled_emissions[:, 0])], [0, 15], fontsize='medium')
-    plt.xlabel("Time", fontsize='medium')
-    axs[0].legend(loc='upper left')
-    plt.suptitle(title)
-    fig.align_ylabels()
-    return fig
-
-
-def plot_hmm_data_whole_session_multiple_models(predicted_emissions, true_emissions, xlim=None, model_labels=None, y_labels=None, title=None):
-    """Plot predicted and true emissions vs. time, for multiple models"""
-    if predicted_emissions.ndim <= 2:
-        predicted_emissions = np.expand_dims(predicted_emissions, 0)
-    num_timesteps = len(predicted_emissions[1])
-    emission_dim = predicted_emissions.shape[-1]
-    fig, axs = plt.subplots(emission_dim, 1, figsize=(15, 10), sharex=True)
-    d = 0
-    for _ in y_labels:
-        ax = axs[d]
-        ax.plot(true_emissions[:, d], "k-", alpha=0.6, label='Data')
-        for label, model_predicted_emissions in zip(model_labels, predicted_emissions):
-            ax.plot(model_predicted_emissions[:, d], '-', linewidth=1.5, label=f'{label}')
-        ax.set_ylabel(f'${{{y_labels[_]}_t}}$', fontsize='medium')
-        d += 1
-    if xlim is None:
-        xlim = (0, num_timesteps)
-    plt.xlim(xlim)
-    plt.xlabel("Time", fontsize='medium')
-    axs[0].legend(loc='upper right')
-    plt.suptitle(title)
-    fig.align_ylabels()
-    plt.tight_layout()
-    return fig
-
-
-def plot_hmm_data_whole_session_with_states(predicted_emissions, true_emissions, predicted_states, config, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
-    """Plot emissions vs. time"""
-    # print("predicted_emissions, true_emissions, predicted_states", predicted_emissions, true_emissions, predicted_states)
-    # print("predicted_emissions, true_emissions", np.sum(predicted_emissions), np.sum(true_emissions))
-    emission_dim = predicted_emissions.shape[-1]
-    fig, axs = plt.subplots(emission_dim, 1, figsize=(10, 7), sharex=True)
-
-    xlim_ = np.r_[xlim[0]:xlim[1]+1].astype(int)
-    # xlim_orig_ = np.r_[xlim_orig[0]:xlim_orig[1]].astype(int)
-
-    d = 0
-    for _ in y_labels:
-        ax = axs[d] if emission_dim > 1 else axs
-        max_value = max(abs(predicted_emissions[xlim_, d]).max(), abs(true_emissions[xlim_, d]).max())
-        lim = 1.05 * max_value
-        ax.imshow(predicted_states[xlim_][None, :], aspect="auto", interpolation="none", cmap=CMAP, vmin=0, vmax=len(COLORS)-1,
-                  extent=(xlim_[0], xlim_[-1], -lim, lim), alpha=0.7)
-        ax.plot(xlim_, true_emissions[xlim_, d], "k-", alpha=0.6, label='Data')
-        ax.plot(xlim_, predicted_emissions[xlim_, d], 'm-', linewidth=2, label=f'{model_label}')
-        ax.set_ylabel(y_labels[_], c=EC)
-        ax.set_ylim([-lim, lim])
-        ax.margins(y=0.05)
-
-        xt = np.linspace(xlim_[0], xlim_[-1], num=5)
-        pws = config['predict_window_size']
-        init_period = config['input_raw_each_dim']
-        orig_fps = config['orig_fps']
-        ax.set_xticks(xt)
-        ax.xaxis.set_major_locator(FixedLocator(xt))
-        ax.set_xticklabels([f"{round((pws * x + init_period)/orig_fps, 1)}" for x in xt])
-
-        d += 1
-
-    plt.xlabel("Time (s)")
-    ax = axs[0] if emission_dim > 1 else axs
-    ax.legend(loc='upper right')
-    plt.suptitle(title)
-    fig.align_ylabels()
-    plt.tight_layout()
-
-    if savefig: plt.savefig(fig_path, dpi=300, bbox_inches='tight', transparent=True)
-    if display: plt.show()
-    plt.close()
-    return
-
-
 def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emissions, predicted_states, config, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
     print(predicted_states.shape)
     emission_dim = predicted_emissions.shape[-1]
@@ -1305,109 +1141,6 @@ def plot_state_aux_dists_reformatted(aux_z, a_labels, config, exclude_a=[], titl
     return
 
 
-def plot_state_aux_dists_hist(aux_z, a_labels, title=None, savefig=False, fig_dir=None, display=True):
-
-    fig, ax = plt.subplots(1, len(a_labels), figsize=(17, 4))
-
-    for a, al in enumerate(a_labels):
-        x99 = 0
-        x0 = 0
-        for z in list(aux_z.keys()):
-            data = np.random.choice(np.round(aux_z[z][:, a], decimals=3), min(10000, len(aux_z[z])), replace=False)
-            x0 = min(x0, 2*np.percentile(data, 0.1))
-            x99 = max(x99, np.percentile(data, 99.5))
-            # print(al, x0, x99)
-            sns.histplot(data, ax=ax[a],
-                         color=COLORS[z],
-                        stat='probability',
-                        label=f'State {z+1}',
-                         # binwidth=1,
-                        alpha=1,
-                        # cut=1,
-                        linewidth=2,
-                        #  kde=True,
-                        #  kde_kws={'cut': 0},
-                        #  line_kws={'linewidth': 2},
-                         bins=500,
-                         element='poly',
-                         fill=False,
-                         # color="white",
-                         # edgecolor="white"
-                        # clip=(x0, x99),
-                        )
-        ax[a].set_xlabel(a_labels[al])
-        # ax[a].set_yscale('log')
-        # ax[a].margins(y=0.1)
-        ax[a].set_xlim([x0-0.1, x99+0.1])
-        # ax[a].axhline(0, ls=":", lw=2, c='k')
-    ax[-1].legend(loc='upper right')
-    fig.suptitle(f'Sensory inputs by state [{title}]')
-    plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_aux_dists_hist.pdf'),
-                            bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
-    plt.close()
-    return
-
-
-def plot_state_zscored_mean_aux(aux_z, a_labels, title=None, savefig=False, fig_dir=None, display=True):
-
-    fig, axes = plt.subplots(3, len(aux_z.keys()), figsize=(15, 12))
-
-    for z in list(aux_z.keys()):
-        aux_means = np.mean(aux_z[z], axis=0)
-        # print(aux_means, aux_means.shape)
-
-        ax = axes[0, z] if len(aux_z.keys()) > 1 else axes[0]
-        # values = aux_means
-        # print("a_labels", a_labels)
-        for a, al in enumerate(a_labels):
-            sns.violinplot(x=a, y=aux_z[z][:, a], ax=ax, color=COLORS[z])
-        # ax.bar(range(len(values)), values, color=COLORS[z])
-        ax.axhline(0, c='k', linewidth=0.8, ls=':')
-        # ax.set_xticks(range(len(values)))
-        ax.set_xticklabels(np.array(list(a_labels.values())), rotation=90)
-        ax.set_ylabel("z-scored value")
-        ax.margins(0.1)
-        ax.set_title(f'State {z+1}', color=COLORS[z])
-        yticks = ax.get_yticks()
-        ax.set_yticks(yticks)
-        ax.set_yticklabels([f"{tick}" if i % 2 == 0 else '' for i, tick in enumerate(yticks)])  # keeps all tick lines but label only every other y-tick
-
-        ax = axes[1, z] if len(aux_z.keys()) > 1 else axes[1]
-        values = aux_means
-        ax.bar(range(len(values)), values, color=COLORS[z])
-        ax.axhline(0, c='k', linewidth=0.8, ls=':')
-        ax.set_xticks(range(len(values)))
-        ax.set_xticklabels(np.array(list(a_labels.values())), rotation=90)
-        ax.set_ylabel("z-scored value")
-        ax.margins(0.1)
-        ax.set_title(f'State {z+1}', color=COLORS[z])
-        yticks = ax.get_yticks()
-        ax.set_yticks(yticks)
-        ax.set_yticklabels([f"{tick}" if i % 2 == 0 else '' for i, tick in enumerate(yticks)])  # keeps all tick lines but label only every other y-tick
-
-        ax = axes[2, z] if len(aux_z.keys()) > 1 else axes[2]
-        sorted_by = np.argsort(np.abs(aux_means))[::-1]
-        ax.bar(range(len(values)), values[sorted_by], color=COLORS[z])
-        ax.axhline(0, c='k', linewidth=0.8, ls=':')
-        ax.set_xticks(range(len(values)))
-        ax.set_xticklabels(np.array(list(a_labels.values()))[sorted_by], rotation=90)
-        ax.set_ylabel("z-scored value")
-        ax.margins(0.1)
-        ax.set_title(f'State {z+1}', color=COLORS[z])
-        yticks = ax.get_yticks()
-        ax.set_yticks(yticks)  # keeps all tick lines
-        ax.set_yticklabels([f"{tick}" if i % 2 == 0 else '' for i, tick in enumerate(yticks)])
-
-    plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_zscored_mean_aux.pdf'),
-                            bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
-    plt.close()
-    return
-
-
 def plot_state_aux_o_mean(aux_z, emissions_z, a_labels, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(1, len(aux_z.keys())*2, figsize=(25, 5), gridspec_kw={'width_ratios': [2, 1]*len(aux_z.keys())})
@@ -1740,16 +1473,12 @@ def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', s
     fig = plt.figure(figsize=(6, 4))
     ax = plt.gca()
 
-    # for z, durations in dwell_times_z.items():
-    #     print(f"State {z+1}: Mean dwell time = {np.mean(durations):.2f}, n = {len(durations)}")
-
     durations = []
     for z in range(num_states):
         d = dwell_times_z[z] / effective_fps    # in seconds
         # print(f"State {z + 1}: Mean dwell time = {np.mean(dwell_times_z[z]):.2f}, n = {len(dwell_times_z[z])}")
         print(f"State {z + 1}: Mean dwell time = {np.mean(d):.4f}s and STD = {np.std(d):.4f}s")
         durations.append(d.tolist())
-    return
 
     df = pd.DataFrame({
         "dwell_time": sum(durations, []),
@@ -1778,67 +1507,12 @@ def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', s
     plt.xlabel("Time (s)")
     plt.title("State residency")
 
-    # ax.get_legend()
-    # ax.legend()
-    # legend.set_title(None)
-    # legend.set_loc('upper right')
-
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'state_dwell_times.pdf'),
                             bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
-
-
-def plot_state_dwell_times_gkde(dwell_times_z, num_states, effective_fps, title='', savefig=False, fig_dir=None, display=True):
-    fig = plt.figure(figsize=(6, 4))
-
-    from scipy.stats import gaussian_kde
-    for z, durations in dwell_times_z.items():
-        durations = durations / effective_fps
-        if len(durations) > 1:  # KDE needs >1 data point
-            kde = gaussian_kde(durations)
-            x = np.arange(-2, max(durations) + 1)
-            pdf_vals = kde(x)
-            pdf_vals /= pdf_vals.sum()  # normalize to make it sum to 1
-            plt.plot(x, pdf_vals, label=f"State {z+1}", c=COLORS[z], linewidth=2)
-    x = list(range(0, 4))
-    plt.xlim([x[0], x[-1]])
-    plt.xticks(x)
-    plt.ylabel("p(state)")
-    plt.xlabel("Time (s)")
-    plt.title("State residency")
-    plt.legend(loc='upper right')
-    plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'state_dwell_times_gkde.pdf'),
-                            bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
-    plt.close()
-    return
-
-
-def plot_prob_states(state_seqs, config, title=None, savefig=False, fig_dir=None, display=True):
-    # print("state_seqs", state_seqs.shape)
-
-    fig = plt.figure(figsize=(10, 5))
-    for z in range(config['num_states']):
-        print(state_seqs)
-        prob_z = np.mean(state_seqs == z, axis=0)  # Probability of z at each time step
-        plt.plot(uniform_filter1d(prob_z, size=100), c=COLORS[z], linewidth=1.5, label=f'State {z+1}')
-    plt.xlabel('Time', fontsize='large')
-    plt.legend(loc='upper right')
-    plt.margins(0.05)
-    plt.ylabel('P(state)', fontsize='large')
-    # plt.xticks([0, len(prob_z)], [0, 15], fontsize='medium')
-    plt.yticks(fontsize='medium')
-    plt.title(f'State occupancy')
-    plt.ylim(0, 1)
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_prob_states_over_time.pdf'), bbox_inches='tight', dpi=300,
-                            transparent=True)
-    if display: plt.show()
-    plt.close()
-    return fig
 
 
 def plot_prob_states_aligned(resampled_state_seq, n_le=None, uniform_filter_size=1, config=None, title=None, xticks=None, xlabel=None, savefig=False, fig_dir=None, display=True):
@@ -1898,91 +1572,6 @@ def plot_transition_matrix(transition_matrix, title=None, savefig=False, fig_dir
     return fig
 
 
-def draw_ethogram(transition_matrix):
-    """
-    Generates a transition diagram (ethogram).
-    - Node size proportional to self-transition probability.
-    - Edge width proportional to transition probability.
-    """
-
-    num_states = transition_matrix.shape[0]
-    states = [f'State {_+1}' for _ in range(num_states)]
-
-    # Create a directed graph
-    G = nx.DiGraph()
-
-    # Lists to store attributes for plotting
-    node_sizes = []
-    edge_widths = []
-    edge_colors = []
-
-    # 1. SETUP NODES
-    # We define a base size and a scaling factor for visibility
-    base_node_size = 1000
-    node_scale_factor = 5000
-
-    for i, state in enumerate(states):
-        # Get self-transition probability (diagonal of the matrix)
-        self_prob = transition_matrix[i][i]
-
-        # Calculate size: Base + (Probability * Scaling Factor)
-        size = base_node_size + (self_prob * node_scale_factor)
-
-        G.add_node(state, size=size)
-        node_sizes.append(size)
-
-    # 2. SETUP EDGES
-    # We define a scaling factor for edge thickness
-    edge_scale_factor = 10
-
-    for i, origin in enumerate(states):
-        for j, target in enumerate(states):
-            prob = transition_matrix[i][j]
-
-            # Threshold: Only draw edges if probability > 0.05 to reduce clutter
-            if prob >= 0.02:
-                if i == j:
-                    # Self-transitions affect node size (handled above),
-                    # but we can also add a small loop edge if desired.
-                    # For this visual, we often omit the self-loop edge to keep it clean
-                    # since the node size already represents it.
-                    continue
-                else:
-                    G.add_edge(origin, target, weight=prob)
-                    edge_widths.append(prob * edge_scale_factor)
-                    edge_colors.append('gray')
-
-    # 3. DRAWING
-    plt.figure(figsize=(6, 6))
-
-    # Layout - Spring layout usually works best for ethograms
-    seed = np.random.randint(1, 1e6)
-    print("seed", seed)
-    pos = nx.spring_layout(G, k=2, seed=seed)
-
-    # Draw Nodes
-    nx.draw_networkx_nodes(G, pos,
-                           node_size=node_sizes,
-                           node_color=[COLORS[_] for _ in range(num_states)],
-                           edgecolors=None)
-
-    # Draw Labels
-    nx.draw_networkx_labels(G, pos)
-
-    # Draw Edges (Curved to show bidirectional flow clearly)
-    nx.draw_networkx_edges(G, pos,
-                           width=edge_widths,
-                           edge_color=edge_colors,
-                           arrowstyle='->',
-                           arrowsize=20,
-                           connectionstyle="arc3,rad=0.1")  # Curvature
-
-    plt.axis('off')
-    plt.tight_layout()
-    plt.show()
-    return
-
-
 def plot_ethogram(transition_matrix, title=None, savefig=False, fig_dir=None, display=True):
     print(transition_matrix.tolist())
     fig = plt.figure()
@@ -2025,55 +1614,6 @@ def plot_ethogram(transition_matrix, title=None, savefig=False, fig_dir=None, di
     plt.margins(0.1)
     filename = title if title else 'ethogram'
     if savefig: fig.savefig(os.path.join(fig_dir, f'{filename}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
-    plt.close()
-    return
-
-
-def plot_ethogram_community(transition_matrix, threshold, savefig=False, fig_dir=None, display=True):
-
-    fig = plt.figure(figsize=(10, 10))
-
-    # Define positions using a circular layout
-    G = nx.DiGraph()
-    num_states = transition_matrix.shape[0]
-
-    # Add edges with weights
-    for i in range(num_states):
-        for j in range(num_states):
-            if transition_matrix[i, j] > threshold:  # Only add edges with nonzero probability
-                G.add_edge(i, j, weight=transition_matrix[i, j])
-
-    communities = nx.community.greedy_modularity_communities(G)
-    # print("communities", communities)
-
-    # Compute positions for the node clusters as if they were themselves nodes in a
-    # supergraph using a larger scale factor
-    supergraph = nx.cycle_graph(len(communities))
-    superpos = nx.spring_layout(G, scale=50)
-
-    # Use the "supernode" positions as the center of each node cluster
-    centers = list(superpos.values())
-    pos = {}
-    for center, comm in zip(centers, communities):
-        pos.update(nx.spring_layout(nx.subgraph(G, comm), center=center))
-
-    edges = G.edges(data=True)
-    edge_widths = [d['weight'] * 5 for (u, v, d) in edges]  # Differentiate in/out degrees
-
-    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=2000,
-            font_size=14, font_weight='bold', edge_color='gray', width=edge_widths,
-            arrows=True,
-            connectionstyle='arc3,rad=0.1')
-    nx.draw_networkx_edges(G, pos=pos)
-
-    # Draw edge labels
-    edge_labels = {(u, v): f"{d['weight']:.3f}" for (u, v, d) in edges}
-    # print(edge_labels, len(edge_labels))
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, label_pos=0.4, connectionstyle='arc3,rad=0.1')
-
-    plt.title("Transition Probability Graph")
-    if savefig: fig.savefig(os.path.join(fig_dir, f'ethogram_community_{threshold}.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
@@ -2794,95 +2334,6 @@ def plot_auxem_acc_by_z_o(stateseq, aux_emissions, probs_z_o, config, ay_labels,
     return
 
 
-# def plot_auxem_acc_by_z_o_traintest(train_stateseq, test_stateseq, train_aux_emissions, test_aux_emissions, train_predict_probs_z_o, test_predict_probs_z_o, config, ay_labels, skip_states=[], title=None, savefig=False, fig_dir=None, display=True):
-#     """
-#     Plot accuracy scores in each state for each auxiliary emission dimension separately
-#     """
-#     from sklearn.metrics import classification_report, confusion_matrix
-#
-#     num_states = config['num_states']
-#     aux_emission_dim = len(ay_labels)
-#
-#     def get_acc_z_o(stateseq, aux_emissions, probs_z_o):
-#         aux_emissions_ = np.concatenate(aux_emissions, axis=0)
-#         z_seq_ = np.concatenate(stateseq, axis=0)
-#         acc_z_o = {}
-#         counts_z_o = {}
-#         for z in range(num_states):
-#             acc_z_o[z] = {}
-#             counts_z_o[z] = {}
-#             for o in range(aux_emission_dim):
-#                 y_true = aux_emissions_[z_seq_ == z][:, o]
-#                 counts_z_o[z][o] = np.sum(y_true) / len(y_true)
-#                 y_pred = probs_z_o[z][o] >= 0.5
-#                 acc_z_o[z][o] = f1_score(y_true, y_pred)
-#                 if not np.sum(y_pred):
-#                     print(f"z {z}", classification_report(y_true, y_pred))
-#                     print(f"z {z}", confusion_matrix(y_true, y_pred))
-#         return acc_z_o, counts_z_o
-#
-#     def get_acc(aux_emissions, probs_o):
-#         aux_emissions_ = np.concatenate(aux_emissions, axis=0)
-#         acc_o = {}
-#         counts_o = {}
-#         for o in range(aux_emission_dim):
-#             y_true = aux_emissions_[:, o]
-#             counts_o[o] = np.sum(y_true) / len(y_true)
-#             y_pred = probs_o[o] >= 0.5
-#             acc_o[o] = f1_score(y_true, y_pred)
-#             if not np.sum(y_pred):
-#                 print(classification_report(y_true, y_pred))
-#                 print(confusion_matrix(y_true, y_pred))
-#         return acc_o, counts_o
-#
-#     train_acc_o, train_counts_o = get_acc(train_aux_emissions, train_predict_probs_z_o)
-#     test_acc_o, test_counts_o = get_acc(test_aux_emissions, test_predict_probs_z_o)
-#
-#     train_acc_z_o, train_counts_z_o = get_acc_z_o(train_stateseq, train_aux_emissions, train_predict_probs_z_o)
-#     print("train_acc_z_o", train_acc_z_o)
-#     test_acc_z_o, test_counts_z_o = get_acc_z_o(test_stateseq, test_aux_emissions, test_predict_probs_z_o)
-#     print("test_acc_z_o", test_acc_z_o)
-#
-#     plt.figure(figsize=(5.5, 4.5))
-#     xt = []
-#     for z in train_acc_z_o:
-#         if z in skip_states: continue
-#         plt.bar(z-0.2, train_acc_z_o[z][0], color=COLORS[z], alpha=0.5, width=0.2, label='train data' if z == 0 else '')
-#         plt.bar(z+0.2, test_acc_z_o[z][0], color=COLORS[z], width=0.2, label='held-out data' if z == 0 else '')
-#         xt.append(z)
-#     xt = np.array(xt)
-#     plt.legend(loc='upper right')
-#     plt.ylim(0, 0.5)
-#     plt.ylabel('F1 score')
-#     plt.xlabel('State')
-#     plt.xticks(xt, xt+1)
-#     plt.tight_layout()
-#     if savefig: plt.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_skip_states={len(skip_states)}_traintest_auxem_acc_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-#     if display: plt.show()
-#     plt.close()
-#
-#     print("train_counts_z_o", train_counts_z_o)
-#     print("test_counts_z_o", test_counts_z_o)
-#     plt.figure(figsize=(5.5, 4.5))
-#     xt = []
-#     for z in train_counts_z_o:
-#         if z in skip_states: continue
-#         plt.bar(z-0.2, train_counts_z_o[z][0], color=COLORS[z], alpha=0.5, width=0.2, label='train data' if z == 0 else '')
-#         plt.bar(z+0.2, test_counts_z_o[z][0], color=COLORS[z], width=0.2, label='held-out data' if z == 0 else '')
-#         xt.append(z)
-#     xt = np.array(xt)
-#     plt.ylim(0, 1)
-#     plt.legend(loc='upper right')
-#     plt.ylabel('P(wing flick = 1 | state)')
-#     plt.xlabel('State')
-#     plt.xticks(xt, xt+1)
-#     plt.tight_layout()
-#     if savefig: plt.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_skip_states={len(skip_states)}_traintest_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-#     if display: plt.show()
-#     plt.close()
-#     return
-
-
 def plot_auxem_acc_full_precomputed(train_true_z_o, train_preds_z_o, test_true_z_o, test_preds_z_o, title=None, savefig=False, fig_dir=None, display=True):
 
     train_alldata = [np.vstack([train_true_z_o[z][0], train_preds_z_o[z][0]]).T for z in train_true_z_o]
@@ -2999,31 +2450,6 @@ def plot_auxem_frac_by_z_o_traintest_precomputed(train_true_z_o, test_true_z_o, 
         if display: plt.show()
         plt.close()
     return
-
-
-# def plot_auxem_fraction_by_z_o(acc_z_o, ay_labels, title=None, savefig=False, fig_dir=None, display=True):
-#     """
-#     Plot aux em event fractions in each state for each auxiliary emission dimension separately
-#     """
-#     fig, ax = plt.subplots(1, len(acc_z_o), figsize=(7, 4), sharey=True, layout='constrained')
-#     for z in acc_z_o:
-#         axes = ax[z] if len(acc_z_o) > 1 else ax
-#         for o in acc_z_o[z]:
-#             axes.bar(o, acc_z_o[z][o] * 100, color=COLORS[z])
-#         axes.set_xticks(list(acc_z_o[z].keys()), list(ay_labels.values()), rotation=0)
-#         axes.set_title(f'State {z+1}', color=COLORS[z])
-#         axes.axhline(0, c='k', ls=':', lw=2)
-#         axes.margins(0.1)
-#
-#     axes = ax[0] if len(acc_z_o) > 1 else ax
-#     axes.set_ylabel('Fraction of behavior (%)')
-#     # plt.suptitle(title)
-#     plt.ylim(0, 100)
-#     plt.tight_layout()
-#     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_auxem_fraction_by_z_and_o.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-#     if display: plt.show()
-#     plt.close()
-#     return fig
 
 
 def plot_var_explained_by_z_o_by_fly(r2_z_o, o_labels, title=None, savefig=False, fig_dir=None, display=True):

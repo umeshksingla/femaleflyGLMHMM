@@ -62,6 +62,8 @@ class WT_DATA:
     def get_all_song(expt_path):
         """
         Return sine, mix and pulse bouts for whole session
+
+        Credits: Talmo Pereira
         """
         with h5py.File(expt_path, "r") as f:
             n_frames = f["trxF"].shape[0]
@@ -84,6 +86,8 @@ class WT_DATA:
     def get_all_individual_song(expt_path):
         """
         Return individual sines and pulses for whole session
+
+        Credits: Talmo Pereira
         """
         with h5py.File(expt_path, "r") as f:
             n_frames = f["trxF"].shape[0]

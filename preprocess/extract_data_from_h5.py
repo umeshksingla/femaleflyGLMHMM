@@ -111,21 +111,20 @@ def get_features(DATA, expt_path, cop_start_frame):
 
 if __name__ == '__main__':
 
-    # DATA = WT_DATA
+    DATA = WT_DATA
     # DATA = AC_BOTH
-    DATA = FREDCLEANED_DATA
+    # DATA = FREDCLEANED_DATA
 
     BASE_FOLDER = f'../../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
 
-    raw_track_data = joblib.load(os.path.join(BASE_FOLDER, 'raw_track_data_11_jan1.pkl'))
-    smoothed_track_data = get_smoothed_raw_track_data(raw_track_data)
+    # raw_track_data = joblib.load(os.path.join(BASE_FOLDER, 'raw_track_data_11_jan1.pkl'))
+    # smoothed_track_data = get_smoothed_raw_track_data(raw_track_data)
     # for s in raw_track_data:
     #     nan_count = np.count_nonzero(np.isnan(raw_track_data[s]['fTrx']))
     #     siz = raw_track_data[s]['fTrx'].size
     #     print(s, nan_count, raw_track_data[s]['fTrx'].size, nan_count/siz * 100)
-    joblib.dump(smoothed_track_data, os.path.join(BASE_FOLDER, f'smoothed_track_data_{len(raw_track_data)}_jan1.pkl'))
-    sys.exit(0)
+    # joblib.dump(smoothed_track_data, os.path.join(BASE_FOLDER, f'smoothed_track_data_{len(raw_track_data)}_jan1.pkl'))
 
     st1 = time.time()
     # Calculate features from all sessions in a dict and dump

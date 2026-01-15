@@ -1,3 +1,7 @@
+"""
+Event-triggered averages.
+"""
+
 import glob
 import sys
 

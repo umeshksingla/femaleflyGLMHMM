@@ -1,6 +1,6 @@
 ## colors
-EC = 'coral'
-IC = 'tab:blue'
+EC = 'coral'        # female
+IC = 'tab:blue'     # male
 ECmap = 'Oranges'
 SCATTERSIZE = 50
 input_label_colors = {
@@ -21,7 +21,7 @@ input_label_colors = {
     'fmAng_cos': 'olive',
     'mfAng_cos': 'olive',
 }
-LR = {
+LR = {  # Left or Right colors
     'L': 'mediumorchid',
     'R': 'forestgreen',
 }

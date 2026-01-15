@@ -11,7 +11,7 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 
 from leaprig import WT_DATA
-from preprocess.get_designmatrix_varlen import create_x_and_y_windows
+from preprocess.get_designmatrix import create_x_and_y_windows
 from preprocess.colors import *
 
 

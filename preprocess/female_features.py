@@ -21,6 +21,8 @@ def normalize_to_egocentric(x, rel_to=None, scale_factor=1, ctr_ind=1, fwd_ind=0
         Egocentrically aligned poses of the same shape as the input.
 
         If return_angles is True, also returns a vector of angles.
+
+    Credits: Talmo Pereira
     """
 
     if rel_to is None:
@@ -85,6 +87,8 @@ def compute_wing_angles(x, left_ind=3, right_ind=4):
 
         Positive angles denote extension away from the midline in the direction of the
         wing. For example, a right wing extension may have thetaR > 0.
+
+    Credits: Talmo Pereira
     """
     xL, yL = x[..., left_ind, 0], x[..., left_ind, 1]
     xR, yR = x[..., right_ind, 0], x[..., right_ind, 1]
