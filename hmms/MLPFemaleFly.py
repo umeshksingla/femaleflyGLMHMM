@@ -1,3 +1,7 @@
+"""
+This file is kept for reference only; it was not used in the paper.
+"""
+
 import os
 
 import joblib

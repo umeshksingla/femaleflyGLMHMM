@@ -112,13 +112,6 @@ class BaseFemaleFly:
         # print("r2s", r2s)
         return r2s
 
-    # def score_by_o(self, emissions, y_preds):
-    #     y_preds = np.concatenate(y_preds, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     r2_o = dict(zip(range(self.data_config["emission_dim"]), r2_score(emissions, y_preds, multioutput='raw_values')))
-    #     # print("r2_o", r2_o)
-    #     return r2_o
-
     def score_by_o_by_fly(self, emissions, y_preds):
         r2_by_o = {}
         for o in range(self.data_config["emission_dim"]):
@@ -132,45 +125,6 @@ class BaseFemaleFly:
             r2_by_o[o] = np.array(r2_by_o[o])
         # print("r2_by_o by_fly", r2_by_o)
         return r2_by_o
-
-    # def score_by_z(self, emissions, y_preds, z_seqs):
-    #     raise NotImplementedError
-    #     y_preds = np.concatenate(y_preds, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     z_seqs = np.concatenate(z_seqs, axis=0)
-    #     r2_z = {}
-    #     for z in range(self.num_states):
-    #         z_mask = z_seqs == z
-    #         r = r2_score(emissions[z_mask], y_preds[z_mask], multioutput='variance_weighted')
-    #         r2_z[z] = r
-    #     # print("r2_z", r2_z)
-    #     return r2_z
-    #
-    # def score_by_z_soft(self, emissions, y_preds_per_state, z_probs):
-    #     y_preds_per_state = np.concatenate(y_preds_per_state, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     z_probs = np.concatenate(z_probs, axis=0)
-    #     r = r2_score_custom(emissions, y_preds_per_state, z_probs)
-    #     r2_z = dict(zip(range(self.num_states), r))
-    #     # print("r2_z soft", r2_z)
-    #     return r2_z
-
-    def score_by_z_by_fly(self, emissions, y_preds, z_seqs):
-        raise NotImplementedError
-        r2_z_by_fly = {}
-        for z in range(self.num_states):
-            r2_z_by_fly[z] = []
-            for i in range(len(emissions)):
-                z_mask = z_seqs[i] == z
-                if np.sum(z_mask):
-                    r = r2_score(emissions[i][z_mask], y_preds[i][z_mask], multioutput='variance_weighted')
-                    r2_z_by_fly[z].append(r)
-                else:
-                    r2_z_by_fly[z].append(0.)
-                    print(f'nothing for state {z} for session {i}')
-            r2_z_by_fly[z] = np.array(r2_z_by_fly[z])
-        # print("r2_z_by_fly", r2_z_by_fly)
-        return r2_z_by_fly
 
     def score_by_z_by_fly_soft(self, emissions, y_preds_per_state, z_probs):
         r2_z_by_fly = {}
@@ -187,50 +141,6 @@ class BaseFemaleFly:
             r2_z_by_fly[z] = np.array(r2_z_by_fly[z])
         # print("r2_z_by_fly soft", r2_z_by_fly)
         return r2_z_by_fly
-
-    # def score_by_z_and_o(self, emissions, y_preds, z_seqs):
-    #     raise NotImplementedError
-    #     y_preds = np.concatenate(y_preds, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     z_seqs = np.concatenate(z_seqs, axis=0)
-    #     r2_z_o = {}
-    #     for z in range(self.num_states):
-    #         r2_z_o[z] = {}
-    #         z_mask = z_seqs == z
-    #         for o in range(self.data_config["emission_dim"]):
-    #             if np.sum(z_mask):
-    #                 r2_z_o[z][o] = r2_score(emissions[z_mask][:, o], y_preds[z_mask][:, o])
-    #             else:
-    #                 print(f'nothing for state {z} for emission {o}')
-    #     # print("r2_z_o", r2_z_o)
-    #     return r2_z_o
-
-    # def score_by_z_and_o_soft(self, emissions, y_preds_per_state, z_probs):
-    #     y_preds_per_state = np.concatenate(y_preds_per_state, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     z_probs = np.concatenate(z_probs, axis=0)
-    #
-    #     r2_z_o = {}
-    #     for z in range(self.num_states):
-    #         r2_z_o[z] = {}
-    #
-    #     for o in range(self.data_config["emission_dim"]):
-    #         r = r2_score_custom(emissions[:, o], y_preds_per_state[..., o], z_probs)
-    #         for z in range(self.num_states):
-    #             r2_z_o[z][o] = r[z]
-    #
-    #     # print("r2_z_o soft", r2_z_o)
-    #     return r2_z_o
-
-    def score_by_z_and_o_by_fly(self, emissions, y_preds, z_seqs):
-        raise NotImplementedError
-        r2_z_o = {}
-        for z in range(self.num_states):
-            emissions_z = [emissions[i][z_seqs[i] == z] for i in range(len(emissions))]
-            y_preds_z = [y_preds[i][z_seqs[i] == z] for i in range(len(emissions))]
-            r2_z_o[z] = self.score_by_o_by_fly(emissions_z, y_preds_z)
-        # print("r2_z_o by fly", r2_z_o)
-        return r2_z_o
 
     def score_by_z_and_o_by_fly_soft(self, emissions, y_preds_per_state, z_probs):
         r2_z_o_by_fly = {}
@@ -260,15 +170,6 @@ class BaseFemaleFly:
     def pearson_by_fly(self, emissions, y_preds):
         pearson_o_fly = self.pearson_by_o_by_fly(emissions, y_preds)
         return np.mean(np.vstack([pearson_o_fly[o] for o in range(self.data_config["emission_dim"])]), axis=0)    # equivalent to multioutput="uniform_average" in r2_score
-    #
-    # def pearson_by_z(self, emissions, y_preds_per_state, z_probs):
-    #     pearson_z_o = self.pearson_by_z_by_o(emissions, y_preds_per_state, z_probs)
-    #     pearson_z = {}
-    #     for z in pearson_z_o:
-    #         # print("pearson_z_o[z]", pearson_z_o[z])
-    #         pearson_z[z] = np.mean([pearson_z_o[z][o] for o in range(self.data_config["emission_dim"])])  # equivalent to multioutput="uniform_average" in r2_score
-    #     # print("pearson_z", pearson_z)
-    #     return pearson_z
 
     def pearson_by_z_by_fly(self, emissions, y_preds_per_state, z_probs):
         pearson_z_o_fly = self.pearson_by_z_and_o_by_fly(emissions, y_preds_per_state, z_probs)
@@ -302,23 +203,6 @@ class BaseFemaleFly:
             pearson_o[o] = np.array(pearson_o[o])
         return pearson_o
 
-    # def pearson_by_z_by_o(self, emissions, y_preds_per_state, z_probs):
-    #
-    #     y_preds_per_state = np.concatenate(y_preds_per_state, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     z_probs = np.concatenate(z_probs, axis=0)
-    #
-    #     pearson_z_o = {}
-    #     for z in range(self.num_states):
-    #         pearson_z_o[z] = {}
-    #
-    #     for o in range(self.data_config["emission_dim"]):
-    #         pro = pearsonr_custom(emissions[:, o], y_preds_per_state[..., o], z_probs)  # pearson for emission o in each state
-    #         for z in range(self.num_states):
-    #             pearson_z_o[z][o] = pro[z]
-    #     # print(pearson_z_o)
-    #     return pearson_z_o
-
     def pearson_by_z_and_o_by_fly(self, emissions, y_preds_per_state, z_probs):
 
         pearson_z_o_by_fly = {}
@@ -339,30 +223,6 @@ class BaseFemaleFly:
             for o in range(self.data_config["emission_dim"]):
                 pearson_z_o_by_fly[z][o] = np.array(pearson_z_o_by_fly[z][o])
         return pearson_z_o_by_fly
-
-    # def correlation_max_by_o(self, emissions, y_preds):
-    #     """To summarize: with the calculation done as above, a positive lag means the first series lags the second,
-    #     or the second leads the first--peaks earlier in time, so at a location to the left on the time series plot.
-    #     Source: https://currents.soest.hawaii.edu/ocn_data_analysis/_static/SEM_EDOF.html
-    #
-    #     +ve lags at the peak will mean "a" lags "b", or "b" leads "a". So, a=model lags b=truth, i.e. model prediction
-    #     is delayed — it's lagging behind the behavior.
-    #     """
-    #     y_preds = np.concatenate(y_preds, axis=0)
-    #     emissions = np.concatenate(emissions, axis=0)
-    #     corrs_dict = {}
-    #     lags_dict = {}
-    #     for o in range(self.data_config["emission_dim"]):
-    #         a = y_preds[:, o]       # a = model, predicted
-    #         b = emissions[:, o]     # b = data, truth
-    #         a = a - np.mean(a)  # ensure both are mean-centered
-    #         b = b - np.mean(b)
-    #         # print(np.mean(a), np.mean(b))
-    #         c = scipy.signal.correlate(a, b, mode='full') / (np.linalg.norm(a) * np.linalg.norm(b))
-    #         lags = np.arange(-len(a) + 1, len(a))
-    #         corrs_dict[o] = np.max(c)
-    #         lags_dict[o] = lags[np.argmax(c)]
-    #     return corrs_dict, lags_dict
 
     def correlation_max_by_o_by_fly(self, emissions, y_preds):
         """To summarize: with the calculation done as above, a positive lag means the first series lags the second,

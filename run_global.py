@@ -15,13 +15,10 @@ import json
 import numpy as np
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
-from hmms.LogRHMMFemaleFly import LogRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
-from hmms.LogRFemaleFly import LogRFemaleFly
 from hmms.GHMMFemaleFly import GHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
-from hmms.LogRHMMCustomInitFemaleFly import LogRHMMCustomInitFemaleFly
 from hmms.InputDrivenLRHMMCustomInitFemaleFly import InputDrivenLRHMMCustomInitFemaleFly
 from utilities import utils
 
@@ -85,20 +82,14 @@ def run(mc, enhance=False, genfig=False):
     model_prefix = mc['name']
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
-    elif model_prefix == 'logrhmm':
-        model = LogRHMMFemaleFly(data_config, mc)
     elif model_prefix == 'ghmm':
         model = GHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
-    elif model_prefix == 'logrhmmci':
-        model = LogRHMMCustomInitFemaleFly(data_config, mc)
     elif model_prefix == 'chance':
         model = ChanceFemaleFly(data_config, mc)
     elif model_prefix == 'lr':
         model = LRFemaleFly(data_config, mc)
-    elif model_prefix == 'logr':
-        model = LogRFemaleFly(data_config, mc)
     elif model_prefix == 'idglmhmmci':
         model = InputDrivenLRHMMCustomInitFemaleFly(data_config, mc)
     else:
@@ -118,7 +109,7 @@ def run(mc, enhance=False, genfig=False):
     if enhance or genfig:
         print(">> Saving enhanced checkpoint:")
         utils.enhance(dump_filepath)     # add prediction statistics etc. to the same checkpoint
-        utils.enhance_auxem(dump_filepath)     # add prediction statistics etc. to the same checkpoint
+        utils.enhance_auxem(dump_filepath)     # dump prediction statistics on aux emissions, like wing flicking
         print(">> Saved.\n")
 
         if model.prefix == 'chance': return
@@ -134,11 +125,11 @@ def run(mc, enhance=False, genfig=False):
             print(">> Generating trajectories:")
             utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
             print(">> Done with trajectories.\n")
-            #
-            # print(">> Generating videos:")
-            # utils.generate_state_traces(dump_filepath, savefig=True, display=False)
-            # utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
-            # print(">> Done with videos.\n")
+
+            print(">> Generating videos:")
+            utils.generate_state_traces(dump_filepath, savefig=True, display=False)
+            utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
+            print(">> Done with videos.\n")
 
     print("Finished.\n")
     return dump_filepath
