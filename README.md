@@ -1,9 +1,5 @@
 This code was developed to analyze female _Drosophila_ behavior during courtship, as described in "**Singla et al. (2026). Latent state dynamics underlying female Drosophila response variability during courtship**"
 
-#### Preprocessing Steps
-
-extract_data_from_h5.py: extract tracking data. full timeseries of features. compute features. Tap, visual, audio
-get_designmatrix.py: specify emissions and associated inputs. zscore, format in input-output windows ready to be fed into models, basis transform
 
 ### Directory Structure
 
