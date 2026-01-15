@@ -1,3 +1,6 @@
+"""
+Based on code from Dynamax (MIT License). Modified by Umesh Singla.
+"""
 import jax.numpy as jnp
 import jax.random as jr
 from jax import vmap

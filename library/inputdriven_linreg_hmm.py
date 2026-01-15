@@ -1,5 +1,7 @@
 """
 Linear regression hidden Markov model (HMM) with state-dependent weights and input-driven state transitions.
+
+Based on code from Dynamax (MIT License). Modified by Umesh Singla.
 """
 from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
 import jax.random as jr
