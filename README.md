@@ -1,7 +1,4 @@
-### implements
 This code was developed to analyze female _Drosophila_ behavior during courtship, as described in "**Singla et al. (2026). Latent state dynamics underlying female Drosophila response variability during courtship**"
-
-> **Note:** This implementation builds on [Dynamax](https://probml.github.io/dynamax/index.html) and JAX and can also be used to reproduce results from similar input-driven HMM studies, such as *Calhoun et al., 2019*.
 
 #### Preprocessing Steps
 
@@ -87,3 +84,5 @@ Use `run_global.py` or `run_separate.py` to train the model and generate the fig
 Scripts are provided to run training jobs on Slurm-based clusters (we tested on Princeton Della).
 * **Configure**: Edit `submit_slurm.py` to set job parameters.
 * **Submit**: Run `python submit_slurm.py`. This script automatically generates configurations and calls `run_slurm.sh` to submit jobs.
+
+> **Note:** This implementation builds on [Dynamax](https://probml.github.io/dynamax/index.html) and JAX and can also be used to reproduce results from similar input-driven HMM studies, such as *Calhoun et al., 2019*.
