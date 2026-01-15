@@ -1,9 +1,11 @@
 ####################################
 
 # Example usage:
+# Used in run_slurm.sh
 # python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}'
 # python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}' --enhance
 # python run_global.py --mc '{"name": "lr", "path": "general", "data_path": "data/wt_fly_data_cos=4_ortho_o=5.pkl"}' --enhance --genfig
+# python run_global.py --mc '{"name": "idglmhmmci", "seed": 0, "datasplit_seed": 6400, "num_states": 5, "data_path": "data/wt_fly_data.pkl", "path": "kfoldcv_wt"}' --enhance --genfig
 
 ####################################
 

@@ -381,10 +381,10 @@ def plot_empirical_occupancy_2datasets(savefig=True, display=True):
 
 
 if __name__ == '__main__':
-    leap_model_dir = '../paper figs/FINAL WT/20260101_235805_duration/'
-    new16mic_model_dir = '../paper figs/FINAL WT FRED/20260102_135949_spandex/'
+    leap_model_dir = '../../paper figs/FINAL WT/20260101_235805_duration/'
+    new16mic_model_dir = '../../paper figs/FINAL WT FRED/20260102_135949_spandex/'
 
-    fig_dir = os.path.join('../paper figs/figure comparison2datasets/')
+    fig_dir = os.path.join('../../paper figs/figure comparison2datasets/')
     # make_plots(savefig=True, fig_dir=fig_dir, display=True)
     # plot_empirical_occupancy_2datasets()
     plot_weight_magnitudes()

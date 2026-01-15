@@ -1,6 +1,6 @@
 ####################################
 
-# Usage: python submit_slurm.py
+# Usage: python submit_slurm.py wt female kfold
 
 ####################################
 

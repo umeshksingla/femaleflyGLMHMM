@@ -18,10 +18,10 @@ from utilities import utils
 
 if __name__  == '__main__':
 
-    chance_shuffled_model_pkl_path = f'models/general_wt_shuffled/chance_0_cv/20260102_132745_sherbet'    # for shuffled data
+    chance_shuffled_model_pkl_path = f'../models/general_wt_shuffled/chance_0_cv/20260102_132745_sherbet'  # for shuffled data
     # chance_model_pkl_path = f'models/general_wt/chance_0_cv/20260102_133220_doorway'    # for normal data
 
-    idglmhmm_model_pkl_path = f'../paper figs/FINAL WT/20260101_235805_duration'    # for idglmhmm model
+    idglmhmm_model_pkl_path = f'../../paper figs/FINAL WT/20260101_235805_duration'  # for idglmhmm model
     # ghmm_model_pkl_path = f'models/general_wt/ghmm_5_cv/20260102_143703_fireman'    # for blind hmm model
 
     chance_shuffled_model_pkl, chance_shuffled_data_config_pkl, chance_shuffled_model_config = utils.load_specific_path(chance_shuffled_model_pkl_path)

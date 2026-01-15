@@ -1,8 +1,6 @@
 ####################################
 
-# Example usage: python run_single.py  --mc '{"names": "lrhmmci", "seeds": 6205, "num_states": 2, "transition_matrix_stickiness": 10}' --path "general"
-# OR
-# python run_single.py --mc '{"names": "chance"}' --path "general"
+# Example usage: python run_separate.py
 
 ####################################
 

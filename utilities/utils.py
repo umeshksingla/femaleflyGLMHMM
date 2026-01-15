@@ -425,10 +425,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
 
     learned_params = model_ckp['learned_params']
     learned_lps = model_ckp['learned_lps']
-    emission_labels = data_config['emission_labels']
-    emission_labels_dict = data_config['emission_labels_dict']
-    # print("emission_labels", emission_labels)
-    # print("emission_labels_dict", emission_labels_dict)
     emission_labels_jr = data_config['emission_labels_jr']
     emission_labels_jr_jr = data_config['emission_labels_jr_jr']
     emission_labels_units = data_config['emission_labels_units']
@@ -436,7 +432,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     auxiliary_labels = data_config['auxiliary_labels']
     auxiliary_labels_jr = data_config['auxiliary_labels_jr']
     auxiliary_labels_full = data_config['auxiliary_labels_full']
-    directional_variables = data_config['directional_variables']
     effective_fps = data_config['effective_fps']
     num_states = model_ckp['num_states']
     model_prefix = model_ckp['prefix']
@@ -537,36 +532,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     all_output_mn_std = [*model_ckp['train_data']['train_output_mn_std'], *model_ckp['test_data']['test_output_mn_std']]
     all_aux_mn_std = [*model_ckp['train_data']['train_aux_mn_std'], *model_ckp['test_data']['test_aux_mn_std']]
 
-    #
-    # print(all_aux_data[1].shape)
-    # print(auxiliary_labels)
-
-    # Why some flies show low or negative performance?
-    # train_pearson = model_ckp['train_data']['train_pearson_by_fly']
-    # test_pearson = model_ckp['test_data']['test_pearson_by_fly']
-    # all_pearson = np.concatenate([train_pearson, test_pearson])
-    # rescaled_emissions = get_rescaled_emissions(all_emissions, all_output_mn_std, effective_fps)
-    # rescaled_aux_data = get_rescaled_aux(all_aux_data, all_aux_mn_std)
-    # print(len(all_pearson), len(rescaled_emissions), len(rescaled_aux_data))
-    #
-    # print(np.array(all_output_mn_std).shape)
-    # vel_means = np.array(all_output_mn_std)[:, 0, 0]
-    # vel_stds = np.array(all_output_mn_std)[:, 0, 1]
-    # aux_means = np.array([np.mean(b[:, 8]) for b in rescaled_aux_data])
-    # # session_lens = np.array([len(b) for b in rescaled_aux_data])
-    # # state1_dur = np.array([np.sum(b == 1)/len(b) for b in all_stateseq])
-    #
-    # plt.figure(figsize=(5, 5))
-    # plt.scatter(all_pearson, aux_means, c='r')
-    # plt.xlabel(r"Pearson $r$")
-    # # plt.ylabel('fwd_vel_means')
-    # plt.margins(0.1)
-    # plt.tight_layout()
-    # plt.show()
-    # plt.close()
-    #
-    # return
-
     plots.plot_state_aux_o_mean(
         get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
@@ -601,7 +566,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     return
 
 
-def enhance_auxem(model_dir, savefig=True, display=False):
+def enhance_auxem(model_dir):
 
     model_ckp, data_config, model_config = load_specific_path(model_dir)
     if model_ckp is None:
@@ -1065,39 +1030,3 @@ def generate_TAs(model_dir, savefig=True, display=False):
     plots.plot_ETAs_all(model_ckp, data_config, fig_dir=fig_dir, savefig=savefig, display=display)
     return
 
-
-
-# def generate_videos(model_dir, override_vid_dir=True):
-#
-#     model_ckp, data_config, model_config = load_specific_path(model_dir)
-#     if model_ckp is None:
-#         return
-#
-#     update_labels(data_config)
-#
-#     vid_dir = os.path.join(model_dir, 'videos')
-#     if os.path.exists(vid_dir) and override_vid_dir:
-#         shutil.rmtree(vid_dir)
-#     os.makedirs(vid_dir, exist_ok=True)
-#
-#     train_stateseq = model_ckp['train_data']['train_stateseq']
-#     train_downsampled_indices = model_ckp['train_data']['train_downsampled_indices']
-#     train_upsampled_indices = model_ckp['train_data']['train_upsampled_indices']
-#     train_session_keys = model_ckp['train_data']['train_session_keys']
-#
-#     for batch in np.random.choice(range(len(train_stateseq)), size=min([10, len(train_stateseq)]), replace=False):
-#         zseq_b = train_stateseq[batch]
-#         downsampled_indices_b = train_downsampled_indices[batch]
-#         upsampled_indices_b = train_upsampled_indices[batch]
-#         orig_indices_b = downsampled_indices_b[upsampled_indices_b]
-#         upsampled_zseq_b = zseq_b[upsampled_indices_b]
-#
-#         key_b = train_session_keys[batch]
-#         intervals_dict_b = get_stateseq_indices(orig_indices_b, upsampled_zseq_b, min_length=150)
-#
-#         for z in intervals_dict_b:
-#             clips_z = intervals_dict_b[z]
-#             for interval in random.sample(clips_z, min(10, len(clips_z))):
-#                 clip_session(os.path.join('/Volumes/murthy/usingla/gold_dataset/wt/mp4', key_b.replace(".h5", ".mp4")),
-#                              interval, output_path=f'{vid_dir}/train{batch}/state{z+1}_origframes={interval}.mp4')
-#     return
