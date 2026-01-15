@@ -427,8 +427,8 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     learned_lps = model_ckp['learned_lps']
     emission_labels = data_config['emission_labels']
     emission_labels_dict = data_config['emission_labels_dict']
-    print("emission_labels", emission_labels)
-    print("emission_labels_dict", emission_labels_dict)
+    # print("emission_labels", emission_labels)
+    # print("emission_labels_dict", emission_labels_dict)
     emission_labels_jr = data_config['emission_labels_jr']
     emission_labels_jr_jr = data_config['emission_labels_jr_jr']
     emission_labels_units = data_config['emission_labels_units']
@@ -482,16 +482,8 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
             plots.plot_transition_matrix(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
             plots.plot_ethogram(learned_params.transitions.transition_matrix, savefig=savefig, fig_dir=fig_dir, display=display)
 
-    # if 'hmm' in model_prefix or 'HMM' in model_prefix:
-    #     weights = learned_params.emissions.weights
-    # elif 'logrhmm' in model_prefix:
-    #     weights = learned_params.emissions.weights[:, np.newaxis, :]
-    # elif model_prefix == 'lr':
-    #     weights = learned_params['w']
-    # else:
-    #     raise Exception(f'wrong prefix={model_prefix}')
-
     def plot_func(prefix):
+        print("prefix", prefix)
         data_key = f'{prefix}_data'
         # emissions = model_ckp[data_key][f'{prefix}_emissions']
         # inputs = model_ckp[data_key][f'{prefix}_inputs']
@@ -709,6 +701,7 @@ def generate_state_filters(model_dir, savefig=True, display=False):
     input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     plots.plot_statetrans_filters_separate(reg_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey=True, savefig=savefig, fig_dir=state_fig_dir, display=display)
+    plots.plot_statetrans_filter_amplitudes(reg_weights, data_config, input_list, input_mask_by_statetrans, input_labels, prefix='allstates', savefig=savefig, fig_dir=state_fig_dir, display=display)
     return
 
 
@@ -859,6 +852,23 @@ def generate_together_figures_filters_given(model_dir, all_weights, savefig=True
     return
 
 
+def generate_figures_filters_given_2datasets(data_config1, data_config2, all_weights1, all_weights2, fig_dir=None, savefig=True, display=False):
+
+    update_labels(data_config1)
+    update_labels(data_config2)
+    input_labels = data_config1['input_labels']
+    num_states = all_weights1.shape[0]
+    assert num_states == all_weights2.shape[0]
+
+    # plot filters for regular emissions
+    input_mask_by_emission = data_config1['input_mask_by_emission']
+
+    emission_labels = data_config1['emission_labels']
+
+    for skip_states in [[0, 1, 2, 3]]:
+        plots.plot_filters_separate_emissions_2datasets(all_weights1, all_weights2, data_config1, data_config2, emission_labels, input_labels, input_mask_by_emission, filesuffix='cmp2datasets', sharey=None, skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=fig_dir, display=display)
+    return
+
 
 def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_dir, suffix='', savefig=True, display=False, gen_corr_video=False):
 
@@ -912,8 +922,7 @@ def generate_state_clips(model_dir, savefig=True, display=False, gen_corr_video=
         data_key = f'{prefix}_data'
         n_sessions = len(model_ckp[data_key][f'{prefix}_session_keys'])
 
-        # for batch in np.random.choice(n_sessions, size=min(10, n_sessions)):
-        for batch in [9, 10, 5, 35]:
+        for batch in np.random.choice(n_sessions, size=min(10, n_sessions)):
             key_b = model_ckp[data_key][f'{prefix}_session_keys'][batch]
             stateseq = model_ckp[data_key][f'{prefix}_stateseq'][batch]
             # num_timestamps = stateseq.shape[0]
@@ -1052,8 +1061,8 @@ def generate_TAs(model_dir, savefig=True, display=False):
     # plots.plot_STAs(model_ckp, model_config, data_config, prefix='train', savefig=savefig, display=display)
     # plots.plot_STAs(model_ckp, model_config, data_config, prefix='test', savefig=savefig, display=display)
     # plots.plot_ETSPs(model_ckp, model_config, data_config, savefig=savefig, display=display)
-    plots.plot_ETAs(model_ckp, model_config, data_config, fig_dir=fig_dir, savefig=savefig, display=display)
-    # plots.plot_ETAs_all(model_ckp, data_config, fig_dir=fig_dir, savefig=savefig, display=display)
+    # plots.plot_ETAs(model_ckp, model_config, data_config, fig_dir=fig_dir, savefig=savefig, display=display)
+    plots.plot_ETAs_all(model_ckp, data_config, fig_dir=fig_dir, savefig=savefig, display=display)
     return
 
 

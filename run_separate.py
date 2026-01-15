@@ -26,7 +26,7 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Wrong dataset {dataset} specified.')
     mc = {
-        "name": 'lr',
+        "name": 'idglmhmmci',
         "seed": 3242,
         "datasplit_seed": 0,
         "num_states": 5,

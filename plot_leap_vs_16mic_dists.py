@@ -1,8 +1,12 @@
-import seaborn as sns
+from typing import OrderedDict
 
-from plotting.plots import COLORS, EC
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import r2_score
+
+from plotting.plots import *
 from utilities.io import *
-from utilities.utils import update_labels
+from utilities.utils import update_labels, generate_figures_filters_given_2datasets
 
 
 def plot_state_o_dists_reformatted_2datasets(emissions1_z, emissions2_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
@@ -232,9 +236,157 @@ def make_plots(savefig=False, fig_dir=None, display=True):
     return
 
 
-if __name__ == '__main__':
-    leap_model_dir = 'models/general_wt_lr/lr_1_cv/20251025_175656_graduate'
-    new16mic_model_dir = 'models/general_wt_fred_lr/lr_1_cv/20251025_175736_tutu'
+def get_filter_amplitudes(weights, data_config, y_labels, input_mask_by_emission, skip_states=[]):
+    # print(weights.shape)
 
-    fig_dir = os.path.join('models/comparison2datasets')
-    make_plots(savefig=True, fig_dir=fig_dir, display=True)
+    num_states = weights.shape[0]
+    basis = data_config['basis']
+
+    print("weights.shape", weights.shape)   # (num states, <emission_dim>, transformed filterlen), e.g. (5, 4, 84)
+    # <emission_dim> is 4 here coz locomotion + wingflick
+
+    w_amps = dict()
+
+    for d, _ in enumerate(y_labels):
+        e_mask = input_mask_by_emission[d]
+        print("y_labels[_]", _, y_labels[_])
+        weights_d = weights[:, [d]][..., e_mask == 1]
+        print("weights_d pre basistr", weights_d.shape)     # (num states, 1, transformed filterlen), e.g. (5, 1, 28)
+        weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=len(y_labels[_]))[:, 0]
+        print("weights_d post basistr", weights_d.shape)    # (num states, n_inputs, orig filterlen), e.g. (5, 7, 450)
+        w_amps[d] = []
+        for z in range(num_states):
+            if z in skip_states:
+                continue
+            w_l2 = np.linalg.norm(weights_d[z], axis=-1)
+            w_amps[d].append(w_l2)
+            print(f'State {z+1}', _, "w_l2.shape", w_l2.shape)
+        w_amps[d] = np.array(w_amps[d])
+        w_amps[d] = w_amps[d] / np.max(w_amps[d][1:])
+    return w_amps
+
+
+# def get_configs(model_dir):
+#     model_ckp, data_config, model_config = load_specific_path(model_dir)
+#     return model_ckp, data_config, model_config
+
+
+def plot_weight_magnitudes(savefig=True, display=True):
+
+    _, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
+    _, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+
+    leap_input_mask_by_emission = leap_data_config['input_mask_by_emission']
+    new16mic_input_mask_by_emission = new16mic_data_config['input_mask_by_emission']
+    emission_labels = leap_data_config['emission_labels']
+    update_labels(leap_data_config)
+    input_labels = leap_data_config['input_labels']
+    emission_labels_dict = leap_data_config['emission_labels_dict']
+    print("emission_labels_dict", emission_labels_dict)
+
+    avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_WT.pkl')
+    avg_weight_WT_FRED =  joblib.load(f'{new16mic_model_dir}/avg_weight_WT_FRED.pkl')
+
+    leap_w_amps = get_filter_amplitudes(avg_weight_WT, leap_data_config, emission_labels, leap_input_mask_by_emission, skip_states=[])
+    new16mic_w_amps = get_filter_amplitudes(avg_weight_WT_FRED, new16mic_data_config, emission_labels, new16mic_input_mask_by_emission, skip_states=[])
+
+    # print(leap_w_amps, leap_w_amps[0].shape)
+    # print(new16mic_w_amps)
+
+    num_states = avg_weight_WT.shape[0]
+    fig, ax = plt.subplots(1, len(emission_labels), figsize=(12+3, 4.1))
+    for d, _ in enumerate(emission_labels):
+        limit = max(leap_w_amps[d][1:].max(), new16mic_w_amps[d][1:].max()) * 1.1
+        # print("limit", limit, leap_w_amps[d][1:].max(), new16mic_w_amps[d][1:].max())
+        ax[d].plot([0, limit], [0, limit], 'k--', alpha=0.3, zorder=0)
+        for z in range(num_states):
+            if z == 0: continue
+            ax[d].scatter(leap_w_amps[d][z], new16mic_w_amps[d][z], color=COLORS[z], label=f'State {z+1}')
+            print(f'State {z+1}', _, ': r2 score: ', r2_score(leap_w_amps[d][z], new16mic_w_amps[d][z]))
+        ax[d].set_title(emission_labels_dict[_])
+        ax[d].set_xticks([0, 0.5, 1])
+        ax[d].set_yticks([0, 0.5, 1])
+        ax[d].margins(0.1)
+        print([input_labels[i] for i in emission_labels[_]])
+        if ax[d].get_subplotspec().is_last_col():
+            ax[d].legend(loc='upper right', bbox_to_anchor=(2, 1), borderaxespad=0.)
+        ax[d].set_xlabel('Norm. |w|\n(Dataset 1)')
+        ax[d].set_ylabel('Norm. |w|\n(Dataset 2)')
+    return
+    plt.tight_layout()
+    if savefig: fig.savefig(os.path.join(fig_dir, 'weightcorr_2datasets.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return
+
+
+def plot_weights():
+    avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_WT.pkl')
+    avg_weight_WT_FRED = joblib.load(f'{new16mic_model_dir}/avg_weight_WT_FRED.pkl')
+
+    _, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
+    _, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+
+    generate_figures_filters_given_2datasets(leap_data_config, new16mic_data_config, avg_weight_WT, avg_weight_WT_FRED, fig_dir, savefig=True, display=False)
+    return
+
+
+def get_emp_occ(state_seqs, config):
+    from collections import defaultdict
+    ps_z = defaultdict(list)
+    for i in range(len(state_seqs)):
+        state_z, count_z = np.unique(state_seqs[i], return_counts=True)
+        # print(i, state_z, count_z)
+        percent_z = count_z / np.sum(count_z)
+        s_p_dict = dict(zip(state_z, percent_z))
+        for z in range(config['num_states']):
+            ps_z[z].append(s_p_dict.get(z, 0))
+    return ps_z
+
+
+def plot_empirical_occupancy_2datasets(savefig=True, display=True):
+
+    leap_model_ckp, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
+    new16mic_model_ckp, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+
+    leap_z_seqs = [*leap_model_ckp['train_data']['train_stateseq'], *leap_model_ckp['test_data']['test_stateseq']]
+    new16mic_z_seqs = [*new16mic_model_ckp['train_data']['train_stateseq'], *new16mic_model_ckp['test_data']['test_stateseq']]
+
+    leap_ps_z = get_emp_occ(leap_z_seqs, leap_model_config)
+    new16mic_ps_z = get_emp_occ(new16mic_z_seqs, new16mic_model_config)
+
+    pmax = -1
+    fig = plt.figure(figsize=(6, 4))
+    for z in leap_ps_z:
+        jitter1 = np.random.uniform(-0.1, 0.1, len(leap_ps_z[z]))
+        jitter2 = np.random.uniform(-0.1, 0.1, len(new16mic_ps_z[z]))
+        plt.scatter(z+1-0.2-jitter1, leap_ps_z[z], c=COLORS[z], s=SCATTERSIZE, edgecolors='none', label=f'Dataset 1' if z == 0 else None)
+        plt.scatter(z+1+0.2+jitter2, new16mic_ps_z[z], c=COLORS[z], alpha=0.5, s=SCATTERSIZE, edgecolors='none', label=f'Dataset 2' if z == 0 else None)
+        plt.errorbar(z+1-0.04, np.mean(leap_ps_z[z]), yerr=np.std(leap_ps_z[z]), color='k', alpha=0.8, fmt='o', capsize=0)
+        plt.errorbar(z+1+0.36, np.mean(new16mic_ps_z[z]), yerr=np.std(new16mic_ps_z[z]), color='k', alpha=0.8, fmt='o', capsize=0)
+        pmax = max(pmax, max(np.max(new16mic_ps_z[z]), np.max(leap_ps_z[z])))
+
+    plt.ylabel('Fraction occupancy')
+    plt.legend(loc='upper left')
+    plt.margins(0.1)
+    pmax = np.round(pmax, 1) + 0.2
+    plt.ylim(-0.1, pmax)
+    plt.yticks([0, pmax / 3, 2*pmax/3, pmax])
+    plt.xticks(range(1, 1 + len(leap_ps_z)))
+    plt.xlabel('State')
+    if savefig: fig.savefig(os.path.join(fig_dir, f'empirical_occupancy_2datasets.pdf'), bbox_inches='tight', dpi=300, transparent=True)
+    if display: plt.show()
+    plt.close()
+    return fig
+
+
+if __name__ == '__main__':
+    leap_model_dir = '../paper figs/FINAL WT/20260101_235805_duration/'
+    new16mic_model_dir = '../paper figs/FINAL WT FRED/20260102_135949_spandex/'
+
+    fig_dir = os.path.join('../paper figs/figure comparison2datasets/')
+    # make_plots(savefig=True, fig_dir=fig_dir, display=True)
+    # plot_empirical_occupancy_2datasets()
+    plot_weight_magnitudes()
+    # plot_weights()
+    # plot_legends(0, 0, savefig=True, fig_dir=fig_dir, display=False)
