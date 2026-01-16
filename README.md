@@ -1,5 +1,6 @@
 This code was developed to analyze female _Drosophila_ behavior during courtship, as described in "**Singla et al. (2026). Latent state dynamics underlying female Drosophila response variability during courtship**"
 
+It implements an input-driven GLM-HMM, extending the base Dynamax library to support state transitions explicitly modulated by external sensory inputs. The current project uses Linear-Gaussian emissions (for continuous observations) but the model class for categorical emissions is also provided (e.g., to predict song outputs as in Calhoun et al., 2019.). It can easily be extended to support other emission types.
 
 ### Directory Structure
 
@@ -10,10 +11,11 @@ This code was developed to analyze female _Drosophila_ behavior during courtship
 │   ├── LRHMMFemaleFly.py               # Standard HMM with linear regression emissions.
 │   └── InputDrivenLRHMMFemaleFly.py    # Core GLM-HMM with input-driven transitions
 ├── library/                            # Custom extensions to Dynamax (features not yet in core)
-│   └── inputdriven_initstate.py        # 
-│   └── inputdriven_transitions.py      # 
-│   └── inputdriven_linreg_hmm.py       # 
-|   └── linreghmm.py                    # (Modified linreg_hmm class to add PSD enforcement, L2 norm, and input masking)
+│   └── inputdriven_initstate.py            # Input-driven Initial State class
+│   └── inputdriven_transitions.py          # Input-driven Transitions class
+│   └── inputdriven_linreg_hmm.py           # Input-driven Linear Regression HMM class
+│   └── inputdriven_categoricalreg_hmm.py   # Input-driven Categorical Regression HMM class
+|   └── linreghmm.py                        # (Modified linreg_hmm classes, see below)
 ├── preprocess/                         # Data pipelines
 │   ├── extract_data_from_h5.py         # Extract raw tracking/sensory data
 │   └── get_designmatrix.py             # Z-scoring, basis transformations
