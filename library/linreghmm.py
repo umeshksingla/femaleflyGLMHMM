@@ -42,7 +42,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
         if input_mask_by_emission is None:
             input_mask_by_emission = jnp.ones((self.emission_dim, self.input_dim))
         self.input_mask_by_emission_full = jnp.broadcast_to(input_mask_by_emission, (num_states, emission_dim, input_dim))
-        print("input_mask_by_emission", input_mask_by_emission.shape, "input_mask_by_emission_full", self.input_mask_by_emission_full.shape)
+        print("LRHMMEmissions input_mask_by_emission", input_mask_by_emission.shape, "input_mask_by_emission_full", self.input_mask_by_emission_full.shape)
 
     @property
     def emission_shape(self):

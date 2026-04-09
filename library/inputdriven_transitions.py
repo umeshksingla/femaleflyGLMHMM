@@ -6,13 +6,17 @@ Based on code from Dynamax (MIT License). Modified by Umesh Singla.
 """
 from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
 import jax.random as jr
+import jax.numpy as jnp
+from jax import vmap
 from jaxtyping import Array, Float, Int, PyTree
 import tensorflow_probability.substrates.jax.distributions as tfd
 import optax
 
+from dynamax.utils.optimize import run_gradient_descent
+from dynamax.parameters import to_unconstrained, from_unconstrained
 from dynamax.hidden_markov_model.inference import HMMPosterior
 from dynamax.hidden_markov_model.models.abstractions import HMMTransitions
-from dynamax.parameters import ParameterProperties, ParameterSet
+from dynamax.parameters import ParameterProperties, ParameterSet, PropertySet
 from dynamax.types import Scalar
 
 
@@ -36,6 +40,7 @@ class InputDrivenHMMTransitions(HMMTransitions):
             self,
             num_states: int,
             input_dim: int,
+            input_mask_first = None,
             m_step_optimizer: optax.GradientTransformation = optax.adam(1e-2),
             m_step_num_iters: int = 50
     ):
@@ -47,6 +52,10 @@ class InputDrivenHMMTransitions(HMMTransitions):
         super().__init__(m_step_optimizer=m_step_optimizer, m_step_num_iters=m_step_num_iters)
         self.num_states = num_states
         self.input_dim = input_dim
+        if input_mask_first is None:
+            input_mask_first = jnp.ones((self.input_dim,))
+        self.input_mask_first_full = jnp.broadcast_to(input_mask_first,(num_states, num_states, input_dim))
+        print("IDHMMTransitions input_mask_by_emission", input_mask_first.shape, "input_mask_by_emission_full", self.input_mask_first_full.shape)
 
     def distribution(
             self,
@@ -94,7 +103,7 @@ class InputDrivenHMMTransitions(HMMTransitions):
         return params, props
 
     def log_prior(self, params: ParamsInputDrivenHMMTransitions) -> Scalar:
-        """Return the log-prior probability of the emission parameters.
+        """Return the log-prior probability of the transition parameters.
 
         Currently, there is no prior so this function returns 0.
         """
@@ -117,6 +126,46 @@ class InputDrivenHMMTransitions(HMMTransitions):
 
         """
         return posterior.trans_probs, inputs
+
+    def m_step(self,
+               params: ParameterSet,
+               props: PropertySet,
+               batch_stats: PyTree,
+               m_step_state: Any,
+               scale: float=1.0
+    ) -> Tuple[ParameterSet, Any]:
+        unc_params = to_unconstrained(params, props)
+
+        # Minimize the negative expected log joint probability
+        def neg_expected_log_joint(unc_params):
+            """Compute the negative expected log joint probability."""
+            params = from_unconstrained(unc_params, props)
+            params = params._replace(weights=params.weights * self.input_mask_first_full)   # Zero out the irrelevant weights (Step 1)
+
+            def _single_expected_log_like(stats):
+                """Compute the expected log likelihood for a single sequence."""
+                expected_transitions, inputs = stats
+                log_trans_matrix = jnp.log(self._compute_transition_matrices(params, inputs))
+                lp = jnp.sum(expected_transitions * log_trans_matrix)
+                return lp
+
+            log_prior = self.log_prior(params)
+            batch_ells = vmap(_single_expected_log_like)(batch_stats)
+            expected_log_joint = log_prior + batch_ells.sum()
+            return -expected_log_joint / scale
+
+        # Run gradient descent
+        unc_params, m_step_state, losses = \
+            run_gradient_descent(neg_expected_log_joint,
+                                 unc_params,
+                                 self.m_step_optimizer,
+                                 optimizer_state=m_step_state,
+                                 num_mstep_iters=self.m_step_num_iters)
+
+        # Return the updated parameters and optimizer state
+        params = from_unconstrained(unc_params, props)
+        params = params._replace(weights=params.weights * self.input_mask_first_full)   # Zero out the irrelevant weights (Step 2)
+        return params, m_step_state
 
     def __getstate__(self):
         # Get parent's state first

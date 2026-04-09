@@ -24,10 +24,12 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         self.num_states = model_config['num_states']
         # print("self.model_config", self.model_config)
         self.seed = model_config.get('seed', 0)
+        print("self.data_config['input_mask_by_emission']", self.data_config['input_mask_by_emission'].shape)
         self.model = InputDrivenLinearRegressionHMM(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
                                     emission_dim=self.data_config['emission_dim'],
-                                    input_mask_by_emission=self.data_config['input_mask_by_emission'])
+                                    input_mask_by_emission=self.data_config['input_mask_by_emission'],
+                                    input_mask_first=self.data_config['input_mask_by_emission'][0])
         self.learned_params = None
         self.learned_lps = None
         super().__init__()
