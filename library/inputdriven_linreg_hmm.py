@@ -31,7 +31,6 @@ class InputDrivenLinearRegressionHMM(HMM):
                  input_dim: int,
                  emission_dim: int,
                  input_mask_by_emission: Float[Array, "emission_dim input_dim"] = None,
-                 initial_probs_concentration: Union[Scalar, Float[Array, " num_states"]]=1.1,
                  m_step_optimizer: optax.GradientTransformation = optax.adam(1e-2),
                  m_step_num_iters: int = 50):
         self.emission_dim = emission_dim
@@ -50,6 +49,8 @@ class InputDrivenLinearRegressionHMM(HMM):
                    key: Array=jr.PRNGKey(0),
                    method: str="prior",
                    initial_probs: Optional[Float[Array, " num_states"]]=None,
+                   transition_weights: Optional[Float[Array, "num_states num_states input_dim"]]=None,
+                   transition_biases: Optional[Float[Array, "num_states num_states"]]=None,
                    emission_weights: Optional[Float[Array, "num_states emission_dim input_dim"]]=None,
                    emission_biases: Optional[Float[Array, "num_states emission_dim"]]=None,
                    emission_covariances:  Optional[Float[Array, "num_states emission_dim emission_dim"]]=None,
@@ -58,6 +59,6 @@ class InputDrivenLinearRegressionHMM(HMM):
         key1, key2, key3 = jr.split(key , 3)
         params, props = dict(), dict()
         params["initial"], props["initial"] = self.initial_component.initialize(key1, method=method, initial_probs=initial_probs)
-        params["transitions"], props["transitions"] = self.transition_component.initialize(key2, method=method)
+        params["transitions"], props["transitions"] = self.transition_component.initialize(key2, method=method, transition_weights=transition_weights, transition_biases=transition_biases)
         params["emissions"], props["emissions"] = self.emission_component.initialize(key3, method=method, emission_weights=emission_weights, emission_biases=emission_biases, emission_covariances=emission_covariances, emissions=emissions)
         return ParamsInputDrivenLinearRegressionHMM(**params), ParamsInputDrivenLinearRegressionHMM(**props)

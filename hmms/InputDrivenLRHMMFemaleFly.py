@@ -4,7 +4,6 @@ import jax
 import numpy as np
 from jax import vmap
 import jax.random as jr
-from library.linreghmm import LinearRegressionHMMCustom
 from library.inputdriven_linreg_hmm import InputDrivenLinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
 
@@ -35,6 +34,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
 
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
+        print('reindexing params...')
 
         # OR Reindex by the activity index
         _, z_seqs, _, _, _ = self.predict(emissions, inputs)
@@ -60,6 +60,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
             )
         )
         # print("After:", params)
+        print('reindexed params.')
         return params
 
     def fit(self, emissions, inputs, output_mn_std):

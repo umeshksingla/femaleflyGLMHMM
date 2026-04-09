@@ -17,7 +17,7 @@ jax.config.update("jax_enable_x64", True)
 
 class LRHMMFemaleFly(BaseFemaleFly):
 
-    prefix = 'glmhmm_'
+    prefix = 'lrhmm_'
 
     def __init__(self, data_config, model_config):
         self.data_config = data_config
@@ -37,7 +37,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
 
-        # print("Before:", em_params)
+        print('reindexing params...')
 
         # OR Reindex by the activity index
         _, z_seqs, _, _, _ = self.predict(emissions, inputs)
@@ -60,7 +60,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
                 covs=em_params.emissions.covs[new_index],
             )
         )
-        # print("After:", params)
+        print('reindexed params.')
         return params
 
     def fit(self, emissions, inputs, output_mn_std):
@@ -97,7 +97,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
             x = inputs[btch]            # shape: (T, I)
 
             post = self.model.smoother(self.learned_params, y_true, x)
-            gamma = post.smoothed_probs     # shape: (T, K)
+            gamma = post.predicted_probs     # shape: (T, K)
 
             preds_per_state = np.stack([x @ W[k].T + b[k] for k in range(K)], axis=1)   # (T, K, D)
             soft_predictions = np.sum(gamma[:, :, None] * preds_per_state, axis=1)      # (T, D)

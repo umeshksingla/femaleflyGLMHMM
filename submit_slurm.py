@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     src = sys.argv[1]       # Specify src = 'wt' or 'wt_fred'
     animal = sys.argv[2]    # Specify animal = 'female' or 'male'
-    cvtype = sys.argv[3]    # Specify cvtype = 'kfold' or 'initseeds'
+    cvtype = sys.argv[3]    # Specify cvtype = 'kfold' or 'initseeds' or 'both'
 
     if src == 'wt':
         if animal == 'female':
@@ -54,24 +54,28 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Incorrect data source specified "{src}".')
 
-    path = f'jan1_{cvtype}cv_{src}_{animal}'
-    model_name = 'idglmhmmci'
+    model_name = 'lrhmmci'
+    path = f'apr6_{cvtype}cv_{src}_{animal}_2'
 
     if cvtype == 'kfold':
         init_seeds = [0]        # fix init seed
     elif cvtype == 'initseeds':
         datasplit_seeds = [0]   # fix data split seed
+    else:
+        pass
+
+    if model_name in ['lr', 'chance']:      # these models do not need to be run with different init seeds
+        init_seeds = [0]
 
     model_configs = {
         'name': [model_name],
-        'seed': init_seeds,
-        'datasplit_seed': datasplit_seeds,  #
+        'seed': init_seeds[:5],
+        'datasplit_seed': datasplit_seeds[:5],  #
         'num_states': [
             # 1      # uncomment for chance or lr
             2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
-            # 8, 10
         ],
-        # 'transition_matrix_stickiness': [100],
+        'transition_matrix_stickiness': [100],
         'data_path': [data_path],
         'path': [path],
     }

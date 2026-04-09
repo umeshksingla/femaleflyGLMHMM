@@ -41,14 +41,18 @@ def fitEMCustomInit(key, hmm, train_emissions, train_inputs,
 
 def fitEMInputDrivenCustomInit(key, hmm, train_emissions, train_inputs,
                     initial_probs=None,
+                    transition_weights=None,
+                    transition_biases=None,
                     emission_weights=None,
                     emission_biases=None,
                     ):
-    print("=== START emCustomInit ==========")
+    print("=== START emInputDrivenCustomInit ==========")
     s = time.time()
     _, key = jr.split(key)
     em_params, em_props = hmm.initialize(key,
                                          initial_probs=initial_probs,
+                                         transition_weights=transition_weights,
+                                         transition_biases=transition_biases,
                                          emission_weights=emission_weights,
                                          emission_biases=emission_biases,
                                          )
@@ -66,7 +70,7 @@ def fitEMInputDrivenCustomInit(key, hmm, train_emissions, train_inputs,
     if not converged:
         print("!!! !!! EM not converged !!! !!!")
     e = time.time()
-    print("=== END emCustomInit ==========")
+    print("=== END emInputDrivenCustomInit ==========")
     print(f"Time taken to fit EM: {round(e - s, 2)}s")
     return em_params, em_lps
 

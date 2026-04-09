@@ -18,7 +18,7 @@ from dynamax.types import Scalar
 
 class ParamsInputDrivenHMMTransitions(NamedTuple):
     """Parameters for the transitions of an input-driven HMM."""
-    weights: Union[Float[Array, "num_states num_states input_dim"], ParameterProperties]    # CHECK??
+    weights: Union[Float[Array, "num_states num_states input_dim"], ParameterProperties]
     biases: Union[Float[Array, "num_states num_states"], ParameterProperties]
 
 
@@ -69,19 +69,28 @@ class InputDrivenHMMTransitions(HMMTransitions):
 
     def initialize(
             self,
-            key: Optional[Array] = None,
-            method: str = "prior", **kwargs
+            key=jr.PRNGKey(0),
+            method: str = "prior",
+            transition_weights=None,
+            transition_biases=None,
+            **kwargs
     ) -> Tuple[ParamsInputDrivenHMMTransitions, ParamsInputDrivenHMMTransitions]:
         if method == "prior":
             # Initialize with small random weights (near zero) so transitions start near uniform
             key_w, key_b = jr.split(key)
-            weights = jr.normal(key_w, (self.num_states, self.num_states, self.input_dim)) * 0.01
-            biases = jr.normal(key_b, (self.num_states, self.num_states)) * 0.01
-        else:                                                                               # CHECK??
+            _weights = jr.normal(key_w, (self.num_states, self.num_states, self.input_dim)) * 0.01
+            _biases = jr.normal(key_b, (self.num_states, self.num_states)) * 0.01
+        else:
             raise ValueError(f"Unknown initialization method: {method}")
-        # Package the results into dictionaries
-        params = ParamsInputDrivenHMMTransitions(weights=weights, biases=biases)
-        props = ParamsInputDrivenHMMTransitions(weights=ParameterProperties(), biases=ParameterProperties())
+
+        # Only use the values above if the user hasn't specified their own
+        default = lambda x, x0: x if x is not None else x0
+        params = ParamsInputDrivenHMMTransitions(
+            weights=default(transition_weights, _weights),
+            biases=default(transition_biases, _biases))
+        props = ParamsInputDrivenHMMTransitions(
+            weights=ParameterProperties(),
+            biases=ParameterProperties())
         return params, props
 
     def log_prior(self, params: ParamsInputDrivenHMMTransitions) -> Scalar:

@@ -25,6 +25,9 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     with open(os.path.join(output_dir, 'model_config.json'), 'w') as f: json.dump(model.model_config, f)
     with open(os.path.join(output_dir, 'SUCCESS.txt'), 'w') as f: f.write(str(model.fit_success))
 
+    if 'hmm' in model.prefix:
+        plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
+
     emissions = data['emissions']
     inputs = data['inputs']
     aux_data = data['aux_data']
@@ -95,8 +98,6 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
     }
     joblib.dump(model_ckp, os.path.join(output_dir, 'model_basic.pkl'))
     print("Basic checkpoint dumped.")
-    if 'hmm' in model_ckp['prefix']:
-        plots.plot_loss(model.learned_lps, savefig=True, fig_dir=output_dir, display=False)
     return
 
 
@@ -649,7 +650,7 @@ def generate_state_filters(model_dir, savefig=True, display=False):
 
     model_prefix = model_ckp['prefix']
     print('model_prefix', model_prefix)
-    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_']:
+    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_', 'lrhmmci', 'lrhmmci', 'lrhmm_', 'lrhmm_']:
         return
 
     fig_dir = os.path.join(model_dir, 'figures')
