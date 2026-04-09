@@ -193,18 +193,19 @@ if __name__ == '__main__':
     savefig = True
     display = True
 
-    # model_paths = OrderedDict({
-    #     'GLM': 'models/general_wt/lr_1_cv/20260102_171428_ladder',  # GLM            !!!!!!!!!!!!!! NEEDS REPLACING
-    #     '5-state\nGLM-HMM': '../paper figs/FINAL WT/20260101_235805_duration',  # 5-GLM-HMM
-    #     # '': 'models/general_wt_shuffled/id-glm-hmm_5_cv/20251229_041412_rice',   # 5-GLM-HMM shuffled             !!!!!!!!!!!!!! NEEDS COMPUTING AS WELL AS REPLACING
-    #     '5-state\nHMM': 'models/general_wt/ghmm_5_cv/20260102_143703_fireman',  # 5-GHMM no inputs
-    #     # '5-state\nGLM-HMM\n(Second Dataset)': 'models__/final_wt_fred/20251229_040811_costume',  # 5-GLM-HMM fred
-    #     # '': 'models/general_wt/ghmm_5_cv/20260102_143703_fireman',   # 5-GHMM fred no inputs
-    #     '5-state\nGLM-HMM\n(accel.)': 'models/general_wt_acc/id-glm-hmm_5_cv/20260102_153816_remains',  # 5-GLM-HMM predict acceleration
-    #     '5-state\nHMM\n(accel.)': 'models/general_wt_acc/ghmm_5_cv/20260102_153345_coffee',  # 5-GHMM predict acceleration no inputs
-    # })
+    model_paths = OrderedDict({
+        'GLM': 'models/general_wt/lr_1_cv/20260102_171428_ladder',  # GLM            !!!!!!!!!!!!!! NEEDS REPLACING
+        '5-state\nGLM-HMM\n(w/o transitions)': '../paper figs/FINAL WT/20260101_235805_duration',  # 5-GLM-HMM
+        '5-state\nGLM-HMM\n(w/o transitions)': '../paper figs/FINAL WT/XX',  # 5-GLM-HMM (w/o GLM transitions)
+        # '': 'models/general_wt_shuffled/id-glm-hmm_5_cv/20251229_041412_rice',   # 5-GLM-HMM shuffled             !!!!!!!!!!!!!! NEEDS COMPUTING AS WELL AS REPLACING
+        '5-state\nHMM': 'models/general_wt/ghmm_5_cv/20260102_143703_fireman',  # 5-GHMM no inputs
+        # '5-state\nGLM-HMM\n(Second Dataset)': 'models__/final_wt_fred/20251229_040811_costume',  # 5-GLM-HMM fred
+        # '': 'models/general_wt/ghmm_5_cv/20260102_143703_fireman',   # 5-GHMM fred no inputs
+        # '5-state\nGLM-HMM\n(accel.)': 'models/general_wt_acc/id-glm-hmm_5_cv/20260102_153816_remains',  # 5-GLM-HMM predict acceleration
+        # '5-state\nHMM\n(accel.)': 'models/general_wt_acc/ghmm_5_cv/20260102_153345_coffee',  # 5-GHMM predict acceleration no inputs
+    })
     # plotCV_diff_model_Score_by_fly(model_paths, plot_only_test=False, filesuffix='', score_type='mse_fly')
-    #
+
     # model_paths = {
     #     # '': 'models/general_wt/lr_1_cv/20260102_171428_ladder',  # GLM female
     #     'Female': '../paper figs/FINAL WT/20260101_235805_duration',  # 5-GLM-HMM female
@@ -216,10 +217,10 @@ if __name__ == '__main__':
     #     'Dataset 1': 'models/general_wt/20251229_041412_rice',  # 5-GLM-HMM female
     #     'Dataset 2': 'models__/final_wt_fred/20251229_040811_costume',  # 5-GLM-HMM female fred
     # }
-    model_paths = {
-        'Dataset 1': '../paper figs/FINAL WT/20260101_235805_duration',  # 5-GLM-HMM female
-        'Dataset 2': '../paper figs/FINAL WT FRED/20260102_135949_spandex',  # 5-GLM-HMM female fred
-    }
+    # model_paths = {
+    #     'Dataset 1': '../paper figs/FINAL WT/20260101_235805_duration',  # 5-GLM-HMM female
+    #     'Dataset 2': '../paper figs/FINAL WT FRED/20260102_135949_spandex',  # 5-GLM-HMM female fred
+    # }
 
     plotCV_diff_model_Score_by_fly(model_paths, plot_only_test=False, filesuffix='', score_type='pearson_fly')
 
