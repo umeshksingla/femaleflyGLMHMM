@@ -671,6 +671,33 @@ def generate_state_filters(model_dir, savefig=True, display=False):
     return
 
 
+def generate_state_filters_filters_given(model_dir, all_weights, savefig=True, display=False):
+
+    model_ckp, data_config, model_config = load_specific_path(model_dir)
+    if (model_ckp is None):
+        return
+
+    model_prefix = model_ckp['prefix']
+    print('model_prefix', model_prefix)
+    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_', 'lrhmmci', 'lrhmmci', 'lrhmm_', 'lrhmm_']:
+        return
+
+    fig_dir = os.path.join(model_dir, 'figures')
+    state_fig_dir = os.path.join(fig_dir, 'state_figures_avgd')
+    os.makedirs(fig_dir, exist_ok=True)
+    os.makedirs(state_fig_dir, exist_ok=True)
+
+    update_labels(data_config)
+    input_labels = data_config['input_labels']
+
+    input_mask_by_statetrans = data_config['input_mask_by_emission'][0]
+    input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
+
+    plots.plot_statetrans_filters_separate(all_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey=True, savefig=savefig, fig_dir=state_fig_dir, display=display)
+    plots.plot_statetrans_filter_amplitudes(all_weights, data_config, input_list, input_mask_by_statetrans, input_labels, prefix='allstates', savefig=savefig, fig_dir=state_fig_dir, display=display)
+    return
+
+
 def generate_together_figures(model_dir, savefig=True, display=False):
     """Plots, such as filters, that need to be together for emissions and aux-emissions. """
 
@@ -857,9 +884,10 @@ def plot_xlims(model_dir, windows, batch, prefix, trajs_dir, trajs2d_dir, probs_
         xlim = (int(xlim_[0]), int(xlim_[1]))
         len_traj = xlim[1] - xlim[0]
         xlim_orig = (int(model_ckp[data_key][dwnsmpl_key][batch][xlim[0]]), int(model_ckp[data_key][dwnsmpl_key][batch][xlim[1]]))
-        plots.plot_state_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
-        plots.plot_trajectories_statewise(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}_perstate{suffix}', display=display)
+        # plots.plot_state_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{key_b}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        plots.plot_state_probs(model_ckp[data_key][f'{prefix}_fwd_state_probs'], model_config, data_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix=prefix, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_{key_b}_{len_traj}_{i}_xlim={xlim}{suffix}_fwd.pdf', display=display)
+        # plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{key_b}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)
+        # plots.plot_trajectories_statewise(model_ckp, model_config, data_config, batch, states_in_bgr=False, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{key_b}_{len_traj}_{i}_xlim={xlim}_perstate{suffix}', display=display)
 
         # plots.plot_comparison_probs(model_ckp[data_key][f'{prefix}_state_probs'], model_ckp[data_key][f'{prefix_data}_fwd_state_probs'], model_config, batch, effective_fps, xlim=xlim, xlim_orig=xlim_orig, prefix_data=prefix_data, suffix=suffix, savefig=savefig, fig_path=f'{probs_dir}/{prefix}{batch}_xlim={xlim}{suffix}_.pdf', display=display)
         # plots.plot_trajectories(model_ckp, model_config, data_config, batch, states_in_bgr=True, prefix=prefix, suffix=suffix, xlim=xlim, xlim_orig=xlim_orig, savefig=savefig, fig_path=f'{trajs_dir}/{prefix}{batch}_{len_traj}_{i}_xlim={xlim}{suffix}.pdf', display=display)

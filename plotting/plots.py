@@ -188,7 +188,7 @@ def plot_legends(num_states, data_config, savefig=False, fig_dir=None, display=T
 
 
 def plot_hmm_data_whole_session_with_states_on_top(predicted_emissions, true_emissions, predicted_states, config, model_label=None, xlim=None, xlim_orig=None, y_labels=None, title=None, savefig=False, fig_path=None, display=True):
-    print(predicted_states.shape)
+
     emission_dim = predicted_emissions.shape[-1]
 
     lent = xlim[1] - xlim[0]
@@ -2568,7 +2568,7 @@ def plot_state_probs(state_probs, model_config, data_config, batch, effective_fp
     ax.set_xticklabels([f"{round((pws * x + init_period) / orig_fps, 1)}" for x in xt])
 
     plt.ylabel('P(state | data)')
-    plt.title(f'{prefix.title()}:{batch} {suffix}')
+    # plt.title(f'{prefix.title()}:{batch} {suffix}')
     plt.xlabel('Time (s)')
     # plt.legend(loc='upper right')
 
@@ -2611,7 +2611,6 @@ def plot_trajectories(model_ckp, model_config, data_config, batch, prefix='', su
     # num_states = model_config['num_states']
     model_label = model_ckp['prefix'].upper() #+ '_' + str(num_states)
     emission_labels_jr = data_config['emission_labels_jr']
-    emission_labels_zscored = data_config['emission_labels_zscored']
 
     emissions = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'][batch]
     true_emissions = model_ckp[f'{prefix}_data'][f'{prefix}_emissions'][batch]
@@ -2636,7 +2635,7 @@ def plot_trajectories_statewise(model_ckp, model_config, data_config, batch, pre
 
     emissions = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions'][batch]
     emissions_per_state = model_ckp[f'{prefix}_data'][f'{prefix}_soft_predictions_per_state'][batch]
-    print("emissions_per_state", emissions_per_state.shape)
+    # print("emissions_per_state", emissions_per_state.shape)
     true_emissions = model_ckp[f'{prefix}_data'][f'{prefix}_emissions'][batch]
     stateseq = model_ckp[f'{prefix}_data'][f'{prefix}_stateseq'][batch]
 

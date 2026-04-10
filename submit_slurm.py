@@ -54,7 +54,7 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Incorrect data source specified "{src}".')
 
-    model_name = 'lrhmmci'
+    model_name = 'idglmhmmci'
     path = f'apr6_{cvtype}cv_{src}_{animal}_2'
 
     if cvtype == 'kfold':

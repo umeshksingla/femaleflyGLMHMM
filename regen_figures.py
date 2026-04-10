@@ -13,16 +13,16 @@ from utilities import utils
 
 if __name__  == '__main__':
 
-    model_pkl_path = f'../../paper figs/FINAL WT/20260101_235805_duration'  # for wt
+    # model_pkl_path = f'../../paper figs/FINAL WT/20260101_235805_duration'  # for wt
     # model_pkl_path = f'../paper figs/FINAL WT FRED/20260102_135949_spandex'    # for wt_fred
+    model_pkl_path = f'models/apr6_bothcv_wt_female_2/id-glm-hmm_5_cv/20260409_042336_chord/'
 
     # utils.enhance(model_pkl_path)
     # utils.enhance_auxem(model_pkl_path)
-
-    utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+    # utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
     # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
     # utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
-    # utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+    utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
     # utils.generate_auxem_figures(model_pkl_path, savefig=1, display=0)
     # utils.generate_state_traces(model_pkl_path, dataset='wt', savefig=1, display=0)
     # utils.generate_TAs(model_pkl_path, savefig=1, display=0)

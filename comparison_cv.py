@@ -95,38 +95,11 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
         # print('test', score_type, f'num_states={num_states}', test_scores)
         return train_scores, test_scores
 
-    # all_train_scores = {}
-    # all_test_scores = {}
-    # for _ in ['r2', 'pearson', 'll']:
-    #     all_train_scores[_] = []
-    #     all_test_scores[_] = []
-
-    # r2_train_score = pkl['train_data']['train_score'] * 100
-    # r2_test_score = pkl['test_data']['test_score'] * 100
-    # pearson_train_score = pkl['train_data']['train_pearson']
-    # pearson_test_score = pkl['test_data']['test_pearson']
-    # factor_bits_per_sec = data_config_pkl['effective_fps']/np.log(2)
-    # ll_train_score = pkl['train_data']['train_lp'].item() * factor_bits_per_sec
-    # ll_test_score = pkl['test_data']['test_lp'].item() * factor_bits_per_sec
-    # ll_fly_train_score = pkl['train_data']['train_lps_by_fly'] * factor_bits_per_sec
-    # ll_fly_test_score = pkl['test_data']['test_lps_by_fly'] * factor_bits_per_sec
-    
-    # all_train_scores['r2'].append(r2_train_score)
-    # all_test_scores['r2'].append(r2_test_score)
-    # all_train_scores['pearson'].append(pearson_train_score)
-    # all_test_scores['pearson'].append(pearson_test_score)
-    # all_train_scores['ll'].append(ll_train_score)
-    # all_test_scores['ll'].append(ll_test_score)
-
-    # for _ in all_train_scores:
-    #     all_train_scores[_] = np.array(all_train_scores[_])
-    #     all_test_scores[_] = np.array(all_test_scores[_])
-    # return all_train_scores, all_test_scores
-
     rows = []
     for model_path_prefix in model_path_prefixes:
+        model_path, prefix, datefilter = model_path_prefix
         for num_states in num_states_configs:
-            model_pkl_paths = sorted(glob.glob(f'models/{path}/{model_path_prefix}_{num_states}_cv/**/'))
+            model_pkl_paths = sorted(glob.glob(f'models/{model_path}/{prefix}_{num_states}_cv/{datefilter}**/'))
             random.shuffle(model_pkl_paths)
 
             c = 0
@@ -135,7 +108,7 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
                 if pkl is None: continue
                 datasplit_seed = model_config['datasplit_seed']
                 init_seed = model_config['seed']
-                name = model_path_prefix.split('/')[-1]
+                name = prefix   # model_path_prefix.split('/')[1]
                 for group in ['train', 'test']:
                     r2_score = pkl[f'{group}_data'][f'{group}_score'] * 100
                     pearson_score = pkl[f'{group}_data'][f'{group}_pearson']
@@ -150,7 +123,7 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
     return scores_df
 
 
-def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix=''):
+# def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix=''):
 
     plt.figure(figsize=(10, 6), constrained_layout=True)
     ax=plt.gca()
@@ -219,7 +192,7 @@ def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=F
     return
 
 
-def plotCV_same_model_LL_WIP(path, model_prefixes, num_states_configs, group, precomputed=False, onlyerrbars=True):
+# def plotCV_same_model_LL_WIP(path, model_prefixes, num_states_configs, group, precomputed=False, onlyerrbars=True):
     '''
     group = 'train' or 'test'
     '''
@@ -294,7 +267,8 @@ def plot_ll_scores(
     num_states=[1, 2, 3, 4, 5, 6, 7, 8, 10], 
     plot_type='mean_sem',   # 'mean_sem' or 'all_points'
     # group_by_seed=None,     # None, 'datasplit_seed', or 'init_seed'
-    figsize=(10, 6)
+    prefix='',
+    score_type='ll_score'
 ):
     """
     Plots ll_score vs num_states for specified models, groups, and seeds.
@@ -320,7 +294,7 @@ def plot_ll_scores(
     # if group_by_seed:
     #     group_cols.append(group_by_seed)
         
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
     colors = {
         'lrhmmci_': 'r',
         'id-glm-hmm': 'b',
@@ -341,11 +315,11 @@ def plot_ll_scores(
         
         if plot_type == 'all_points':
             ax.scatter(group_df['num_states'] + np.random.uniform(-0.1, 0.1, size=len(group_df)),
-                        group_df['ll_score'], color=colors[name[0]], edgecolors='none', s=5, alpha=0.4) #, label=label)
+                        group_df[score_type], color=colors[name[0]], edgecolors='none', s=5, alpha=0.4) #, label=label)
 
         # elif plot_type == 'mean_sem':
         # Calculate mean and standard error of the mean
-        stats_df = group_df.groupby('num_states')['ll_score'].agg(['mean', 'sem']).reset_index()
+        stats_df = group_df.groupby('num_states')[score_type].agg(['mean', 'sem']).reset_index()
         stats_df['sem'] = stats_df['sem'].fillna(0) # Handle single-point edge cases
 
         ax.errorbar(
@@ -363,7 +337,14 @@ def plot_ll_scores(
     # 5. Formatting and Aesthetics
     ax.set_xticks(num_states)
     ax.set_xlabel('Number of States')
-    ax.set_ylabel('Normalized LL (bits/s)')
+    if score_type == 'll_score':
+        ax.set_ylabel('Normalized LL (bits/s)')
+    elif score_type == 'pearson_score':
+        ax.set_ylabel(r'Pearson $r$')
+    elif score_type == 'r2_score':
+        ax.set_ylabel('Var Explained (%)')
+    else:
+        raise NotImplementedError
 
     plt.title(f'GLM-HMM ({name[1].title()})')
 
@@ -375,7 +356,7 @@ def plot_ll_scores(
     plt.grid(alpha=0.15)
     plt.ylim([90, 280])
     if savefig:
-        filename = f'{model_prefixes}_{groups}_{plot_type}.pdf'
+        filename = f'{prefix}_{model_prefixes}_{groups}_{plot_type}.pdf'
         print(f'Saved at: {filename}')
         plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
     if display:
@@ -384,7 +365,7 @@ def plot_ll_scores(
 
 
 
-def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, plot_only_test=False, filesuffix=''):
+# def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, plot_only_test=False, filesuffix=''):
 
     plt.figure(figsize=(10, 6), constrained_layout=True)
     ax=plt.gca()
@@ -450,7 +431,7 @@ def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, plot_onl
     return
 
 
-def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
+# def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
     """
     :param score_type: 'r2' or 'pearson'
     """
@@ -515,7 +496,7 @@ def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_tes
     return
 
 
-def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
+# def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
     """
     :param score_type: 'r2' or 'pearson'
     """
@@ -586,19 +567,6 @@ def scores_dump(path, model_prefixes, num_states_configs):
     joblib.dump(hmm_scores_df, f'{path}_hmm_scores_df.pkl')
     return
 
-    scores_dict = {}
-    for mi, mp in enumerate(model_prefixes):
-        scores_dict[mp] = {}
-        for i, s in enumerate(num_states_configs):
-            scores_dict[mp][s] = {}
-            # hmm_train_scores_dict, hmm_test_scores_dict = loadCV_Scores(path, mp, s)
-            # scores_dict[mp][s]['train'] = hmm_train_scores_dict
-            # scores_dict[mp][s]['test'] = hmm_test_scores_dict
-            hmm_scores_df = loadCV_Scores(path, mp, s)
-    print(hmm_scores_df)
-    joblib.dump(hmm_scores_df, f'{path}_hmm_scores_df.pkl')
-    return
-
 
 if __name__ == '__main__':
     import sys
@@ -606,27 +574,27 @@ if __name__ == '__main__':
     savefig = True
     display = False
 
-    # path = 'jan1_initseedscv_wt_female'
-    # path = 'apr6_bothcv_wt_female_2'
-
-    num_states_configs = [ 1, 2, 3, 4, 5, 6, 7, 8, 10 ]
-    # num_states_configs = [1, 2, 5]
-    # scores_dump('', ['apr6_bothcv_wt_female_2/lrhmmci_', 'apr6_bothcv_wt_female_2/id-glm-hmm'], num_states_configs)
+    # num_states_configs = [ 1, 2, 3, 4, 5, 6, 7, 8, 10 ]
+    # # num_states_configs = [1, 2, 5]
+    # scores_dump('apr10', [
+    #     ('apr6_bothcv_wt_female_2', 'lrhmmci_', ''),
+    #     ('apr6_bothcv_wt_female_2', 'id-glm-hmm', '')],
+    #     num_states_configs)
     # sys.exit(0)
 
-    df = joblib.load('new_hmm_scores_df.pkl')
+    df = joblib.load('apr10_hmm_scores_df.pkl')
     print(df)
 
-    # # 1. Isolate the training data
+    # 1. Isolate the training data
     train_df = df[df['group'] == 'train']
 
-    # # 2. Find the index of the max train ll_score for each setup
+    # 2. Find the index of the max train ll_score for each setup
     best_train_idx = train_df.groupby(['model', 'num_states', 'datasplit_seed'])['ll_score'].idxmax()
 
-    # # 3. Extract the winning combinations of model, states, datasplit, and the resulting best init_seed
+    # 3. Extract the winning combinations of model, states, datasplit, and the resulting best init_seed
     winning_combinations = train_df.loc[best_train_idx, ['model', 'num_states', 'datasplit_seed', 'init_seed']]
 
-    # # 4. Merge this back with the original dataframe to get both 'train' and 'test' rows for those specific seeds
+    # 4. Merge this back with the original dataframe to get both 'train' and 'test' rows for those specific seeds
     best_runs_df = pd.merge(
         df, 
         winning_combinations, 
@@ -636,15 +604,16 @@ if __name__ == '__main__':
     print(best_runs_df)
     print(winning_combinations)
 
-    # plot_ll_scores(df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['train'], plot_type='mean_sem')
-    # plot_ll_scores(df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='mean_sem')
-    # plot_ll_scores(df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points')
-    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['train'], plot_type='all_points')
-    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points')
+    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['train'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='mean_sem', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='mean_sem', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='mean_sem', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='all_points', prefix='apr10')
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='mean_sem', prefix='apr10')
 
-    # plotCV_same_model_LL_WIP('', ['apr6_bothcv_wt_female_2/id-glm-hmm', 'jan1_kfoldcv_wt_female/lrhmmci_'], num_states_configs, group='train', precomputed=True, onlyerrbars=False)
-    # plotCV_same_model_LL(path, 'lrhmmci_', num_states_configs, plot_all_test=True, filesuffix='')
-    # plotCV_same_model_Score(path, 'lrhmmci_', num_states_configs, plot_all_test=True, filesuffix='', score_type='pearson')
-    # plotCV_same_model_Score(path, 'lrhmmci_', num_states_configs, plot_all_test=True, filesuffix='', score_type='r2')
     # plotCV_same_model_LL_by_fly(path, 'lrhmmci_', num_states_configs, plot_only_test=True, filesuffix='plot_only_test')
 
