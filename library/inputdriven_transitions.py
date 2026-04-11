@@ -108,6 +108,7 @@ class InputDrivenHMMTransitions(HMMTransitions):
         Currently, there is no prior so this function returns 0.
         """
         return 0.0
+        # return tfd.Normal(0, 0.01).log_prob(params.weights).sum()
 
     def collect_suff_stats(self,
                            params: ParameterSet,
@@ -152,7 +153,11 @@ class InputDrivenHMMTransitions(HMMTransitions):
             log_prior = self.log_prior(params)
             batch_ells = vmap(_single_expected_log_like)(batch_stats)
             expected_log_joint = log_prior + batch_ells.sum()
-            return -expected_log_joint / scale
+
+            l2_reg = 1000 * jnp.sum(params.weights ** 2)
+            l1_reg = 1000 * jnp.sum(jnp.abs(params.weights))
+            total_penalty = l2_reg + l1_reg
+            return -expected_log_joint / scale + total_penalty
 
         # Run gradient descent
         unc_params, m_step_state, losses = \

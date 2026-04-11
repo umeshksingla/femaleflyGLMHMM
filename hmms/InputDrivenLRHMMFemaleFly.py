@@ -112,7 +112,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
             preds_per_states.append(preds_per_state)
             z_probs.append(post.smoothed_probs)
             fwd_z_probs.append(post.predicted_probs)
-            print("nan?", btch, np.sum(np.isnan(y_pred)), np.sum(np.isnan(preds_per_state)))
+            # print("nan?", btch, np.sum(np.isnan(y_pred)), np.sum(np.isnan(preds_per_state)))
         return y_preds, z_seqs, preds_per_states, z_probs, fwd_z_probs
 
     def get_data_logprob(self, emissions, inputs=None):

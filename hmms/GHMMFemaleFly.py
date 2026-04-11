@@ -41,7 +41,7 @@ class GHMMFemaleFly(BaseFemaleFly):
         emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
         state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
         new_index = np.argsort(state_activity_index)[::-1]
-        print("state_tot_activity_mean", state_activity_index)
+        # print("state_tot_activity_mean", state_activity_index)
         print("new ordering:", new_index)
 
         params = em_params._replace(
