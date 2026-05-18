@@ -33,11 +33,14 @@ class InputDrivenLinearRegressionHMM(HMM):
                  input_mask_by_emission: Float[Array, "emission_dim input_dim"] = None,
                  input_mask_first: Float[Array, "input_dim"] = None,
                  m_step_optimizer: optax.GradientTransformation = optax.adam(1e-2),
-                 m_step_num_iters: int = 50):
+                 m_step_num_iters: int = 50,
+                 l2_penalty: float = 1.0):
         self.emission_dim = emission_dim
         self.input_dim = input_dim
+        self.l2_penalty = l2_penalty
+        print("!!! Model initialized with", self.l2_penalty)
         initial_component = InputDrivenHMMInitialState(num_states, input_dim, input_mask_first)
-        transition_component = InputDrivenHMMTransitions(num_states, input_dim, input_mask_first, m_step_optimizer=m_step_optimizer, m_step_num_iters=m_step_num_iters)
+        transition_component = InputDrivenHMMTransitions(num_states, input_dim, input_mask_first, m_step_optimizer=m_step_optimizer, m_step_num_iters=m_step_num_iters, l2_penalty=l2_penalty)
         emission_component = LinearRegressionHMMEmissionsCustom(num_states, input_dim, emission_dim, input_mask_by_emission)
         super().__init__(num_states, initial_component, transition_component, emission_component)
 

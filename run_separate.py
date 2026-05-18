@@ -29,6 +29,7 @@ if __name__ == '__main__':
         "datasplit_seed": 0,
         "num_states": 5,
         "transition_matrix_stickiness": 100,
+        "l2_penalty": 12.0,
         "path": f'general_{dataset}',
         "data_path": data_path,
     }
