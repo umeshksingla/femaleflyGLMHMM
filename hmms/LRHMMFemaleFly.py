@@ -119,9 +119,9 @@ class LRHMMFemaleFly(BaseFemaleFly):
         # print("lps", lps)
         lp = np.sum(lps)
         # print("lp", lp)
-        lp_prior = self.model.log_prior(self.learned_params)
+        # lp_prior = self.model.log_prior(self.learned_params)
         # print("lp_prior", lp_prior)
-        lp += lp_prior
+        # lp += lp_prior
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = lp / total_emissions_size
         # print("lp", lp, "emissions_size", total_emissions_size)
