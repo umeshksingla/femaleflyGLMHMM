@@ -62,7 +62,8 @@ def run(mc, enhance=False, genfig=False):
 
     num_batches = data_config['num_sessions']
     datasplit_seed = mc.get('datasplit_seed', 0)
-    num_train_batches = int(num_batches * 0.8)
+    split = mc['split']
+    num_train_batches = int(num_batches * 0.5)
 
     # Set up reproducible RNG and shuffle indices
     rng = np.random.default_rng(datasplit_seed)
@@ -71,6 +72,10 @@ def run(mc, enhance=False, genfig=False):
 
     train_session_indices = all_indices[:num_train_batches].astype(int)
     test_session_indices = all_indices[num_train_batches:].astype(int)
+
+    if split == 1:
+        # swap the split used for training data
+        train_session_indices, test_session_indices = test_session_indices, train_session_indices
 
     train_emissions = [emissions[e] for e in train_session_indices]
     train_inputs = [inputs[e] for e in train_session_indices]
@@ -122,14 +127,14 @@ def run(mc, enhance=False, genfig=False):
             utils.generate_state_filters(dump_filepath, savefig=True, display=False)
             print(">> Done with figures.\n")
 
-            print(">> Generating trajectories:")
-            utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
-            print(">> Done with trajectories.\n")
-
-            print(">> Generating videos:")
-            utils.generate_state_traces(dump_filepath, savefig=True, display=False)
-            utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
-            print(">> Done with videos.\n")
+            # print(">> Generating trajectories:")
+            # utils.generate_trajs(dump_filepath, savefig=True, display=False, gen_corr_video=False)
+            # print(">> Done with trajectories.\n")
+            #
+            # print(">> Generating videos:")
+            # utils.generate_state_traces(dump_filepath, savefig=True, display=False)
+            # utils.generate_state_clips(dump_filepath, savefig=True, display=False, gen_corr_video=True)
+            # print(">> Done with videos.\n")
 
     print("Finished.\n")
     return dump_filepath
