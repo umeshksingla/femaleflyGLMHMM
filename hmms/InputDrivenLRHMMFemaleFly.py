@@ -32,7 +32,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
                                     input_mask_by_emission=self.data_config['input_mask_by_emission'],
                                     input_mask_first=self.data_config['input_mask_by_emission'][0],
                                     l2_penalty=self.l2_penalty,
-                                    m_step_num_iters=200,)
+                                    m_step_num_iters=100,)
         self.learned_params = None
         self.learned_lps = None
         super().__init__()

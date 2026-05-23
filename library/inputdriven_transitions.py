@@ -157,8 +157,8 @@ class InputDrivenHMMTransitions(HMMTransitions):
             expected_log_joint = log_prior + batch_ells.sum()
 
             l2_reg = self.l2_penalty * jnp.sum(params.weights ** 2)
-            # l1_reg = jnp.sum(jnp.abs(params.weights))
-            total_penalty = l2_reg # + l1_reg
+            # l1_reg =  jnp.sum(jnp.abs(params.weights))
+            total_penalty = l2_reg  # + l1_reg
             return -expected_log_joint / scale + total_penalty
 
         # Run gradient descent
