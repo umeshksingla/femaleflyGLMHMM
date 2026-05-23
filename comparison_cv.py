@@ -85,7 +85,7 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
     """
     :param score_type: 'r2' or 'pearson' or 'll'
     """
-    from utilities import utils
+    from utilities.io import load_specific_path
 
     if precomputed:
         scores_dict = joblib.load(f'{path}_all_scores_dict.pkl')
@@ -100,11 +100,11 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
         model_path, prefix, datefilter = model_path_prefix
         for num_states in num_states_configs:
             model_pkl_paths = sorted(glob.glob(f'models/{model_path}/{prefix}_{num_states}_cv/{datefilter}**/'))
-            random.shuffle(model_pkl_paths)
+            # random.shuffle(model_pkl_paths)
 
             c = 0
             for _ in model_pkl_paths:
-                pkl, data_config_pkl, model_config = utils.load_specific_path(_)
+                pkl, data_config_pkl, model_config = load_specific_path(_)
                 if pkl is None: continue
                 datasplit_seed = model_config['datasplit_seed']
                 init_seed = model_config['seed']
@@ -112,159 +112,24 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
                 for group in ['train', 'test']:
                     r2_score = pkl[f'{group}_data'][f'{group}_score'] * 100
                     pearson_score = pkl[f'{group}_data'][f'{group}_pearson']
+                    l2_penalty = model_config['l2_penalty']
                     factor_bits_per_sec = data_config_pkl['effective_fps']/np.log(2)
                     ll_score = pkl[f'{group}_data'][f'{group}_lp'].item() * factor_bits_per_sec
-                    row = [name, num_states, group, datasplit_seed, init_seed, r2_score, pearson_score, ll_score, _]
+                    row = [name, num_states, group, datasplit_seed, init_seed, r2_score, pearson_score, ll_score, l2_penalty, _]
                     rows.append(row)
                 c += 1
-                # if c == 2: break
-    scores_df = pd.DataFrame(rows, columns=['model', 'num_states', 'group', 'datasplit_seed', 'init_seed', 'r2_score', 'pearson_score', 'll_score', 'path'])
+                if c == 10: break
+    columns=['model', 'num_states', 'group', 'datasplit_seed', 'init_seed', 'r2_score', 'pearson_score', 'll_score', 'l2_penalty', 'path']
+    scores_df = pd.DataFrame(rows, columns=columns)
     print(scores_df)
     return scores_df
-
-
-# def plotCV_same_model_LL(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix=''):
-
-    plt.figure(figsize=(10, 6), constrained_layout=True)
-    ax=plt.gca()
-    ms = 5
-
-    # Plot for num_states=0 i.e. chance
-    # chance_train_lps, chance_test_lps = loadCV_LLs(path, 'chance', 1)
-    # train_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_train_lps))
-    # plt.plot([0], [0.], 'ko', mfc='none', markersize=ms)  # plot 0s for chance as chance_lps stored are not relative to chance.
-
-    # Plot for num_states=0 i.e. chance
-    s = 0
-    chance_train_lps, chance_test_lps = loadCV_Scores(path, 'chance', 0, score_type='ll')
-    train_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_train_lps))
-    plt.plot(s+train_jitter, np.zeros_like(chance_train_lps), 'ko', mfc='none', markersize=ms)  # plot 0s for chance as chance_lps stored are not relative to chance.
-    if plot_all_test:
-        test_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_test_lps))
-        plt.plot(s+test_jitter, np.zeros_like(chance_test_lps), 'ko', markersize=ms)
-    else:
-        plt.plot(s, (0.), 'ko', markersize=ms)   # plot for the max train one
-
-    # Plot for num_states=1 i.e. linear regression
-    s = 1
-    lr_train_lps, lr_test_lps = loadCV_Scores(path, 'lr', 1, score_type='ll')
-    train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_lps))
-    plt.plot(s+train_jitter, lr_train_lps, 'ko', mfc='none', markersize=ms, label='Train')
-    if plot_all_test:
-        test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_lps))
-        plt.plot(s+test_jitter, lr_test_lps, 'ko', markersize=ms, label='Held-out')
-    else:
-        plt.plot(s, (lr_test_lps[np.argmax(lr_train_lps)]), 'ko', markersize=ms, label='Held-out')   # plot for the max train one
-
-    # Plot for num_states > 1 now
-    for i, s in enumerate(num_states_configs):
-        hmm_train_lps, hmm_test_lps = loadCV_Scores(path, model_prefix, s, score_type='ll')
-        print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_lps)} Test:{len(hmm_test_lps)}")
-        train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_lps))
-        plt.plot(s+train_jitter, hmm_train_lps, 'ko', mfc='none', markersize=ms)
-        # plt.errorbar(s + 0.4, np.mean(hmm_train_lps), yerr=np.std(hmm_train_lps), color='k', fmt='o', capsize=0)
-
-        if plot_all_test:
-            test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_lps))
-            plt.plot(s+test_jitter, hmm_test_lps, 'ko', markersize=ms)
-        else:
-            if len(hmm_train_lps):
-                plt.plot(s, (hmm_test_lps[np.argmax(hmm_train_lps)]), 'ko', markersize=ms)   # plot for the max train one
-
-    plt.ylabel('Normalized LL (bits/s)')
-    plt.xlabel('Number of states')
-    plt.xticks([0, 1] + num_states_configs, labels=['Chance', 'GLM'] + num_states_configs)
-
-    # Rotate only the first 2 tick labels
-    for i, label in enumerate(ax.get_xticklabels()):
-        if i < 2:
-            label.set_rotation(90)
-    # plt.title(model_prefix.upper())
-    plt.title('GLM-HMM')
-    plt.legend(loc='lower right')
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    # plt.tight_layout()
-    if savefig:
-        plt.savefig(f'models/{path}/{model_prefix}_{path}_ll_cv{filesuffix}.pdf', bbox_inches='tight', dpi=300)
-    if display:
-        plt.show()
-    return
-
-
-# def plotCV_same_model_LL_WIP(path, model_prefixes, num_states_configs, group, precomputed=False, onlyerrbars=True):
-    '''
-    group = 'train' or 'test'
-    '''
-
-    plt.figure(figsize=(10, 6), constrained_layout=True)
-    ax=plt.gca()
-    ms = 2
-
-    colors = {
-        'lrhmmci_': 'r',
-        'id-glm-hmm': 'b',
-    }
-
-    labels = {
-        'lrhmmci_': 'w/o GLM Transitions',
-        'id-glm-hmm': 'w GLM Transitions',
-    }
-
-    # Plot for num_states > 1
-    mps = []
-    for mi, mpath in enumerate(model_prefixes):
-        mp = mpath.split('/')[-1]
-        ss = []
-        mns = []
-        stds = []
-        sems = []
-        for i, s in enumerate(num_states_configs):
-            hmm_train_lps, hmm_test_lps = loadCV_Scores(path, mpath, s, score_type='ll', precomputed=precomputed)
-            # print(f"{mp}: num_states={s} Train: {len(hmm_train_lps)} Test:{len(hmm_test_lps)}")
-            train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_lps))
-
-            if group == 'train':
-                mn = np.mean(hmm_train_lps)
-                std = np.std(hmm_train_lps)
-                sem = stats.sem(hmm_train_lps)
-            elif group == 'test':
-                mn = np.mean(hmm_test_lps)
-                std = np.std(hmm_test_lps)
-                sem = stats.sem(hmm_test_lps)
-
-            ss.append(s)  # s + 0.1 * pow(-1, mi+1)
-            mns.append(mn)
-            stds.append(std)
-            sems.append(sem)
-            print(f"model={mp} ({group}) \t\t states={s} LL = {mn} ± {sem}")
-
-            if not onlyerrbars:
-                plt.plot(s+train_jitter, hmm_train_lps, 'o', color=colors[mp], mfc='none', markersize=ms)
-    
-        plt.errorbar(ss, mns, yerr=sems, color=colors[mp], fmt='o-', markersize=ms, capsize=0, label=labels[mp])
-        mps.append(mp)
-
-    plt.ylabel('Normalized LL (bits/s)')
-    plt.xlabel('Number of states')
-    plt.xticks(num_states_configs, labels=num_states_configs)
-    plt.title('GLM-HMM')
-    plt.legend(loc='lower right')
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    # plt.tight_layout()
-    if savefig:
-        plt.savefig(f'models/cv_figs/{mps}_ll_cv_{group}.pdf', bbox_inches='tight', dpi=300)
-    if display:
-        plt.show()
-    return
 
 
 def plot_ll_scores(
     df, 
     model_prefixes=['id-glm-hmm'], 
-    groups=['train', 'test'], 
-    num_states=[1, 2, 3, 4, 5, 6, 7, 8, 10], 
+    # groups=['train', 'test'], 
+    num_states=[2, 3, 4, 5, 6, 7, 8, 10], 
     plot_type='mean_sem',   # 'mean_sem' or 'all_points'
     # group_by_seed=None,     # None, 'datasplit_seed', or 'init_seed'
     prefix='',
@@ -276,25 +141,27 @@ def plot_ll_scores(
     np.random.seed(0)
 
     # 1. Filter for specific states and groups
-    plot_df = df[df['num_states'].isin(num_states)].copy()
-    plot_df = plot_df[plot_df['group'].isin(groups)]
+    # plot_df = df[df['num_states'].isin(num_states)].copy()
+    # plot_df = plot_df[plot_df['group'].isin(groups)]
     
-    # 2. Filter and extract model prefixes (to handle names like 'hmm_1', 'glm_base')
-    def get_prefix(model_name):
-        for prefix in model_prefixes:
-            if model_name.startswith(prefix):
-                return prefix
-        return None
+    # # 2. Filter and extract model prefixes (to handle names like 'hmm_1', 'glm_base')
+    # def get_prefix(model_name):
+    #     for prefix in model_prefixes:
+    #         if model_name.startswith(prefix):
+    #             return prefix
+    #     return None
         
-    plot_df['model_prefix'] = plot_df['model'].apply(get_prefix)
-    plot_df = plot_df.dropna(subset=['model_prefix'])
+    # plot_df['model_prefix'] = plot_df['model'].apply(get_prefix)
+    # plot_df = plot_df.dropna(subset=['model_prefix'])
+
+    # plot_df['model_prefix'] = plot_df['model']
     
     # 3. Determine how we are grouping the data for lines/colors
     group_cols = ['model_prefix', 'group']
     # if group_by_seed:
     #     group_cols.append(group_by_seed)
         
-    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+    fig, axes = plt.subplots(2, 1, figsize=(10, 12), constrained_layout=True, sharey=True)
     colors = {
         'lrhmmci_': 'r',
         'id-glm-hmm': 'b',
@@ -306,57 +173,67 @@ def plot_ll_scores(
     }
     
     # 4. Group data and plot
-    for name, group_df in plot_df.groupby(group_cols):
-        # 'name' is a tuple representing the current group
-        label = " | ".join(map(str, name))
+    for e, groups in enumerate([['train'], ['test']]):
+        ax = axes[e]
 
-        # Sort to ensure lines connect left-to-right properly
-        group_df = group_df.sort_values('num_states')
-        
-        if plot_type == 'all_points':
-            ax.scatter(group_df['num_states'] + np.random.uniform(-0.1, 0.1, size=len(group_df)),
-                        group_df[score_type], color=colors[name[0]], edgecolors='none', s=5, alpha=0.4) #, label=label)
+        plot_df = df[df['num_states'].isin(num_states)].copy()
+        plot_df = plot_df[plot_df['group'].isin(groups)]
+        plot_df['model_prefix'] = plot_df['model']
 
-        # elif plot_type == 'mean_sem':
-        # Calculate mean and standard error of the mean
-        stats_df = group_df.groupby('num_states')[score_type].agg(['mean', 'sem']).reset_index()
-        stats_df['sem'] = stats_df['sem'].fillna(0) # Handle single-point edge cases
+        for name, group_df in plot_df.groupby(group_cols):
+            # 'name' is a tuple representing the current group
+            label = " | ".join(map(str, name))
+            print(label)
 
-        ax.errorbar(
-            stats_df['num_states'], 
-            stats_df['mean'], 
-            yerr=stats_df['sem'], 
-            marker='o', 
-            capsize=0,
-            # linewidth=2,
-            markersize=2,
-            label=labels[name[0]],
-            color=colors[name[0]],
-        )
+            group_df = group_df.sort_values('num_states')
 
-    # 5. Formatting and Aesthetics
-    ax.set_xticks(num_states)
-    ax.set_xlabel('Number of States')
-    if score_type == 'll_score':
-        ax.set_ylabel('Normalized LL (bits/s)')
-    elif score_type == 'pearson_score':
-        ax.set_ylabel(r'Pearson $r$')
-    elif score_type == 'r2_score':
-        ax.set_ylabel('Var Explained (%)')
-    else:
-        raise NotImplementedError
+            if plot_type == 'all_points':
+                ax.scatter(group_df['num_states'] + np.random.uniform(-0.1, 0.1, size=len(group_df)),
+                            group_df[score_type], color=colors[name[0]], edgecolors='none', s=5, alpha=0.4) #, label=label)
 
-    plt.title(f'GLM-HMM ({name[1].title()})')
+            # elif plot_type == 'mean_sem':
+            # Calculate mean and standard error of the mean
+            stats_df = group_df.groupby('num_states')[score_type].agg(['mean', 'sem']).reset_index()
+            stats_df['sem'] = stats_df['sem'].fillna(0) # Handle single-point edge cases
 
-    handles, labels = ax.get_legend_handles_labels()
-    cleaned_handles = [ h[0] if type(h).__name__ == 'ErrorbarContainer' else h for h in handles]
-    ax.legend(cleaned_handles, labels, loc='lower right')
+            ax.errorbar(
+                stats_df['num_states'], 
+                stats_df['mean'], 
+                yerr=stats_df['sem'], 
+                marker='o', 
+                capsize=0,
+                # linewidth=2,
+                markersize=2,
+                label=labels[name[0]],
+                color=colors[name[0]],
+            )
+            # print(stats_df)
 
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    plt.ylim([90, 280])
+        # 5. Formatting and Aesthetics
+        ax.set_xticks(num_states)
+        if ax.get_subplotspec().is_last_row():
+            ax.set_xlabel('Number of States')
+        if score_type == 'll_score':
+            ax.set_ylabel('Normalized LL (bits/s)')
+        elif score_type == 'pearson_score':
+            ax.set_ylabel(r'Pearson $r$')
+        elif score_type == 'r2_score':
+            ax.set_ylabel('Var Explained (%)')
+        else:
+            raise NotImplementedError
+
+        ax.set_title(f'GLM-HMM ({name[1].title()})')
+
+        handles, hlabels = ax.get_legend_handles_labels()
+        cleaned_handles = [ h[0] if type(h).__name__ == 'ErrorbarContainer' else h for h in handles]
+        ax.legend(cleaned_handles, hlabels, loc='lower right')
+
+        ax.margins(0.1)
+        ax.grid(alpha=0.15)
+        # ax.set_ylim([90, 280])
+
     if savefig:
-        filename = f'{prefix}_{model_prefixes}_{groups}_{plot_type}.pdf'
+        filename = f'{prefix}_{model_prefixes}_{groups}_{plot_type}_both_wo1.pdf'
         print(f'Saved at: {filename}')
         plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
     if display:
@@ -364,200 +241,95 @@ def plot_ll_scores(
     return
 
 
+def plot_penalty_cv(prefix, df):
 
-# def plotCV_same_model_LL_by_fly(path, model_prefix, num_states_configs, plot_only_test=False, filesuffix=''):
+    df = df.groupby(["num_states", "l2_penalty", "group"], as_index=False)["ll_score"].mean()
 
-    plt.figure(figsize=(10, 6), constrained_layout=True)
-    ax=plt.gca()
-    ms = 5
+    l2_values = sorted(df["l2_penalty"].unique())
+    colors = plt.cm.tab10(range(len(l2_values)))
 
-    # Plot for num_states=0 i.e. chance
-    s = 0
-    chance_train_lps, chance_test_lps = loadCV_Scores(path, 'chance', 0, score_type='ll_fly')
+    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
 
-    if not plot_only_test:
-        train_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_train_lps))
-        plt.plot(s+train_jitter, np.zeros_like(chance_train_lps), 'ko', mfc='none', markersize=ms)  # plot 0s for chance as chance_lps stored are not relative to chance.
+    for color, l2 in zip(colors, l2_values):
+        sub = df[df["l2_penalty"] == l2]
+        train = sub[sub["group"] == "train"].sort_values("num_states")
+        test  = sub[sub["group"] == "test"].sort_values("num_states")
+        ax.plot(train["num_states"], train["ll_score"], color=color, linestyle="-", marker=".", label=f"l2={l2} train")
+        ax.plot(test["num_states"],  test["ll_score"],  color=color, linestyle=":", marker=".", label=f"l2={l2} test")
 
-    test_jitter = np.random.uniform(-0.25, 0.25, size=len(chance_test_lps))
-    plt.plot(s+test_jitter, np.zeros_like(chance_test_lps), 'ko', markersize=ms)
-
-    # Plot for num_states=1 i.e. linear regression
-    s = 1
-    lr_train_lps, lr_test_lps = loadCV_Scores(path, 'lr', 1, score_type='ll_fly')
-
-    if not plot_only_test:
-        train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_lps))
-        plt.plot(s+train_jitter, lr_train_lps, 'ko', mfc='none', markersize=ms, label='Train')
-
-    test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_lps))
-    plt.plot(s+test_jitter, lr_test_lps, 'ko', markersize=ms, label='Held-out')
-    plt.errorbar(s + 0.4, np.mean(lr_test_lps), yerr=np.std(lr_test_lps), color='k', fmt='o', capsize=0)
-
-
-    # Plot for num_states > 1 now
-    for i, s in enumerate(num_states_configs):
-        hmm_train_lps, hmm_test_lps = loadCV_Scores(path, model_prefix, s, score_type='ll_fly')
-        print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_lps)} Test:{len(hmm_test_lps)}")
-
-        if not plot_only_test:
-            train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_lps))
-            plt.plot(s+train_jitter, hmm_train_lps, 'ko', mfc='none', markersize=ms)
-        # plt.errorbar(s + 0.4, np.mean(hmm_train_lps), yerr=np.std(hmm_train_lps), color='k', fmt='o', capsize=0)
-
-        test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_lps))
-        plt.plot(s+test_jitter, hmm_test_lps, 'ko', markersize=ms)
-        plt.errorbar(s + 0.4, np.mean(hmm_test_lps), yerr=np.std(hmm_test_lps), color='k', fmt='o', capsize=0)
-
-
-    plt.ylabel('Normalized LL (bits/s)')
-    plt.xlabel('Number of states')
-    plt.xticks([0, 1] + num_states_configs, labels=['Chance', 'GLM'] + num_states_configs)
-
-    # Rotate only the first 2 tick labels
-    for i, label in enumerate(ax.get_xticklabels()):
-        if i < 2:
-            label.set_rotation(90)
-    # plt.title(model_prefix.upper())
-    plt.title('GLM-HMM')
-    plt.legend(loc='lower right')
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    # plt.tight_layout()
+    ax.set_xlabel("num_states")
+    ax.set_ylabel("Normalized LL (bits/s)")
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.legend(title="L2 / split")
+    ax.margins(0.1)
+    ax.grid(alpha=0.15)
+    plt.tight_layout()
     if savefig:
-        plt.savefig(f'models/{path}/{model_prefix}_{path}_ll_by_fly_cv{filesuffix}.pdf', bbox_inches='tight', dpi=300)
+        filename = f'{prefix}_penalty.pdf'
+        print(f'Saved at: {filename}')
+        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
 
 
-# def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
-    """
-    :param score_type: 'r2' or 'pearson'
-    """
+def plot_penalty_cv_perstate(prefix, df, filter_numstates=[]):
 
-    if score_type not in ['r2', 'pearson']:
-        raise Exception(f'Unsupported score type "{score_type}".')
+    df = df.groupby(["num_states", "l2_penalty", "group"], as_index=False)["ll_score"].mean()
 
-    plt.figure(figsize=(10, 6), constrained_layout=True)
-    ax=plt.gca()
-    ms = 5
+    states = sorted(df["num_states"].unique())
+    colors = plt.cm.tab10(range(len(states)))
 
-    # skip chance model for r2 and pearson
-    # Plot for num_states=1 i.e. linear regression
-    lr_train_scores, lr_test_scores = loadCV_Scores(path, 'lr', 1, score_type=score_type)
-    train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_scores))
-    plt.plot(1+train_jitter, lr_train_scores, 'ko', mfc='none', markersize=ms, label='Train')
-    if plot_all_test:
-        test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_scores))
-        plt.plot(1+test_jitter, lr_test_scores, 'ko', markersize=ms, label='Held-out')
-    else:
-        plt.plot(1, (lr_test_scores[np.argmax(lr_train_scores)]), 'ko', markersize=ms, label='Held-out')   # plot for the max train one
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Plot for num_states > 1 now
-    for i, s in enumerate(num_states_configs):
-        hmm_train_scores, hmm_test_scores = loadCV_Scores(path, model_prefix, s, score_type=score_type)
-        print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_scores)} Test:{len(hmm_test_scores)}")
-        train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_scores))
-        plt.plot(s+train_jitter, hmm_train_scores, 'ko', mfc='none', markersize=ms)
-        # plt.errorbar(s + 0.4, np.mean(hmm_train_lps*factor_bits_per_sec), yerr=np.std(hmm_train_lps*factor_bits_per_sec), color='k', fmt='o', capsize=0)
+    for color, ns in zip(colors, states):
+        if ns not in filter_numstates: continue
+        sub = df[df["num_states"] == ns]
+        train = sub[sub["group"] == "train"].sort_values("l2_penalty")
+        test  = sub[sub["group"] == "test"].sort_values("l2_penalty")
+        ax.plot(train["l2_penalty"], train["ll_score"], color=color, linestyle="-",
+                marker=".", label=f"n={ns} / Train")
+        ax.plot(test["l2_penalty"],  test["ll_score"],  color=color, linestyle=":",
+                marker=".", label=f"n={ns} / Test")
 
-        if plot_all_test:
-            test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_scores))
-            plt.plot(s+test_jitter, hmm_test_scores, 'ko', markersize=ms)
-        else:
-            if len(hmm_train_scores):
-                plt.plot(s, (hmm_test_scores[np.argmax(hmm_train_scores)]), 'ko', markersize=ms)   # plot for the max train one
-
-    if score_type == 'r2':
-        plt.ylabel('Var Explained (%)')
-    elif score_type == 'pearson':
-        plt.ylabel(r'Pearson $r$')
-    else:
-        raise Exception(f'Unsupported score type "{score_type}".')
-
-    plt.xlabel('Number of states')
-    plt.xticks([1] + num_states_configs, labels=['GLM'] + num_states_configs)
-
-    # Rotate only the first 2 tick labels
-    for i, label in enumerate(ax.get_xticklabels()):
-        if i < 2:
-            label.set_rotation(90)
-    # plt.title(model_prefix.upper())
-    plt.title('GLM-HMM')
-    plt.legend(loc='lower right')
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    # plt.tight_layout()
+    ax.set_xlabel("l2_penalty")
+    ax.set_ylabel("Normalized LL (bits/sec)")
+    ax.set_xscale("log")
+    ax.legend(title="states / split", fontsize=10, bbox_to_anchor=(1.02, 1), loc="upper left", borderaxespad=0)
+    ax.margins(0.1)
+    ax.grid(alpha=0.15)
+    plt.tight_layout()
     if savefig:
-        plt.savefig(f'models/{path}/{model_prefix}_{path}_{score_type}_cv{filesuffix}.pdf', bbox_inches='tight', dpi=300)
+        filename = f'{prefix}_penalty_perstate_{filter_numstates}.pdf'
+        print(f'Saved at: {filename}')
+        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
 
 
-# def plotCV_same_model_Score(path, model_prefix, num_states_configs, plot_all_test=False, filesuffix='', score_type='r2'):
-    """
-    :param score_type: 'r2' or 'pearson'
-    """
+def return_grouped_ll_scores(
+    prefix,
+    df, 
+    model_prefixes, 
+    score_type='ll_score'
+    ):
 
-    if score_type not in ['r2', 'pearson']:
-        raise Exception(f'Unsupported score type "{score_type}".')
+    df['model'] = df['model'].replace('id-glm-hmm', 'GLM Tr')
+    df['model'] = df['model'].replace('lrhmmci_', 'Static Tr')
 
-    plt.figure(figsize=(10, 6), constrained_layout=True)
-    ax=plt.gca()
-    ms = 5
-
-    # skip chance model for r2 and pearson
-    # Plot for num_states=1 i.e. linear regression
-    lr_train_scores, lr_test_scores = loadCV_Scores(path, 'lr', 1, score_type=score_type)
-    train_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_train_scores))
-    plt.plot(1+train_jitter, lr_train_scores, 'ko', mfc='none', markersize=ms, label='Train')
-    if plot_all_test:
-        test_jitter = np.random.uniform(-0.25, 0.25, size=len(lr_test_scores))
-        plt.plot(1+test_jitter, lr_test_scores, 'ko', markersize=ms, label='Held-out')
-    else:
-        plt.plot(1, (lr_test_scores[np.argmax(lr_train_scores)]), 'ko', markersize=ms, label='Held-out')   # plot for the max train one
-
-    # Plot for num_states > 1 now
-    for i, s in enumerate(num_states_configs):
-        hmm_train_scores, hmm_test_scores = loadCV_Scores(path, model_prefix, s, score_type=score_type)
-        print(f"{model_prefix}: num_states={s} Train: {len(hmm_train_scores)} Test:{len(hmm_test_scores)}")
-        train_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_train_scores))
-        plt.plot(s+train_jitter, hmm_train_scores, 'ko', mfc='none', markersize=ms)
-        # plt.errorbar(s + 0.4, np.mean(hmm_train_lps*factor_bits_per_sec), yerr=np.std(hmm_train_lps*factor_bits_per_sec), color='k', fmt='o', capsize=0)
-
-        if plot_all_test:
-            test_jitter = np.random.uniform(-0.25, 0.25, size=len(hmm_test_scores))
-            plt.plot(s+test_jitter, hmm_test_scores, 'ko', markersize=ms)
-        else:
-            if len(hmm_train_scores):
-                plt.plot(s, (hmm_test_scores[np.argmax(hmm_train_scores)]), 'ko', markersize=ms)   # plot for the max train one
-
-    if score_type == 'r2':
-        plt.ylabel('Var Explained (%)')
-    elif score_type == 'pearson':
-        plt.ylabel(r'Pearson $r$')
-    else:
-        raise Exception(f'Unsupported score type "{score_type}".')
-
-    plt.xlabel('Number of states')
-    plt.xticks([1] + num_states_configs, labels=['GLM'] + num_states_configs)
-
-    # Rotate only the first 2 tick labels
-    for i, label in enumerate(ax.get_xticklabels()):
-        if i < 2:
-            label.set_rotation(90)
-    # plt.title(model_prefix.upper())
-    plt.title('GLM-HMM')
-    plt.legend(loc='lower right')
-    plt.margins(0.1)
-    plt.grid(alpha=0.15)
-    # plt.tight_layout()
-    if savefig:
-        plt.savefig(f'models/{path}/{model_prefix}_{path}_{score_type}_cv{filesuffix}.pdf', bbox_inches='tight', dpi=300)
-    if display:
-        plt.show()
+    df_side_by_side = df.pivot_table(
+        index=['num_states', 'group'],      # What you want as your rows
+        columns='model',   # The categories you want side-by-side
+        values='ll_score',         # The numbers to calculate
+        aggfunc=['mean', 'sem'] # The math to apply
+    )
+    df_side_by_side.columns = [f"{model}_{stat}" for stat, model in df_side_by_side.columns]
+    df_side_by_side = df_side_by_side.sort_values(by=['group', 'num_states'], ascending=[0, 1])
+    df_side_by_side = df_side_by_side.reset_index()
+    df_side_by_side['diff_mean(GLM-Static)'] = df_side_by_side['GLM Tr_mean'] - df_side_by_side['Static Tr_mean']
+    print(df_side_by_side.to_string(index=False))
+    df_side_by_side.to_csv(f'{prefix}_ll_scores_data.csv', index=False)
     return
 
 
@@ -574,16 +346,28 @@ if __name__ == '__main__':
     savefig = True
     display = False
 
-    # num_states_configs = [ 1, 2, 3, 4, 5, 6, 7, 8, 10 ]
-    # # num_states_configs = [1, 2, 5]
-    # scores_dump('apr10', [
-    #     ('apr6_bothcv_wt_female_2', 'lrhmmci_', ''),
-    #     ('apr6_bothcv_wt_female_2', 'id-glm-hmm', '')],
+    prefix = 'may17'
+
+    # # num_states_configs = [ 1, 2, 3, 4, 5, 6, 7, 8, 10 ]
+    # num_states_configs = [ 2, 3, 4, 5, 6, 7, 8, 10 ]
+    # # num_states_configs = [2]
+    # scores_dump(prefix, [
+    #     ('may17_sweepcvcv_wt_female', 'id-glm-hmm', ''),
+    #     # ('apr6_bothcv_wt_female_2', 'lrhmmci_', ''),
+    #     # ('apr11_bothcv_wt_female', 'id-glm-hmm', '')
+    #     ],
     #     num_states_configs)
     # sys.exit(0)
 
-    df = joblib.load('apr10_hmm_scores_df.pkl')
-    print(df)
+    # df = joblib.load(f'{prefix}_hmm_scores_df.pkl')
+    # df.to_csv(f'{prefix}_ll_scores_data.csv', index=False)
+    # print(df)
+    df = pd.read_csv(f"{prefix}_ll_scores_data.csv")
+    # plot_penalty_cv(prefix, df)
+    # plot_penalty_cv_perstate(prefix, df)
+    plot_penalty_cv_perstate(prefix, df, filter_numstates=[5])
+    sys.exit(0)
+    print("df ===============\n")
 
     # 1. Isolate the training data
     train_df = df[df['group'] == 'train']
@@ -602,18 +386,29 @@ if __name__ == '__main__':
         how='inner'
     )
     print(best_runs_df)
+    print("best_runs_df ===============\n")
     print(winning_combinations)
+    print("winning_combinations ===============\n")
 
-    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['train'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='mean_sem', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='mean_sem', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='mean_sem', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='all_points', prefix='apr10')
-    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='mean_sem', prefix='apr10')
+    return_grouped_ll_scores(prefix, best_runs_df,
+                             model_prefixes=[
+                                 'id-glm-hmm',
+                                #  'lrhmmci_'
+                                 ])
+    sys.exit(0)
+    print("===============\n")
+
+    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], plot_type='all_points', prefix=prefix)
+    # plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points', prefix=prefix)
+    sys.exit(0)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='all_points', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='mean_sem', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='all_points', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='mean_sem', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='all_points', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='mean_sem', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='all_points', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='mean_sem', prefix=prefix)
 
     # plotCV_same_model_LL_by_fly(path, 'lrhmmci_', num_states_configs, plot_only_test=True, filesuffix='plot_only_test')
 

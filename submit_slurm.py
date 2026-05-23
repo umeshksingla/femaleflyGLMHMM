@@ -55,7 +55,7 @@ if __name__ == '__main__':
         raise Exception(f'Incorrect data source specified "{src}".')
 
     model_name = 'idglmhmmci'
-    path = f'apr6_{cvtype}cv_{src}_{animal}_2'
+    path = f'may17_{cvtype}cv_{src}_{animal}'
 
     if cvtype == 'kfold':
         init_seeds = [0]        # fix init seed
@@ -69,13 +69,14 @@ if __name__ == '__main__':
 
     model_configs = {
         'name': [model_name],
-        'seed': init_seeds[:5],
-        'datasplit_seed': datasplit_seeds[:5],  #
+        'seed': init_seeds[:1],
+        'datasplit_seed': datasplit_seeds[:1],  #
         'num_states': [
             # 1      # uncomment for chance or lr
             2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
         ],
         'transition_matrix_stickiness': [100],
+        'l2_penalty': [0.1, 1, 10, 100, 1000, 10000],
         'data_path': [data_path],
         'path': [path],
     }
