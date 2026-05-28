@@ -128,10 +128,6 @@ class LRHMMFemaleFly(BaseFemaleFly):
         lps = [self.model.marginal_log_prob(self.learned_params, e, i) for e, i in zip(emissions, inputs)]
         # print("lps", lps)
         lp = np.sum(lps)
-        # print("lp", lp)
-        # lp_prior = self.model.log_prior(self.learned_params)
-        # print("lp_prior", lp_prior)
-        # lp += lp_prior
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = lp / total_emissions_size
         # print("lp", lp, "emissions_size", total_emissions_size)
@@ -142,9 +138,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
 
     def get_data_logprob_by_fly(self, emissions, inputs=None):
         """Evaluate the log probability of the data under the given model and model parameters, by fly."""
-        lp_prior = self.model.log_prior(self.learned_params)
-        # print("lp_prior", lp_prior)
-        lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i) + lp_prior)/len(e) for e, i in zip(emissions, inputs)])
+        lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i))/len(e) for e, i in zip(emissions, inputs)])
         # print("lps", lps)
         chance_lps = np.array([get_chance_logprob(yt, self.chance_mu, self.chance_cov)/len(yt) for yt in emissions])
         # print("chance_lps", chance_lps)
