@@ -14,6 +14,7 @@ import jax.numpy as jnp
 from sklearn.linear_model import LinearRegression
 
 from hmms.BaseFemaleFly import BaseFemaleFly
+from hmms.ChanceFemaleFly import ChanceFemaleFly
 from utilities.io import get_chance_logprob
 
 # print("jax.config", jax.config.values)
@@ -39,9 +40,18 @@ class LRFemaleFly(BaseFemaleFly):
         self.emission_dim = len(self.data_config['emission_labels'])
         self.input_mask_by_emission = self.data_config['input_mask_by_emission'].astype(int)
         self.model = [LinearRegression(fit_intercept=True) for o in range(self.emission_dim)]
+        self.chance_mu = None
+        self.chance_cov = None
         super().__init__()
 
     def fit(self, emissions, inputs, output_mn_std=None):
+        print(f'Begin fitting chance...')
+        chance = ChanceFemaleFly(self.data_config, self.model_config)
+        chance.fit(emissions, inputs)
+        chance_params = chance.learned_params
+        self.chance_mu = chance_params['mu']
+        self.chance_cov = chance_params['cov']
+        print('chance fit.')
         print(f'Begin fitting {self.__class__.__name__}...')
         X_tr = np.concatenate(inputs, axis=0)
         # print(X_tr.shape)
@@ -122,7 +132,7 @@ class LRFemaleFly(BaseFemaleFly):
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = fit_normal_residuals(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
         # print("LR lp calc tog", lp)
-        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0), self.chance_mu, self.chance_cov) / total_emissions_size
         relative_lp = lp - chance_lp
         # print("chance_lp", chance_lp)
         # print("relative_lp", relative_lp)
@@ -153,7 +163,7 @@ class LRFemaleFly(BaseFemaleFly):
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = calc(np.concatenate(emissions_pred, axis=0), np.concatenate(emissions, axis=0)) / total_emissions_size
         # print("lp", lp)
-        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0), self.chance_mu, self.chance_cov) / total_emissions_size
         # print("chance_lp", chance_lp)
         relative_lp = lp - chance_lp
         # print("relative_lp", relative_lp)
@@ -199,6 +209,6 @@ class LRFemaleFly(BaseFemaleFly):
 
         # chance model per fly. "How much better does my model predict behavior
         # than a naive, non-informative model — for this specific session?"
-        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
+        chance_lps = np.array([get_chance_logprob(yt, self.chance_mu, self.chance_cov)/len(yt) for yt in emissions])
         # print("chance_lps", chance_lps)
         return lps - chance_lps

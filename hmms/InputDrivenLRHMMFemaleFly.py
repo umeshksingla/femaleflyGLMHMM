@@ -6,6 +6,7 @@ from jax import vmap
 import jax.random as jr
 from library.inputdriven_linreg_hmm import InputDrivenLinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
+from hmms.ChanceFemaleFly import ChanceFemaleFly
 
 from utilities.io import get_chance_logprob
 from utilities import fitting, utils
@@ -35,6 +36,8 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
                                     m_step_num_iters=100,)
         self.learned_params = None
         self.learned_lps = None
+        self.chance_mu = None
+        self.chance_cov = None
         super().__init__()
 
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
@@ -69,6 +72,13 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         return params
 
     def fit(self, emissions, inputs, output_mn_std):
+        print(f'Begin fitting chance...')
+        chance = ChanceFemaleFly(self.data_config, self.model_config)
+        chance.fit(emissions, inputs)
+        chance_params = chance.learned_params
+        self.chance_mu = chance_params['mu']
+        self.chance_cov = chance_params['cov']
+        print('chance fit.')
         print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
         em_params, em_lps = fitting.fitEM(key, self.model, emissions, train_inputs=inputs)
@@ -131,7 +141,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         total_emissions_size = np.sum([len(_) for _ in emissions])
         lp = lp / total_emissions_size
         # print("lp", lp, "emissions_size", total_emissions_size)
-        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0))/total_emissions_size
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0), self.chance_mu, self.chance_cov)/total_emissions_size
         relative_lp = lp - chance_lp
         # print("chance_lp", chance_lp)
         return relative_lp
@@ -142,7 +152,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         # print("lp_prior", lp_prior)
         lps = np.array([(self.model.marginal_log_prob(self.learned_params, e, i) + lp_prior)/len(e) for e, i in zip(emissions, inputs)])
         # print("lps", lps)
-        chance_lps = np.array([get_chance_logprob(yt)/len(yt) for yt in emissions])
+        chance_lps = np.array([get_chance_logprob(yt, self.chance_mu, self.chance_cov)/len(yt) for yt in emissions])
         # print("chance_lps", chance_lps)
         relative_lps = lps - chance_lps
         return relative_lps

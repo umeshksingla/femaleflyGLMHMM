@@ -38,9 +38,10 @@ class ChanceFemaleFly(BaseFemaleFly):
         print(y.shape)
         mu = jnp.mean(y, axis=0)
         cov = jnp.cov(y.T)
+        cov = jnp.atleast_2d(cov)
         print(mu, mu.shape)
         print(cov, cov.shape)
-        self.model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
+        # self.model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
         self.learned_params = {'mu': mu, 'cov': cov}
         self.update_status()
         return
@@ -65,12 +66,16 @@ class ChanceFemaleFly(BaseFemaleFly):
 
     def get_data_logprob(self, emissions, inputs):
         total_emissions_size = np.sum([len(_) for _ in emissions])
-        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0)) / total_emissions_size
+        chance_mu = self.learned_params['mu']
+        chance_cov = self.learned_params['cov']
+        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0), chance_mu, chance_cov) / total_emissions_size
         print("chance lp", chance_lp)
         return chance_lp
 
     def get_data_logprob_by_fly(self, emissions, inputs):
-        chance_lps = np.array([get_chance_logprob(yt) / len(yt) for yt in emissions])
+        chance_mu = self.learned_params['mu']
+        chance_cov = self.learned_params['cov']
+        chance_lps = np.array([get_chance_logprob(yt, chance_mu, chance_cov) / len(yt) for yt in emissions])
         print("chance lps by fly", chance_lps)
         return chance_lps
 

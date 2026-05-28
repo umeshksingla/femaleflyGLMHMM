@@ -305,10 +305,14 @@ def get_full_window_to_plot(effective_fps, num_timestamps):
     return windows
 
 
-def get_chance_logprob(y):
-    mu = jnp.mean(y, axis=0)
-    cov = jnp.cov(y.T)
-    cov = jnp.atleast_2d(cov)
+def get_chance_logprob(y, mu, cov):
+    """
+    Get log prob of given sequence y under Chance(mu, cov)
+    """
+    # mu = jnp.mean(y, axis=0)
+    # cov = jnp.cov(y.T)
+    # cov = jnp.atleast_2d(cov)
+    assert mu is not None and cov is not None
     model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
     p = model.prob(y)
     p = jnp.maximum(p, 1e-15)

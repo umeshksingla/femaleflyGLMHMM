@@ -5,7 +5,7 @@ import jax.random as jr
 from hmms.InputDrivenLRHMMFemaleFly import InputDrivenLRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
-
+from hmms.ChanceFemaleFly import ChanceFemaleFly
 from utilities import fitting, io
 
 jax.config.update("jax_enable_x64", True)
@@ -21,6 +21,13 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
             batched_inputs:
             batched_output_mn_std:
         """
+        print(f'Begin fitting chance...')
+        chance = ChanceFemaleFly(self.data_config, self.model_config)
+        chance.fit(batched_emissions, batched_inputs)
+        chance_params = chance.learned_params
+        self.chance_mu = chance_params['mu']
+        self.chance_cov = chance_params['cov']
+        print('chance fit.')
         print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
 

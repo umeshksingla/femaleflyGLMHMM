@@ -60,6 +60,8 @@ def save(model, data, train_session_indices, test_session_indices, output_dir):
         'num_states': model.num_states,
         'learned_params': model.learned_params,
         'learned_lps': model.learned_lps,
+        'chance_mu': model.chance_mu,
+        'chance_cov': model.chance_cov,
         'train_data': {
             'train_emissions': train_emissions,
             'train_inputs': train_inputs,
