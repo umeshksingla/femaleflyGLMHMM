@@ -43,7 +43,8 @@ class InputDrivenHMMTransitions(HMMTransitions):
             input_mask_first = None,
             m_step_optimizer: optax.GradientTransformation = optax.adam(1e-2),
             m_step_num_iters: int = 50,
-            l2_penalty: float = 1.0,
+            l2_penalty: float = 0.0,
+            l1_penalty: float = 0.0,
     ):
         """
         Args:
@@ -54,6 +55,7 @@ class InputDrivenHMMTransitions(HMMTransitions):
         self.num_states = num_states
         self.input_dim = input_dim
         self.l2_penalty = l2_penalty
+        self.l1_penalty = l1_penalty
         if input_mask_first is None:
             input_mask_first = jnp.ones((self.input_dim,))
         self.input_mask_first_full = jnp.broadcast_to(input_mask_first,(num_states, num_states, input_dim))
@@ -157,8 +159,8 @@ class InputDrivenHMMTransitions(HMMTransitions):
             expected_log_joint = log_prior + batch_ells.sum()
 
             l2_reg = self.l2_penalty * jnp.sum(params.weights ** 2)
-            # l1_reg =  jnp.sum(jnp.abs(params.weights))
-            total_penalty = l2_reg  # + l1_reg
+            l1_reg =  self.l1_penalty * jnp.sum(jnp.abs(params.weights))
+            total_penalty = l1_reg  + l2_reg
             return -expected_log_joint / scale + total_penalty
 
         # Run gradient descent
