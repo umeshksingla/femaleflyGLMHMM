@@ -702,6 +702,54 @@ def plot_statetrans_filters_separate(orig_weights, data_config, input_list, inpu
     return
 
 
+def plot_statetrans_filters_separate_individual(orig_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix, sharey=False, savefig=False, fig_dir=None, display=True):
+
+    num_states = orig_weights.shape[0]
+    print("orig_weights.shape", orig_weights.shape)     # (num states, num states, n_inputs * ncos), e.g. (5, 5, 84)
+
+    filter_len = orig_weights.shape[-1]
+
+    assert data_config['ncos'] == filter_len // len(data_config['input_labels_list'])
+
+    basis = data_config['basis']
+    print(orig_weights[..., input_mask_by_statetrans == 1].shape)
+    weights = basis_invtransform_one_by_one(orig_weights[..., input_mask_by_statetrans == 1], basis, n_inputs=len(input_list))
+    print("weights.shape after tr", weights.shape)
+
+    for z_ in range(num_states):
+        print("State", z_+1)
+
+        weights_z_ = weights[z_]    # (5, 7, 450)
+
+        stim = 0
+        for __ in input_list:
+            
+            fig = plt.figure(figsize=(3.2, 3.2))
+            ax = plt.gca()
+
+            for z in range(num_states):
+                if z == z_: continue
+                ax.plot(np.arange(-weights_z_[z, stim].shape[-1], 0)/data_config['orig_fps'], weights_z_[z, stim], color=COLORS[z], linewidth=3, label=f'To State {z+1}')
+
+            ax.set_title(input_labels[__])
+            ax.axhline(0, ls=':', c='k', lw=0.5)
+            maxtime = weights_z_[0, stim].shape[-1]//data_config['orig_fps']
+            ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime+1), labels=[-maxtime] + ['']*(maxtime-1) + [0])
+            ax.margins(y=0.05)
+            ax.yaxis.set_tick_params(labelleft=True)  # ensure ytick labels are shown
+            ax.set_xlabel('Time (s)')
+            # ax.set_ylabel('filter amplitude')
+            ax.set_ylim([1.1 * np.min(weights_z_), 1.1 * np.max(weights_z_)])
+            stim += 1
+            plt.tight_layout()
+
+            if savefig:
+                fig.savefig(os.path.join(fig_dir, f'subplot_{z_+1}_{__}.pdf'), dpi=300, bbox_inches='tight', transparent=True)
+            if display: plt.show()
+            plt.close()
+    return
+
+
 def plot_statetrans_filter_amplitudes(orig_weights, data_config, input_list, input_mask_by_statetrans, input_labels, prefix='', savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 

@@ -55,7 +55,7 @@ if __name__ == '__main__':
         raise Exception(f'Incorrect data source specified "{src}".')
 
     model_name = 'idglmhmmci'
-    path = f'may23_{cvtype}cv_{src}_{animal}'
+    path = f'may31l1l2_{cvtype}cv_{src}_{animal}'
 
     if cvtype == 'kfold':
         init_seeds = [0]        # fix init seed
@@ -70,17 +70,18 @@ if __name__ == '__main__':
     model_configs = {
         'name': [model_name],
         'seed': init_seeds[:1],
-        'datasplit_seed': datasplit_seeds[:1],
-        'split': [0, 1],    # use first or second split for fitting model
+        'datasplit_seed': datasplit_seeds,
         'num_states': [
             # 1      # uncomment for chance or lr
             # 2, 3, 4, 5, 6, 7, 8, 10, #12, 15, 20, 25, 30
-            4, 5, 6
+            5
         ],
         'transition_matrix_stickiness': [100],
-        'l2_penalty': [0.1, 1, 10, 100, 1000, 1e4, 1e5, 1e6, 1e7, 1e8][::-1],
+        'l2_penalty': [0.01, 1, 1e3, 1e6, 1e8],
+        'l1_penalty': [0.01, 1, 1e3, 1e6, 1e8],
         'data_path': [data_path],
         'path': [path],
+        # 'split': [0, 1],    # use first or second split for fitting model
     }
     arrayfilename = f'{path}_{model_name}_array_args.txt'        # CAUTION!! Running this script will overwrite existing array_args file.
     job_configs = create_array_file(model_configs, arrayfilename=arrayfilename)

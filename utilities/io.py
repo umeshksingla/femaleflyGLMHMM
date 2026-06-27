@@ -31,10 +31,13 @@ def load_latest(model_name):
 def load_specific_path(model_path):
     print('Loading:', model_path)
     with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
-    if fit_success != 'True':
-        print(Warning(f'Unsuccessful model loaded. {model_path}'))
-        return None, None, None
     with open(os.path.join(model_path, 'model_config.json')) as f: model_config = json.load(f)
+    if fit_success != 'True':
+        datasplit_seed = model_config['datasplit_seed']
+        l2_penalty = model_config.get('l2_penalty', None)
+        l1_penalty = model_config.get('l1_penalty', None)
+        print(Warning(f'Unsuccessful model loaded. {model_path}. Split {datasplit_seed}: (L1, L2) = ({l1_penalty}, {l2_penalty})'))
+        return None, None, None
     data_config_pkl = joblib.load(os.path.join(model_path, 'data_config.pkl'))
     model_pkl = joblib.load(os.path.join(model_path, 'model.pkl'))
     return model_pkl, data_config_pkl, model_config

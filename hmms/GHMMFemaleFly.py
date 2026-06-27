@@ -63,7 +63,9 @@ class GHMMFemaleFly(BaseFemaleFly):
 
     def fit(self, batched_emissions, batched_inputs, batched_output_mn_std):
         print(f'Begin fitting chance...')
-        chance_params = ChanceFemaleFly(self.data_config, self.model_config).fit(batched_emissions, batched_inputs)
+        chance = ChanceFemaleFly(self.data_config, self.model_config)
+        chance.fit(batched_emissions, batched_inputs)
+        chance_params = chance.learned_params
         self.chance_mu = chance_params['mu']
         self.chance_cov = chance_params['cov']
         print('chance fit.')

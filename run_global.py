@@ -62,8 +62,8 @@ def run(mc, enhance=False, genfig=False):
 
     num_batches = data_config['num_sessions']
     datasplit_seed = mc.get('datasplit_seed', 0)
-    split = mc['split']
-    num_train_batches = int(num_batches * 0.5)
+    # split = mc['split']
+    num_train_batches = int(num_batches * 0.8)
 
     # Set up reproducible RNG and shuffle indices
     rng = np.random.default_rng(datasplit_seed)
@@ -73,9 +73,9 @@ def run(mc, enhance=False, genfig=False):
     train_session_indices = all_indices[:num_train_batches].astype(int)
     test_session_indices = all_indices[num_train_batches:].astype(int)
 
-    if split == 1:
-        # swap the split used for training data
-        train_session_indices, test_session_indices = test_session_indices, train_session_indices
+    # if split == 1:
+    #     # swap the split used for training data
+    #     train_session_indices, test_session_indices = test_session_indices, train_session_indices
 
     train_emissions = [emissions[e] for e in train_session_indices]
     train_inputs = [inputs[e] for e in train_session_indices]

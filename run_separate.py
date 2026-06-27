@@ -30,6 +30,7 @@ if __name__ == '__main__':
         "num_states": 5,
         "transition_matrix_stickiness": 100,
         "l2_penalty": 1000,
+        "l1_penalty": 1000,
         'split': 1,
         "path": f'general_{dataset}',
         "data_path": data_path,
