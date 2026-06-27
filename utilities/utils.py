@@ -686,8 +686,10 @@ def generate_state_filters_filters_given(model_dir, all_weights, savefig=True, d
 
     fig_dir = os.path.join(model_dir, 'figures')
     state_fig_dir = os.path.join(fig_dir, 'state_figures_avgd')
+    state_fig_dir_ind = os.path.join(state_fig_dir, f'allstates_individual_filters')
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(state_fig_dir, exist_ok=True)
+    os.makedirs(state_fig_dir_ind, exist_ok=True)
 
     update_labels(data_config)
     input_labels = data_config['input_labels']
@@ -696,6 +698,7 @@ def generate_state_filters_filters_given(model_dir, all_weights, savefig=True, d
     input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     plots.plot_statetrans_filters_separate(all_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey=True, savefig=savefig, fig_dir=state_fig_dir, display=display)
+    plots.plot_statetrans_filters_separate_individual(all_weights, data_config, input_list, input_mask_by_statetrans, input_labels, filesuffix='allstates', sharey=True, savefig=savefig, fig_dir=state_fig_dir_ind, display=display)
     plots.plot_statetrans_filter_amplitudes(all_weights, data_config, input_list, input_mask_by_statetrans, input_labels, prefix='allstates', savefig=savefig, fig_dir=state_fig_dir, display=display)
     return
 
@@ -860,7 +863,7 @@ def generate_figures_filters_given_2datasets(data_config1, data_config2, all_wei
 
     emission_labels = data_config1['emission_labels']
 
-    for skip_states in [[0, 1, 2, 3]]:
+    for skip_states in [[0, 1, 2, 3], [0, 2, 3, 4]]:    # plot for state 2 and state 5
         plots.plot_filters_separate_emissions_2datasets(all_weights1, all_weights2, data_config1, data_config2, emission_labels, input_labels, input_mask_by_emission, filesuffix='cmp2datasets', sharey=None, skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=fig_dir, display=display)
     return
 
