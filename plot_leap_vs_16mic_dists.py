@@ -284,8 +284,8 @@ def plot_weight_magnitudes(savefig=True, display=True):
     emission_labels_dict = leap_data_config['emission_labels_dict']
     print("emission_labels_dict", emission_labels_dict)
 
-    avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_WT.pkl')
-    avg_weight_WT_FRED =  joblib.load(f'{new16mic_model_dir}/avg_weight_WT_FRED.pkl')
+    # avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_wt.pkl')
+    # avg_weight_WT_FRED =  joblib.load(f'{new16mic_model_dir}/avg_weight_wt_fred.pkl')
 
     leap_w_amps = get_filter_amplitudes(avg_weight_WT, leap_data_config, emission_labels, leap_input_mask_by_emission, skip_states=[])
     new16mic_w_amps = get_filter_amplitudes(avg_weight_WT_FRED, new16mic_data_config, emission_labels, new16mic_input_mask_by_emission, skip_states=[])
@@ -312,7 +312,6 @@ def plot_weight_magnitudes(savefig=True, display=True):
             ax[d].legend(loc='upper right', bbox_to_anchor=(2, 1), borderaxespad=0.)
         ax[d].set_xlabel('Norm. |w|\n(Dataset 1)')
         ax[d].set_ylabel('Norm. |w|\n(Dataset 2)')
-    return
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, 'weightcorr_2datasets.pdf'), bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
@@ -321,8 +320,11 @@ def plot_weight_magnitudes(savefig=True, display=True):
 
 
 def plot_weights():
-    avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_WT.pkl')
-    avg_weight_WT_FRED = joblib.load(f'{new16mic_model_dir}/avg_weight_WT_FRED.pkl')
+    # all_weights_wt = joblib.load(f'{leap_model_dir}/all_weights_wt.pkl')
+    # all_weights_wt_fred = joblib.load(f'{new16mic_model_dir}/all_weights_wt_fred.pkl')
+
+    # avg_weight_WT = np.mean(all_weights_wt, axis=0)
+    # avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
 
     _, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
     _, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
@@ -381,12 +383,24 @@ def plot_empirical_occupancy_2datasets(savefig=True, display=True):
 
 
 if __name__ == '__main__':
-    leap_model_dir = '../../paper figs/FINAL WT/20260101_235805_duration/'
-    new16mic_model_dir = '../../paper figs/FINAL WT FRED/20260102_135949_spandex/'
 
-    fig_dir = os.path.join('../../paper figs/figure comparison2datasets/')
+    model_paths = {
+        'Dataset 1': 'models/may31l1l2_sweepcv_wt_female/id-glm-hmm_5_cv/20260531_183347_obsidian',  # 5-GLM-HMM female
+        'Dataset 2': 'models/june26l1l2_sweepcv_wt_fred_female/id-glm-hmm_5_cv/20260626_050049_whelp',  # 5-GLM-HMM female fred
+    }
+
+    leap_model_dir = model_paths['Dataset 1']
+    new16mic_model_dir = model_paths['Dataset 2']
+
+    all_weights_wt = joblib.load(f'{leap_model_dir}/all_weights_wt.pkl')
+    all_weights_wt_fred = joblib.load(f'{new16mic_model_dir}/all_weights_wt_fred.pkl')
+
+    avg_weight_WT = np.mean(all_weights_wt, axis=0)
+    avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
+
+    fig_dir = os.path.join('models/cv_figs')
     # make_plots(savefig=True, fig_dir=fig_dir, display=True)
     # plot_empirical_occupancy_2datasets()
-    plot_weight_magnitudes()
-    # plot_weights()
+    # plot_weight_magnitudes()
+    plot_weights()
     # plot_legends(0, 0, savefig=True, fig_dir=fig_dir, display=False)
