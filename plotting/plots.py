@@ -3179,14 +3179,25 @@ def plot_ETAs_all(model_ckp, data_config, savefig=False, fig_dir=None, display=T
         fig = plt.figure(figsize=(5, 5))
         ax = plt.gca()
         mean_traj = np.mean(masked_trajs_windows, axis=0)
-        print("mean_traj", mean_traj.shape, "masked_trajs_windows", mean_traj.shape)
+        print("mean_traj", mean_traj.shape, "masked_trajs_windows", masked_trajs_windows.shape)
+
         r = np.random.choice(len(masked_trajs_windows), size=min(200, len(masked_trajs_windows)))
+
+        # smoothed = uniform_filter1d(masked_trajs_windows, size=10, axis=1, mode='nearest')   # smooth and some jitter
+        # masked_trajs_windows = smoothed + np.random.normal(loc=0.0, scale=0.01, size=smoothed.shape)
+
+        # if i plot x,y as y,x, I obtain not the correct rotated image but a mirror image of what i would expect. So better to rotate afterward
         ax.plot(masked_trajs_windows[r, :, 0].T, masked_trajs_windows[r, :, 1].T, '-', alpha=0.1, color=color)
         ax.plot(mean_traj[:, 0].T, mean_traj[:, 1].T, '-', alpha=1, lw=2, color=color)
+
         ax.set_aspect('equal')
         ax.axhline(0, lw=2, ls=':', c='k')
-        ax.set_xlim([-2, 2])
-        ax.set_ylim([-2, 2])
+
+        y_max = max(abs(ax.get_ylim()[0]), abs(ax.get_ylim()[1]))   # Hard to see the mean trajectory in this case, as female doesn't move much in most cases
+        y_max = 2
+        print("Y_MAX", y_max)
+        ax.set_ylim(-y_max, y_max)
+        ax.set_xlim(-y_max, y_max)
         ax.axis('off')
         plt.tight_layout()
         if savefig: fig.savefig(os.path.join(fig_dir, f'ETAs_{event_name}_{dir}_[{mini, maxi}].pdf'), bbox_inches='tight', dpi=300,
@@ -3209,10 +3220,10 @@ def plot_ETAs_all(model_ckp, data_config, savefig=False, fig_dir=None, display=T
 
     # parameters
     effective_fps = data_config['effective_fps']
-    window_s = 1  # window size (seconds) before and after switch
+    window_s = 0.5  # window size (seconds) before and after switch
     window_frames = int(window_s * effective_fps)
 
-    for event_name in ['pulse_i', 'sine_i']:
+    for event_name in ['pulse_i', 'sine_i'][:1]:
 
         # --- STEP 1: Find event onsets ---
         event_ts = all_aux_data_rescaled[:, a_labels_list.index(event_name)]
@@ -3239,13 +3250,11 @@ def plot_ETAs_all(model_ckp, data_config, savefig=False, fig_dir=None, display=T
         print(fFV_windows.shape, fFV_windows[0])
         print("trajs_windows", traj_windows.shape)
 
-        # mini, maxi = 0, 30
-        mini, maxi = 60, 90
-
-        # male on left
-        left_mask = ((fmAng_windows[:, 0] > mini) & (fmAng_windows[:, 0] < maxi)).squeeze()
-        plot(traj_windows[left_mask], 'L')
-        # male on right
-        right_mask = ((fmAng_windows[:, 0] < -mini) & (fmAng_windows[:, 0] > -maxi)).squeeze()
-        plot(traj_windows[right_mask], 'R')
+        for mini, maxi in [(0, 30), (60, 90)]:
+            # male on left
+            left_mask = ((fmAng_windows[:, 0] > mini) & (fmAng_windows[:, 0] < maxi)).squeeze()
+            plot(traj_windows[left_mask], 'L')
+            # male on right
+            right_mask = ((fmAng_windows[:, 0] < -mini) & (fmAng_windows[:, 0] > -maxi)).squeeze()
+            plot(traj_windows[right_mask], 'R')
     return
