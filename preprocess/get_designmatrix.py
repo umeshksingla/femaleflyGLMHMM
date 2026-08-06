@@ -367,10 +367,26 @@ def get_x_and_y_data(datacls, sessions_features, config, display=False):
     shuffle_inputs = config['shuffle_inputs']
 
     # Cosine basis transformation of inputs
+    ncos = config['ncos']
     input_each_dim = config['ncos']
     b = multifeature_basis(raised_cosine(0, input_each_dim, [0, 3 * input_raw_each_dim / 4], 10, input_raw_each_dim), 1)
     basis = scipy.linalg.orth(multifeature_basis(b, 1))
+    print("input_raw_each_dim", input_raw_each_dim, "b", b.shape, "basis", basis.shape)
     print("Basis created.")
+
+    if display:
+        fig, ax = plt.subplots(2, 1, figsize=(7, 7))
+        ax[0].plot(np.arange(-b.shape[0], 0) / config['orig_fps'], b)
+        ax[0].set_title('Cosine Basis')
+        ax[0].grid(alpha=0.5)
+        ax[1].plot(np.arange(-b.shape[0], 0) / config['orig_fps'], basis)
+        ax[1].set_title('Orthonormalized')
+        ax[1].grid(alpha=0.5)
+        ax[1].set_xlabel('Lag (secs)')
+        plt.tight_layout()
+        plt.savefig(f'basis_ncos={ncos}.pdf', bbox_inches='tight', dpi=300, transparent=True)
+        plt.show()
+        plt.close()
 
     # Create temporary directory for session files
     temp_dir = Path(f'../../data/{source}_{animal}_temp_sessions')
@@ -758,7 +774,7 @@ def extract_female(source, shuffle_inputs=False):
     data_config["predict_window_size"] = fps//30  # averaging emission over this window size
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
-    data_config['ncos'] = 4
+    data_config['ncos'] = 20
 
     # emissions to fit, along with male inputs for each
     data_config['emission_labels'] = OrderedDict({
@@ -785,7 +801,7 @@ def extract_female(source, shuffle_inputs=False):
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_shuffle_inputs={shuffle_inputs}_accelerations_today=jan1_metadata.pkl'
+               f'o={data_config["predict_window_size"]}_shuffle_inputs={shuffle_inputs}_accelerations_today=aug6_metadata.pkl'
 
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
