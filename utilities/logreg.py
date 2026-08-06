@@ -8,7 +8,7 @@ def train_logreg_aux_emissions(train_inputs, test_inputs, train_aux_emissions, t
     print('Fitting LogReg on aux emissions...')
 
     def train_logreg(x, y):
-        model = LogisticRegression(solver='lbfgs', C=0.1, max_iter=1000, class_weight='balanced')
+        model = LogisticRegression(solver='lbfgs', C=0.0000001, max_iter=1000, class_weight='balanced')
         model.fit(x, y)
         weights = model.coef_[0]  # shape: (D,)
         bias = model.intercept_[0]
@@ -19,23 +19,6 @@ def train_logreg_aux_emissions(train_inputs, test_inputs, train_aux_emissions, t
         preds = probs >= 0.5
         f1score = f1_score(y, preds)
         print(classification_report(y, preds))
-
-
-        # import matplotlib.pyplot as plt
-        # from sklearn.metrics import precision_recall_curve, average_precision_score
-        # precision, recall, thresholds = precision_recall_curve(y, probs)
-        # ap = average_precision_score(y, probs)
-        # # Plot
-        # plt.figure(figsize=(6, 5))
-        # plt.plot(recall, precision, label=f'PR curve (AP = {ap:.3f})')
-        # plt.xlabel('Recall')
-        # plt.ylabel('Precision')
-        # plt.title('Precision-Recall Curve')
-        # plt.grid(True)
-        # plt.legend()
-        # plt.tight_layout()
-        # plt.show()
-
         return probs, f1score, preds
 
     train_inputs_ = np.concatenate(train_inputs, axis=0)
