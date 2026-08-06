@@ -1518,14 +1518,13 @@ def plot_state_aux_sorted_o_mean_directional(aux_z, emissions_z, a_labels_, o_la
 
 
 def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', savefig=False, fig_dir=None, display=True):
-    fig = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(7, 4))
     ax = plt.gca()
 
     durations = []
     for z in range(num_states):
         d = dwell_times_z[z] / effective_fps    # in seconds
-        # print(f"State {z + 1}: Mean dwell time = {np.mean(dwell_times_z[z]):.2f}, n = {len(dwell_times_z[z])}")
-        print(f"State {z + 1}: Mean dwell time = {np.mean(d):.4f}s and STD = {np.std(d):.4f}s")
+        print(f"State {z + 1}: Mean dwell time = {np.mean(d)*1000:.2f}ms and STD = {np.std(d)*1000:.2f}ms")
         durations.append(d.tolist())
 
     df = pd.DataFrame({
@@ -1542,18 +1541,21 @@ def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', s
         x="dwell_time",
         hue="state_label",
         palette=palette,
-        # bw_adjust=0.5,
+        bw_adjust=3,
         cut=0,
         # clip=(0, None),
         # common_norm=True,
         linewidth=3,
-        legend=None,
+        legend=False,
     )
-    x = list(range(0, 4))
-    plt.xlim([x[0], x[-1]])
-    plt.xticks(x)
+
+    ax.set_xscale('log')
+
     plt.xlabel("Time (s)")
     plt.title("State residency")
+    ylim = plt.ylim()
+    print("ylim", ylim)
+    plt.ylim(ylim[0]-0.2, ylim[1]+0.2)
 
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'state_dwell_times.pdf'),
@@ -1565,7 +1567,7 @@ def plot_state_dwell_times(dwell_times_z, num_states, effective_fps, title='', s
 
 def plot_prob_states_aligned(resampled_state_seq, n_le=None, uniform_filter_size=1, config=None, title=None, xticks=None, xlabel=None, savefig=False, fig_dir=None, display=True):
 
-    fig = plt.figure(figsize=(9, 3))
+    fig = plt.figure(figsize=(9, 4))
 
     GRID = resampled_state_seq.shape[1]     # reshaped timesteps
     percent = np.linspace(0, GRID-1, GRID)
@@ -1583,13 +1585,13 @@ def plot_prob_states_aligned(resampled_state_seq, n_le=None, uniform_filter_size
         # plt.fill_between(percent, mean - sem, mean + sem, alpha=.3)
 
     # plt.grid(alpha=.3)
-    plt.ylim(0, 0.7)
+    plt.ylim(0, 0.6)
     plt.xlabel(xlabel)
     plt.ylabel('p(state)')
     # plt.legend(loc='upper left')
     # if title: plt.title(f'{title} sessions')
     if xticks: plt.xticks([0, GRID-1], xticks)
-    plt.yticks(ticks=np.linspace(0, 0.7, num=8), labels=[0] + ['']*6 + [0.7])
+    # plt.yticks(ticks=np.linspace(0, 0.7, num=8), labels=[0] + ['']*6 + [0.7])
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_prob_states_over_time.pdf'), bbox_inches='tight', dpi=300,
                             transparent=True)
