@@ -155,7 +155,7 @@ def get_rescaled_emissions(emissions, output_mn_std, effective_fps):
     return emissions_rescaled_b
 
 
-def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False, effective_fps=None):
+def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False):
     """
     Return a dictionary of states mapped to emission values in that state.
     :param aux_data:
@@ -163,7 +163,6 @@ def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=F
     :param num_states:
     :param output_mn_std:
     :param rescaled:
-    :param effective_fps:
     :return:
     """
     aux_data_z = {}

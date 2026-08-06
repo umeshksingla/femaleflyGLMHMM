@@ -458,19 +458,19 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
         plots.plot_prob_states_aligned(padded_arrays, n_le, 300, model_config, title=f'All data',
                                        xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
-        train_nocop_state_probs = [model_ckp['train_data']['train_state_probs'][i] for i, c in enumerate(model_ckp['train_data']['train_copulation_bools']) if c == False]
-        test_nocop_state_probs = [model_ckp['test_data']['test_state_probs'][i] for i, c in enumerate(model_ckp['test_data']['test_copulation_bools']) if c == False]
-        nocop_state_probs = [*train_nocop_state_probs, *test_nocop_state_probs]
-        padded_arrays, n_le = pad_to_equal_length(nocop_state_probs)
-        plots.plot_prob_states_aligned(padded_arrays, n_le, 300, config=model_config, title=f'All No Copulation data',
-                                       xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-
         train_cop_state_probs = [model_ckp['train_data']['train_state_probs'][i] for i, c in enumerate(model_ckp['train_data']['train_copulation_bools']) if c == True]
         test_cop_state_probs = [model_ckp['test_data']['test_state_probs'][i] for i, c in enumerate(model_ckp['test_data']['test_copulation_bools']) if c == True]
         cop_state_probs = [*train_cop_state_probs, *test_cop_state_probs]
         plots.plot_prob_states_aligned(normalize_to_equal_length(cop_state_probs, GRID=50000), None, 300,
                                        config=model_config, title=f'All Copulation data',
                                        xticks=['Start', 'Copulation'], xlabel='Time (in courtship)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
+
+        train_nocop_state_probs = [model_ckp['train_data']['train_state_probs'][i] for i, c in enumerate(model_ckp['train_data']['train_copulation_bools']) if c == False]
+        test_nocop_state_probs = [model_ckp['test_data']['test_state_probs'][i] for i, c in enumerate(model_ckp['test_data']['test_copulation_bools']) if c == False]
+        nocop_state_probs = [*train_nocop_state_probs, *test_nocop_state_probs]
+        padded_arrays, n_le = pad_to_equal_length(nocop_state_probs)
+        plots.plot_prob_states_aligned(padded_arrays, n_le, 300, config=model_config, title=f'All No Copulation data',
+                                       xticks=['0', '30'], xlabel='Time (min)', savefig=savefig, fig_dir=dists_fig_dir, display=display)
 
         if 'id' in model_prefix:
             emp_transition_matrix = calculate_empirical_transition_matrix(z_seqs, num_states)
@@ -535,11 +535,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     all_output_mn_std = [*model_ckp['train_data']['train_output_mn_std'], *model_ckp['test_data']['test_output_mn_std']]
     all_aux_mn_std = [*model_ckp['train_data']['train_aux_mn_std'], *model_ckp['test_data']['test_aux_mn_std']]
 
-    plots.plot_state_aux_o_mean(
-        get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
-        get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-        auxiliary_labels_jr, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir,
-        display=display)
     plots.plot_state_o_dists_otherfilters(all_soft_predictions_per_state, all_stateseq, num_states, emission_labels_zscored,
                                           title='all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_aux_dists_reformatted(
@@ -548,7 +543,7 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_state_aux_dists_reformatted(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, all_aux_mn_std, rescaled=True,),
          auxiliary_labels, data_config, exclude_a=['wingAlign', 'fmAng_sin', 'mfAng_sin'], title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    plots.plot_state_aux_sorted_odists(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
+    plots.plot_state_aux_sorted_odists(get_aux_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
         auxiliary_labels_full, emission_labels_jr_jr, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     plots.plot_state_o_dists(
@@ -560,12 +555,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Tr
     plots.plot_state_aux_dists(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         auxiliary_labels, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    # plots.plot_state_aux_sorted_mean_o(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
-    #     get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-    #     auxiliary_labels_full, emission_labels_dict, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    # plots.plot_state_aux_sorted_o_mean_directional(get_emissions_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
-    #     get_emissions_by_state(all_emissions, all_stateseq, num_states, rescaled=False),
-    #     auxiliary_labels_full, emission_labels_dict, directional_variables, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
     return
 
 
