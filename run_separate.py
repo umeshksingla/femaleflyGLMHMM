@@ -10,7 +10,7 @@ import run_global
 if __name__ == '__main__':
     dataset = 'wt'
     if dataset == 'wt':
-        data_path = f'../data/wt_fly_data_cos=4_ortho_o=5_today=jan1.pkl'
+        data_path = f'../data/wt_fly_data_cos=20_ortho_o=5_shuffle_inputs=False_today=aug6.pkl'
     elif dataset == 'wt_acc':
         data_path = f'../data/wt_fly_data_cos=4_ortho_o=5_shuffle_inputs=False_accelerations_today=jan1.pkl'
     elif dataset == 'wt_shuffled':
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         "datasplit_seed": 0,
         "num_states": 5,
         "transition_matrix_stickiness": 100,
-        "l2_penalty": 1000,
+        "l2_penalty": 100000000,
         "l1_penalty": 1000,
         'split': 1,
         "path": f'general_{dataset}',

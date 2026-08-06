@@ -180,7 +180,7 @@ def get_aux_feat(sessions_features, s, f_name, aux_windows):
 
 def get_output_feat(sessions_features, s, f_name, output_windows):
     sf = sessions_features[s]
-    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'fFA', 'fLA', 'mFV', 'mFS', 'mLS', 'mLV']:
+    if f_name in ['fFV', 'fFS', 'fLS', 'fLV', 'mFV', 'mFS', 'mLS', 'mLV']:
         ts = sf[f_name]
         mn = ts.mean()
         std = ts.std()
@@ -778,9 +778,9 @@ def extract_female(source, shuffle_inputs=False):
 
     # emissions to fit, along with male inputs for each
     data_config['emission_labels'] = OrderedDict({
-        'fFA': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
-        'fLA': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
-        'fAA': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
+        'fFV': ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2'],
+        'fLV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
+        'fAV': ['mFV_directedlr2', 'mLS_directedlr2', 'mfDist_directedlr2', 'wingAlign_song_i_directedlr2', 'pulse_i_directedlr2', 'sine_i_directedlr2', 'tap2_directedlr2'],
     })
     data_config['input_labels_list'] = [data_config['emission_labels'][o] for o in data_config['emission_labels']]
     data_config['input_labels_list'] = [__ for _ in data_config['input_labels_list'] for __ in _]     # unroll
@@ -801,7 +801,7 @@ def extract_female(source, shuffle_inputs=False):
     data_config['statetrans_input_labels_list'] = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
 
     filename = f'{source}_fly_data_{data_config["basis_transformed"]}={data_config["ncos"]}_ortho_' \
-               f'o={data_config["predict_window_size"]}_shuffle_inputs={shuffle_inputs}_accelerations_today=aug6_metadata.pkl'
+               f'o={data_config["predict_window_size"]}_shuffle_inputs={shuffle_inputs}_today=aug6_metadata.pkl'
 
     s = time.time()
     data = get_x_and_y_data(datacls, sessions_features, data_config, display=False)
