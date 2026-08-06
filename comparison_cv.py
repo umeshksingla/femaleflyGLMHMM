@@ -114,11 +114,17 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
                     continue
                 if pkl is None: continue
                 datasplit_seed = model_config['datasplit_seed']
+                if datasplit_seed not in [7401, 3930, 6244, 6400, 8116]:
+                    continue
                 init_seed = model_config['seed']
                 name = prefix   # model_path_prefix.split('/')[1]
                 for group in ['train', 'test']:
-                    r2_score = pkl[f'{group}_data'][f'{group}_score'] * 100
-                    pearson_score = pkl[f'{group}_data'][f'{group}_pearson']
+                    try:
+                        r2_score = pkl[f'{group}_data'][f'{group}_score'] * 100
+                        pearson_score = pkl[f'{group}_data'][f'{group}_pearson']
+                    except:
+                        r2_score = None
+                        pearson_score = None
                     l2_penalty = model_config.get('l2_penalty', None)
                     l1_penalty = model_config.get('l1_penalty', None)
                     split = model_config.get('split', None)
@@ -132,6 +138,68 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
     scores_df = pd.DataFrame(rows, columns=columns)
     print(scores_df)
     return scores_df
+
+
+def plot_scores(
+    df, 
+    model_prefix='id-glm-hmm',
+    num_states=[1, 2, 3, 4, 5, 6, 7, 8, 10], 
+    prefix='',
+    score_type='ll_score'
+):
+    """
+    Plots ll_score vs num_states for specified models, groups, and seeds.
+    """
+    np.random.seed(0)
+    
+    # df = df[df['model'] == model_prefix]
+        
+    plt.figure(figsize=(10, 6), constrained_layout=True)
+    ax = plt.gca()
+
+    CLR = '#2271B2'
+    
+    chance_df = df[df['model'] == 'chance']
+    train_df = chance_df[chance_df['group'] == 'train']
+    test_df = chance_df[chance_df['group'] == 'test']
+    # for chance, plot 0s, as we are plotting relative to chance
+    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df[score_type]-train_df[score_type], color=CLR, edgecolors=CLR, facecolor='none', s=25, label='Train')
+    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df[score_type]-test_df[score_type], color=CLR, edgecolors=CLR, s=25, facecolor=CLR, label='Held-out')
+
+    df = df[df['model'] != 'chance']
+    train_df = df[df['group'] == 'train']
+    test_df = df[df['group'] == 'test']
+    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df[score_type], color=CLR, edgecolors=CLR, facecolor='none', s=25)
+    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df[score_type], color=CLR, edgecolors=CLR, facecolor=CLR,  s=25)
+
+    # ax.set_xlabel('Number of States')
+    if score_type == 'll_score':
+        ax.set_ylabel('Normalized LL (bits/s)')
+    elif score_type == 'pearson_score':
+        ax.set_ylabel(r'Pearson $r$')
+    elif score_type == 'r2_score':
+        ax.set_ylabel('Var Explained (%)')
+    else:
+        raise NotImplementedError
+
+    plt.margins(0.1)
+    plt.grid(alpha=0.15)
+    plt.legend(loc='lower right')
+    plt.xlabel('Number of states')
+    plt.title('GLM-HMM')
+    plt.xticks([0] + num_states, labels=['Chance', 'GLM'] + num_states[1:])
+
+    # Rotate only the first 2 tick labels
+    for i, label in enumerate(ax.get_xticklabels()):
+        if i < 2: label.set_rotation(90)
+
+    if savefig:
+        filename = f'{prefix}_{dataset}_{model_prefix}_{score_type}.pdf'
+        print(f'Saved at: {filename}')
+        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return
 
 
 def plot_ll_scores(
@@ -592,6 +660,7 @@ def plot_penalty_cv_datasplitseeds(prefix, df):
         best_idglmhmm_df[(best_idglmhmm_df["datasplit_seed"] == s) & (best_idglmhmm_df["group"] == grp)]["ll_score"].values
         for s in splits
     ]
+    print("splits", splits)
     # best_idglmhmm_vals = [(_ if len(_) else [np.nan]) for _ in best_idglmhmm_vals]
     print("best_idglmhmm_vals", best_idglmhmm_vals)
     best_idglmhmm_vals = np.array(best_idglmhmm_vals)[:, 0]
@@ -600,7 +669,7 @@ def plot_penalty_cv_datasplitseeds(prefix, df):
     print("lrhmm_vals", lrhmm_vals)
     # print("ghmm_vals", ghmm_vals)
 
-    diffs = [g - l for g, l in zip(best_idglmhmm_vals, lrhmm_vals)]
+    diffs = np.array([g - l for g, l in zip(best_idglmhmm_vals, lrhmm_vals)])
     n = len(diffs)
     x = np.arange(n)
 
@@ -608,11 +677,14 @@ def plot_penalty_cv_datasplitseeds(prefix, df):
     iqr_lo   = np.percentile(diffs, 25)
     iqr_hi   = np.percentile(diffs, 75)
     print("median_d", median_d, "iqr", (iqr_lo, iqr_hi))
+    print("diffs", diffs)
 
     CLR_POS = '#2271B2'
     CLR_NEG = '#CC3311'
 
     fig, ax = plt.subplots(figsize=(5, 5))
+
+    assert np.sum(diffs < 0) == 0
 
     # median line and IQR shading
     ax.axhline(median_d, color='#333333', lw=1.2, ls='-')
@@ -633,6 +705,89 @@ def plot_penalty_cv_datasplitseeds(prefix, df):
 
     if savefig:
         filename = f'{prefix}_{dataset}_datasplitseeds.pdf'
+        print(f'Saved at: {filename}')
+        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300, transparent=True)
+    if display:
+        plt.show()
+    return
+
+
+def plot_penalty_cv_datasplitseeds_2datasets(df_wt, df_wt_fred):
+
+    plt.figure(figsize=(5, 5), constrained_layout=True)
+    ax = plt.gca()
+
+    for i, df in enumerate([df_wt, df_wt_fred]):
+        idglmhmm_df   = df[df["model"] == 'id-glm-hmm'].copy()   # id-glm-hmm_ci
+        lrhmm_df = df[df["model"] == 'lrhmmci_'].copy()          # lrhmmci_
+
+        splits = sorted(set(idglmhmm_df["datasplit_seed"]) & set(lrhmm_df["datasplit_seed"]))   # get splits that were successful on both models
+
+        # ── Best regularized (IDGLMHMM) combo per (split, group) ─────────────────────────────────
+        # Step 1: find best (l1, l2) per split using test performance only
+        best_test_combo = (
+            idglmhmm_df[idglmhmm_df["group"] == "test"]
+            .sort_values("ll_score", ascending=False)
+            .groupby("datasplit_seed", as_index=False)
+            .first()
+        )
+
+        print("best_test_combo")
+        best_paths = best_test_combo['path'].tolist()
+        print(best_paths)
+        print([p.split('/')[-2] for p in best_paths])
+
+        best_test_combo = best_test_combo[["datasplit_seed", "l1_penalty", "l2_penalty"]]
+        
+        # Step 2: retrieve both train and test LL for that best combo
+        best_idglmhmm_df = best_test_combo.merge(idglmhmm_df, on=["datasplit_seed", "l1_penalty", "l2_penalty"])
+
+        grp = 'test'
+
+        lrhmm_vals = np.array([
+            lrhmm_df[(lrhmm_df["datasplit_seed"] == s) & (lrhmm_df["group"] == grp)]["ll_score"].values
+            for s in splits
+        ])[:, 0]
+
+        best_idglmhmm_vals = [
+            best_idglmhmm_df[(best_idglmhmm_df["datasplit_seed"] == s) & (best_idglmhmm_df["group"] == grp)]["ll_score"].values
+            for s in splits
+        ]
+        print("splits", splits)
+        # best_idglmhmm_vals = [(_ if len(_) else [np.nan]) for _ in best_idglmhmm_vals]
+        print("best_idglmhmm_vals", best_idglmhmm_vals)
+        best_idglmhmm_vals = np.array(best_idglmhmm_vals)[:, 0]
+
+        print("idglmhmm_vals", best_idglmhmm_vals)
+        print("lrhmm_vals", lrhmm_vals)
+        # print("ghmm_vals", ghmm_vals)
+
+        diffs = np.array([g - l for g, l in zip(best_idglmhmm_vals, lrhmm_vals)])
+
+        median_d = np.median(diffs)
+        iqr_lo   = np.percentile(diffs, 25)
+        iqr_hi   = np.percentile(diffs, 75)
+        print("median_d", median_d, "iqr", (iqr_lo, iqr_hi))
+        print("diffs", diffs)
+
+        CLR = '#2271B2'
+
+        assert np.sum(diffs < 0) == 0
+
+        jitter = np.random.uniform(-0.1, 0.1, size=len(diffs))
+        plt.plot(i + jitter, diffs, '.', color=CLR, markersize=10)
+        plt.errorbar(i + 0.4, median_d, yerr=np.array([[median_d-iqr_lo, iqr_hi-median_d]]).T, color='k', fmt='o', capsize=2)    # median and IQR
+
+    plt.axhline(0, color='black', lw=0.8, ls='--')
+    plt.xticks(list(range(2)), [f'Dataset {_+1}' for _ in range(2)])
+    plt.ylabel('LL difference (bits/s)\nGLM Tr - Static Tr')
+    plt.margins(0.1)
+    plt.grid(alpha=0.15)
+    plt.ylim([-0.1, 2.5])
+    plt.tight_layout()
+
+    if savefig:
+        filename = f'wt_vs_wt_fred_datasplitseeds.pdf'
         print(f'Saved at: {filename}')
         plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300, transparent=True)
     if display:
@@ -668,7 +823,7 @@ def return_grouped_ll_scores(
 def scores_dump(path, model_prefixes, num_states_configs):
     hmm_scores_df = loadCV_Scores(path, model_prefixes, num_states_configs)
     print(hmm_scores_df)
-    joblib.dump(hmm_scores_df, f'{path}_{dataset}_hmm_scores_df.pkl')
+    # joblib.dump(hmm_scores_df, f'{path}_{dataset}_hmm_scores_df.pkl')
     hmm_scores_df.to_csv(f'{path}_{dataset}_hmm_scores_df.csv', index=False)
     return
 
@@ -679,14 +834,18 @@ if __name__ == '__main__':
     savefig = True
     display = False
 
-    prefix = 'june26l1l2'
-    dataset = 'wt_fred'
+    # prefix = 'june26l1l2'
+    # dataset = 'wt_fred'
 
-    # num_states_configs = [5]
+    # num_states_configs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10]
     # scores_dump(prefix, [
     #     # (f'{prefix}_sweepcv_{dataset}_female', 'ghmm', ''),
-    #     (f'{prefix}_sweepcv_{dataset}_female', 'lrhmmci_', ''),
-    #     (f'{prefix}_sweepcv_{dataset}_female', 'id-glm-hmm', ''),
+    #     # (f'{prefix}_sweepcv_{dataset}_female', 'lrhmmci_', ''),
+    #     # (f'{prefix}_sweepcv_{dataset}_female', 'id-glm-hmm', ''),
+
+    #     (f'{prefix}_kfoldcv_{dataset}_female', 'chance', ''),
+    #     (f'{prefix}_kfoldcv_{dataset}_female', 'lr', ''),
+    #     (f'{prefix}_kfoldcv_{dataset}_female', 'id-glm-hmm', ''),
 
     #     # ('may23_sweepcv_wt_female', 'id-glm-hmm', ''),
     #     # ('may17_sweepcvcv_wt_female', 'id-glm-hmm', ''),
@@ -695,12 +854,19 @@ if __name__ == '__main__':
     #     ],
     #     num_states_configs)
 
-    df = joblib.load(f'{prefix}_{dataset}_hmm_scores_df.pkl')
-    print("df ===============\n")
-    print(df)
+    # df = joblib.load(f'{prefix}_{dataset}_hmm_scores_df.pkl')
+    # df = pd.read_csv(f'{prefix}_{dataset}_hmm_scores_df.csv')
+    # print("df ===============\n")
+    # print(df)
+    # plot_scores(df, model_prefix='id-glm-hmm', prefix=prefix)
+    # plot_penalty_cv_datasplitseeds(prefix, df)
+
+    df1 = pd.read_csv(f'may31l1l2_wt_hmm_scores_df.csv')
+    df2 = pd.read_csv(f'june26l1l2_wt_fred_hmm_scores_df.csv')
+    plot_penalty_cv_datasplitseeds_2datasets(df1, df2)
+
     # plot_penalty_cv_split(prefix, df)
-    plot_penalty_cv_2models(prefix, df)
-    plot_penalty_cv_datasplitseeds(prefix, df)
+    # plot_penalty_cv_2models(prefix, df)
     sys.exit(0)
 
     df = pd.read_csv(f"{prefix}_hmm_scores_df.csv")
