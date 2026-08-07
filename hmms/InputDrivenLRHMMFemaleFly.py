@@ -8,11 +8,11 @@ from library.inputdriven_linreg_hmm import InputDrivenLinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 
-from utilities.io import get_chance_logprob
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64
 from utilities import fitting, utils
 
 # print("jax.config", jax.config.values)
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", ENABLE_FLOAT64)
 
 
 class InputDrivenLRHMMFemaleFly(BaseFemaleFly):

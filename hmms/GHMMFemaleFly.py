@@ -7,12 +7,12 @@ from jax import vmap
 import jax.random as jr
 from dynamax.hidden_markov_model import GaussianHMM
 
-from utilities.io import get_chance_logprob
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64
 from utilities import utils, fitting, io
 from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", ENABLE_FLOAT64)
 
 
 class GHMMFemaleFly(BaseFemaleFly):

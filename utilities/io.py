@@ -18,6 +18,9 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 import jax.numpy as jnp
 
 
+ENABLE_FLOAT64 = True
+
+
 def getafilepath(model_name):
     foldertime = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f'./models/{model_name}/{foldertime}_{RandomWord().word()}'

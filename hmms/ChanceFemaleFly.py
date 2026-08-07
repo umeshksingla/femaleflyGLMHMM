@@ -7,11 +7,11 @@ import jax.numpy as jnp
 from sklearn.metrics import r2_score
 
 from utilities import utils
-from utilities.io import get_chance_logprob
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64
 from hmms.BaseFemaleFly import BaseFemaleFly
 
 # print("jax.config", jax.config.values)
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", ENABLE_FLOAT64)
 
 
 class ChanceFemaleFly(BaseFemaleFly):

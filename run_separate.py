@@ -3,9 +3,18 @@
 # Example usage: python run_separate.py
 
 ####################################
-
+import os
 import run_global
+import psutil
 
+# Get memory info
+mem = psutil.virtual_memory()
+
+# Print available memory in GB
+print(f"Available CPU Memory: {mem.available / (1024 ** 3):.2f} GB")
+
+print('XLA_PYTHON_CLIENT_PREALLOCATE=', os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'])
+print('XLA_PYTHON_CLIENT_ALLOCATOR=', os.environ['XLA_PYTHON_CLIENT_ALLOCATOR'])
 
 if __name__ == '__main__':
     dataset = 'wt'

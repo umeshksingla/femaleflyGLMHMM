@@ -5,8 +5,9 @@ from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from utilities import fitting, io
+from utilities.io import ENABLE_FLOAT64
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", ENABLE_FLOAT64)
 
 
 class LRHMMCustomInitFemaleFly(LRHMMFemaleFly):
