@@ -29,6 +29,7 @@ class LRHMMFemaleFly(BaseFemaleFly):
         self.model = LinearRegressionHMMCustom(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
                                     emission_dim=self.data_config['emission_dim'],
+                                    n_bases_per_feature=self.data_config['ncos'],
                                     input_mask_by_emission=self.data_config['input_mask_by_emission'],
                                     transition_matrix_stickiness=self.model_config['transition_matrix_stickiness'])
         self.learned_params = None

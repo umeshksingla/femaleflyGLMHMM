@@ -31,6 +31,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         self.model = InputDrivenLinearRegressionHMM(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
                                     emission_dim=self.data_config['emission_dim'],
+                                    n_bases_per_feature=self.data_config['ncos'],
                                     input_mask_by_emission=self.data_config['input_mask_by_emission'],
                                     input_mask_first=self.data_config['input_mask_by_emission'][0],
                                     l2_penalty=self.l2_penalty,
