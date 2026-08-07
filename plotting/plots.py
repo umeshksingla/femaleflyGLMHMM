@@ -6,6 +6,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import ListedColormap, to_rgba
 from matplotlib.ticker import FixedLocator
 from matplotlib.patches import FancyArrowPatch, Rectangle
+from functools import reduce
 import seaborn as sns
 import os
 import networkx as nx
@@ -360,7 +361,7 @@ def plot_hmm_data_whole_session_with_aux_with_states(predicted_emissions, true_e
     return
 
 
-def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_input_labels_list, input_labels, y_labels, y_aux_labels, prefix, axtitles=True, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
+def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_input_labels_list, input_labels, y_labels, y_aux_labels, prefix, sharey='row', axtitles=True, skip_states=[], only_plot_inputs=None, savefig=False, fig_dir=None, display=True):
     # print(weights.shape)
 
     num_states = orig_weights.shape[0]
@@ -380,7 +381,7 @@ def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_inp
     print(weights.shape)
 
     eff_num_states = num_states - len(skip_states)
-    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(2.5 * eff_num_states + 3, 2.4 * len(y_labels)), sharey='row')
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(5 * eff_num_states + 3, 4 * len(y_labels)), sharey=sharey)
 
     n_feats = 0
     for d, _ in enumerate(y_labels):
@@ -525,7 +526,7 @@ def plot_filters_separate_emissions(orig_weights, data_config, y_labels, input_l
         print("weights_d before basis tr", weights_d.shape, "n_inputs_d", n_inputs_d)
         weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=n_inputs_d)[:, 0]
         print("weights_d after basis tr", weights_d.shape)      # (num states, n_inputs_d, orig filterlen), e.g. (5, 7, 450)
-        fig, axs = plt.subplots(1, n_inputs_d, figsize=(3 * n_inputs_d, 3), sharey=sharey)
+        fig, axs = plt.subplots(1, n_inputs_d, figsize=(6 * n_inputs_d, 6), sharey=sharey)
 
         stim = 0
         for __ in y_labels[_]:
@@ -540,7 +541,8 @@ def plot_filters_separate_emissions(orig_weights, data_config, y_labels, input_l
 
             ax.axhline(0, ls=':', c='k', lw=0.5)
             maxtime = weights_d[0, stim].shape[-1]//data_config['orig_fps']
-            ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime+1), labels=[-maxtime] + ['']*(maxtime-1) + [0])
+            n_ticks_inbetween_integers = 4
+            ax.set_xticks(np.linspace(-maxtime, 0, num=maxtime*n_ticks_inbetween_integers+1), labels=[-maxtime] + reduce(lambda x, i: x+i, [['']*(n_ticks_inbetween_integers-1) + [int(i)] for i in np.arange(-maxtime+1, 1)]))
             ax.margins(y=0.05)
             if saveindividual:
                 ax.yaxis.set_tick_params(labelleft=True)  # ensure ytick labels are shown

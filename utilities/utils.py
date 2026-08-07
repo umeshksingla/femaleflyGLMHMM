@@ -701,7 +701,7 @@ def generate_together_figures(model_dir, savefig=True, display=False):
         return
 
     fig_dir = os.path.join(model_dir, 'figures')
-    together_filters_fig_dir = os.path.join(fig_dir, 'together_filters_fig_dir')
+    together_filters_fig_dir = os.path.join(fig_dir, 'together_filters_fig_dir_noyrow2')
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(together_filters_fig_dir, exist_ok=True)
 
@@ -761,16 +761,17 @@ def generate_together_figures(model_dir, savefig=True, display=False):
     print(data_config['input_labels'])
 
     only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2', 'mfDist']
+    sharey = False  # 'row' or False
 
     for skip_states in [[0], []]:
         if num_states <= 1 and skip_states:
             continue    # skip skip_states if there's only state
         plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions',
-                                     only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+                                     sharey=sharey, only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        # plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey=sharey, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        # plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey=sharey, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
+        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey=sharey, skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return
