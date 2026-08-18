@@ -1,15 +1,31 @@
-from typing import OrderedDict
-
-import matplotlib.pyplot as plt
 import seaborn as sns
+from seaborn import xkcd_rgb
 from sklearn.metrics import r2_score
 
-from plotting.plots import *
 from utilities.io import *
+from preprocess.colors import EC, colors_datasource
 from utilities.utils import update_labels, generate_figures_filters_given_2datasets
 
 
-def plot_state_o_dists_reformatted_2datasets(emissions1_z, emissions2_z, o_labels, title=None, savefig=False, fig_dir=None, display=True):
+def plot_legends(ds1, ds2, savefig=False, fig_dir=None, display=True):
+
+    fig, ax = plt.subplots(figsize=(2.4, 1.2))
+    ax.plot([0, 1], [1, 1], c=xkcd_rgb[colors_datasource[ds1]], linewidth=6)
+    ax.text(1.2, 1, ds1, va='center', fontsize='small')
+    ax.plot([0, 1], [0, 0], c=xkcd_rgb[colors_datasource[ds2]], linewidth=6, alpha=0.5, linestyle='--')
+    ax.text(1.2, 0, ds2, va='center', fontsize='small')
+    # ax.set_ylim([0.5, -num_states-0.5])
+    ax.axis('off')
+    plt.tight_layout()
+    if savefig:
+        plt.savefig(f'{fig_dir}/{ds1}-{ds2}_legend.pdf', dpi=300, transparent=True, bbox_inches='tight')
+    if display:
+        plt.show()
+    plt.close()
+    return
+
+
+def plot_o_dists_reformatted_2datasets(ds1, ds2, emissions1, emissions2, o_labels, title=None, savefig=False, fig_dir=None, display=True):
 
     fig, axes = plt.subplots(1, len(o_labels), figsize=(16, 5))
 
@@ -32,49 +48,48 @@ def plot_state_o_dists_reformatted_2datasets(emissions1_z, emissions2_z, o_label
 
     for o, ol in enumerate(o_labels):
         ax = axes[o] if len(o_labels) > 1 else axes
-        for z in list(emissions1_z.keys()):
-            data_z1 = emissions1_z[z][:, o]
-            data_z_reformatted1, xlim, ylim = reformat(ol, data_z1)
-            np.random.seed(0)
-            samples1 = np.random.choice(np.round(data_z_reformatted1, decimals=3), min(10000, len(data_z_reformatted1)), replace=False)
-            sns.kdeplot(samples1, color=COLORS[z], ax=ax,
-                        common_norm=True,
-                        label=f'LEAP rig',
-                        alpha=1,
-                        cut=0,
-                        linewidth=2,
-                        bw_adjust=2,
-                        )
+        data1 = emissions1[:, o]
+        data_reformatted1, xlim, ylim = reformat(ol, data1)
+        np.random.seed(0)
+        samples1 = np.random.choice(np.round(data_reformatted1, decimals=3), min(10000, len(data_reformatted1)), replace=False)
+        sns.kdeplot(samples1, color=xkcd_rgb[colors_datasource[ds1]], ax=ax,
+                    common_norm=True,
+                    label=ds1,
+                    alpha=1,
+                    cut=0,
+                    linewidth=2,
+                    bw_adjust=2,
+                    )
 
-            data_z2 = emissions2_z[z][:, o]
-            data_z_reformatted2, xlim, ylim = reformat(ol, data_z2)
-            np.random.seed(0)
-            samples2 = np.random.choice(np.round(data_z_reformatted2, decimals=3), min(10000, len(data_z_reformatted2)), replace=False)
-            sns.kdeplot(samples2, color=COLORS[z], ax=ax,
-                        common_norm=True,
-                        label=f'16mic rig',
-                        alpha=1,
-                        cut=0,
-                        linewidth=2,
-                        bw_adjust=2,
-                        linestyle='--',
-                        )
+        data2 = emissions2[:, o]
+        data_reformatted2, xlim, ylim = reformat(ol, data2)
+        np.random.seed(0)
+        samples2 = np.random.choice(np.round(data_reformatted2, decimals=3), min(10000, len(data_reformatted2)), replace=False)
+        sns.kdeplot(samples2, color=xkcd_rgb[colors_datasource[ds2]], ax=ax,
+                    common_norm=True,
+                    label=ds2,
+                    alpha=1,
+                    cut=0,
+                    linewidth=2,
+                    bw_adjust=2,
+                    linestyle='--',
+                    )
 
         # ax.axvline(0, lw=0.5, c='gray', ls=':', alpha=0.7)
         ax.set_xlabel(o_labels[ol], color=EC)
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
 
-    # ax.legend(loc='upper right')
+    axes[0].legend(loc='upper right')
     plt.tight_layout()
-    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_outputs_by_o_dists_reformatted_2datasets.pdf'),
+    if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_mean_outputs_by_o_dists_reformatted_2datasets.pdf'),
                             bbox_inches='tight', dpi=300, transparent=True)
     if display: plt.show()
     plt.close()
     return
 
 
-def plot_state_aux_dists_reformatted_2datasets(aux_z1, aux_z2, a_labels, effective_fps1, effective_fps2, exclude_a=[], title=None, savefig=False, fig_dir=None, display=True):
+def plot_aux_dists_reformatted_2datasets(ds1, ds2, aux1, aux2, a_labels, effective_fps1, effective_fps2, exclude_a=[], title=None, savefig=False, fig_dir=None, display=True):
 
     def reformat(f_name, dt, effective_fps):
         print(f_name)
@@ -146,31 +161,30 @@ def plot_state_aux_dists_reformatted_2datasets(aux_z1, aux_z2, a_labels, effecti
         print(a, al)
         if al in exclude_a:
             continue
-        for z in list(aux_z1.keys()):
-            data_z1 = aux_z1[z][:, a]
-            data_z2 = aux_z2[z][:, a]
-            data_z_reformatted1, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z1, effective_fps1)
-            data_z_reformatted2, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z2, effective_fps2)
+        data_z1 = aux1[:, a]
+        data_z2 = aux2[:, a]
+        data_z_reformatted1, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z1, effective_fps1)
+        data_z_reformatted2, cut, xlabel, ylabel, xlim, xticks, axtitle = reformat(al, data_z2, effective_fps2)
 
-            if al in ['pulse_i', 'sine_i', 'tap2']:
-                ax[axi].bar(z/2-0.2, data_z_reformatted1, color=COLORS[z], alpha=0.9, width=0.25)
-                ax[axi].bar(z/2+0.2, data_z_reformatted2, color=COLORS[z], alpha=0.5, width=0.25)
-            else:
-                samples1 = np.random.choice(data_z_reformatted1, min(10000, len(data_z1)), replace=False)
-                sns.kdeplot(samples1, color=COLORS[z], ax=ax[axi],
-                            label=f'LEAP rig',
-                            alpha=1,
-                            cut=cut,
-                            linewidth=2,
-                            )
-                samples2 = np.random.choice(data_z_reformatted2, min(10000, len(data_z2)), replace=False)
-                sns.kdeplot(samples2, color=COLORS[z], ax=ax[axi],
-                            label=f'16mic rig',
-                            alpha=1,
-                            cut=cut,
-                            linewidth=2,
-                            linestyle='--',
-                            )
+        if al in ['pulse_i', 'sine_i', 'tap2']:
+            ax[axi].bar(-0.2, data_z_reformatted1, color=xkcd_rgb[colors_datasource[ds1]], alpha=0.9, width=0.25)
+            ax[axi].bar(+0.2, data_z_reformatted2, color=xkcd_rgb[colors_datasource[ds2]], alpha=0.5, width=0.25)
+        else:
+            samples1 = np.random.choice(data_z_reformatted1, min(10000, len(data_z1)), replace=False)
+            sns.kdeplot(samples1, color=xkcd_rgb[colors_datasource[ds1]], ax=ax[axi],
+                        label=ds1,
+                        alpha=1,
+                        cut=cut,
+                        linewidth=2,
+                        )
+            samples2 = np.random.choice(data_z_reformatted2, min(10000, len(data_z2)), replace=False)
+            sns.kdeplot(samples2, color=xkcd_rgb[colors_datasource[ds2]], ax=ax[axi],
+                        label=ds2,
+                        alpha=1,
+                        cut=cut,
+                        linewidth=2,
+                        linestyle='--',
+                        )
 
         # ax[axi].axvline(0, lw=0.5, c='gray', ls=':', alpha=0.7)
         ax[axi].set_title(axtitle if axtitle else a_labels[al])
@@ -181,6 +195,7 @@ def plot_state_aux_dists_reformatted_2datasets(aux_z1, aux_z2, a_labels, effecti
         ax[axi].margins(y=0.1,x=0.1)
         # ax[axi].title.set_position([.5, 10.05])
         axi += 1
+    # ax[0].legend(loc='upper right')
     fig.align_xlabels()
     plt.tight_layout()
     if savefig: fig.savefig(os.path.join(fig_dir, f'{title.lower().replace(" ", "")}_state_mean_aux_dists_exclude_a={len(exclude_a)}_reformatted_2datasets.pdf'),
@@ -199,39 +214,50 @@ def data(model_ckp):
     return all_emissions, all_stateseq, all_output_mn_std, all_aux_data, all_aux_mn_std
 
 
-def make_plots(savefig=False, fig_dir=None, display=True):
+def make_plots(ds1='', ds2='', savefig=False, fig_dir=None, display=True):
+    ds1_model_dir = model_paths[ds1]
+    ds2_model_dir = model_paths[ds2]
 
-    leap_model_ckp, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
-    new16mic_model_ckp, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+    ds1_model_ckp, ds1_data_config, ds1_model_config = load_specific_path(ds1_model_dir)
+    ds2_model_ckp, ds2_data_config, ds2_model_config = load_specific_path(ds2_model_dir)
 
-    leap_effective_fps = leap_data_config['effective_fps']
-    new16mic_effective_fps = new16mic_data_config['effective_fps']
-    leap_all_emissions, leap_all_stateseq, leap_all_output_mn_std, leap_all_aux_data, leap_all_aux_mn_std = data(leap_model_ckp)
-    new16mic_all_emissions, new16mic_all_stateseq, new16mic_all_output_mn_std, new16mic_all_aux_data, new16mic_all_aux_mn_std = data(new16mic_model_ckp)
+    ds1_effective_fps = ds1_data_config['effective_fps']
+    ds2_effective_fps = ds2_data_config['effective_fps']
+    ds1_all_emissions, ds1_all_stateseq, ds1_all_output_mn_std, ds1_all_aux_data, ds1_all_aux_mn_std = data(ds1_model_ckp)
+    ds2_all_emissions, ds2_all_stateseq, ds2_all_output_mn_std, ds2_all_aux_data, ds2_all_aux_mn_std = data(ds2_model_ckp)
 
-    leap_aux_z = get_aux_by_state(leap_all_aux_data, leap_all_stateseq, 1, leap_all_aux_mn_std, rescaled=True)
-    new16mic_aux_z = get_aux_by_state(new16mic_all_aux_data, new16mic_all_stateseq, 1, new16mic_all_aux_mn_std, rescaled=True)
+    ds1_all_stateseq = [np.zeros(_.shape) for _ in ds1_all_stateseq]    # all states are just 0s for these plots
+    ds2_all_stateseq = [np.zeros(_.shape) for _ in ds2_all_stateseq]
 
-    leap_emissions_z = get_emissions_by_state(leap_all_emissions, leap_all_stateseq, 1, leap_all_output_mn_std, rescaled=True, effective_fps=leap_effective_fps)
-    new16mic_emissions_z = get_emissions_by_state(new16mic_all_emissions, new16mic_all_stateseq, 1, new16mic_all_output_mn_std, rescaled=True, effective_fps=new16mic_effective_fps)
+    ds1_aux = get_aux_by_state(ds1_all_aux_data, ds1_all_stateseq, 1, ds1_all_aux_mn_std, rescaled=True)
+    ds2_aux = get_aux_by_state(ds2_all_aux_data, ds2_all_stateseq, 1, ds2_all_aux_mn_std, rescaled=True)
 
-    update_labels(leap_data_config)
+    ds1_emissions = get_emissions_by_state(ds1_all_emissions, ds1_all_stateseq, 1, ds1_all_output_mn_std, rescaled=True, effective_fps=ds1_effective_fps)
+    ds2_emissions = get_emissions_by_state(ds2_all_emissions, ds2_all_stateseq, 1, ds2_all_output_mn_std, rescaled=True, effective_fps=ds2_effective_fps)
+    update_labels(ds1_data_config)
 
-    # plots.plot_legends(1, leap_data_config, savefig=savefig, fig_dir=fig_dir, display=display)
-    #
-    # plots.plot_state_o_dists_reformatted_2datasets(
-    #     leap_emissions_z, new16mic_emissions_z, leap_data_config['emission_labels_units'],
-    #     title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display
-    # )
+    ds1_aux = ds1_aux[0]            # everything is in just state 0
+    ds2_aux = ds2_aux[0]
+    ds1_emissions = ds1_emissions[0]
+    ds2_emissions = ds2_emissions[0]
 
-    plot_state_aux_dists_reformatted_2datasets(
-        leap_aux_z, new16mic_aux_z, leap_data_config['auxiliary_labels'], leap_effective_fps, new16mic_effective_fps,
-        exclude_a=['wingAlign', 'fmAng_sin'], title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display
+    prefix = f'{ds1}-{ds2}'
+
+    plot_legends(ds1, ds2, savefig=savefig, fig_dir=fig_dir, display=display)
+
+    plot_o_dists_reformatted_2datasets(
+        ds1, ds2, ds1_emissions, ds2_emissions, ds1_data_config['emission_labels_units'],
+        title=prefix, savefig=savefig, fig_dir=fig_dir, display=display
     )
 
-    plot_state_aux_dists_reformatted_2datasets(
-        leap_aux_z, new16mic_aux_z, leap_data_config['auxiliary_labels'], leap_effective_fps, new16mic_effective_fps,
-        title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display
+    plot_aux_dists_reformatted_2datasets(
+        ds1, ds2, ds1_aux, ds2_aux, ds1_data_config['auxiliary_labels'], ds1_effective_fps, ds2_effective_fps,
+        exclude_a=['wingAlign', 'fmAng_sin'], title=prefix, savefig=savefig, fig_dir=fig_dir, display=display
+    )
+
+    plot_aux_dists_reformatted_2datasets(
+        ds1, ds2, ds1_aux, ds2_aux, ds1_data_config['auxiliary_labels'], ds1_effective_fps, ds2_effective_fps,
+        title=prefix, savefig=savefig, fig_dir=fig_dir, display=display
     )
     return
 
@@ -385,22 +411,25 @@ def plot_empirical_occupancy_2datasets(savefig=True, display=True):
 if __name__ == '__main__':
 
     model_paths = {
-        'Dataset 1': 'models/may31l1l2_sweepcv_wt_female/id-glm-hmm_5_cv/20260531_183347_obsidian',  # 5-GLM-HMM female
-        'Dataset 2': 'models/june26l1l2_sweepcv_wt_fred_female/id-glm-hmm_5_cv/20260626_050049_whelp',  # 5-GLM-HMM female fred
+        'wt': '../FINAL_WT/20260531_183347_obsidian/',       # wt female
+        'wt_16mic': '../FINAL_WT_FRED/20260626_050049_whelp',    # wt female fred
+        'ac_both': 'models/general_ac_both/idarhmm_5_cv/20260814_173744_accounting/',         # ac both female
+        'blind_both': 'models/general_blind_both/idarhmm_5_cv/20260814_175044_congregation/',  # blind both female
     }
 
-    leap_model_dir = model_paths['Dataset 1']
-    new16mic_model_dir = model_paths['Dataset 2']
+    # ds1_model_dir = model_paths['wt']
+    # ds2_model_dir = model_paths['ac_both']
 
-    all_weights_wt = joblib.load(f'{leap_model_dir}/all_weights_wt.pkl')
-    all_weights_wt_fred = joblib.load(f'{new16mic_model_dir}/all_weights_wt_fred.pkl')
-
-    avg_weight_WT = np.mean(all_weights_wt, axis=0)
-    avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
+    # all_weights_wt = joblib.load(f'{leap_model_dir}/all_weights_wt.pkl')
+    # all_weights_wt_fred = joblib.load(f'{new16mic_model_dir}/all_weights_wt_fred.pkl')
+    #
+    # avg_weight_WT = np.mean(all_weights_wt, axis=0)
+    # avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
 
     fig_dir = os.path.join('models/cv_figs')
-    # make_plots(savefig=True, fig_dir=fig_dir, display=True)
+    os.makedirs(fig_dir, exist_ok=True)
+    make_plots(ds1='wt', ds2='wt_16mic', savefig=True, fig_dir=fig_dir, display=False)
     # plot_empirical_occupancy_2datasets()
     # plot_weight_magnitudes()
-    plot_weights()
+    # plot_weights()
     # plot_legends(0, 0, savefig=True, fig_dir=fig_dir, display=False)

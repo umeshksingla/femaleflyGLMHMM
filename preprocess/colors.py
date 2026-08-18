@@ -25,3 +25,9 @@ LR = {  # Left or Right colors
     'L': 'mediumorchid',
     'R': 'forestgreen',
 }
+colors_datasource = {
+    'wt': 'steel blue',
+    'ac_both': 'light mauve',
+    'blind_both': 'avocado',
+    'wt_16mic': 'taupe',
+}
