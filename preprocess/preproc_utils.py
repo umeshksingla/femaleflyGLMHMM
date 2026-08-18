@@ -61,6 +61,10 @@ def lims_to_mask(lims, size=None):
     return mask
 
 
+def cross2d(arr1, arr2):
+    return arr1[..., 0] * arr2[..., 1] - arr1[..., 1] * arr2[..., 0]
+
+
 def signed_angle(a, b):
     """Finds the signed angle between two 2D vectors a and b.
 
@@ -77,7 +81,7 @@ def signed_angle(a, b):
     a = a / np.linalg.norm(a, axis=1, keepdims=True)
     b = b / np.linalg.norm(b, axis=1, keepdims=True)
     theta = np.arccos(np.around(np.sum(a * b, axis=1), decimals=4))
-    cross = np.cross(a, b, axis=1)
+    cross = cross2d(a, b)
     sign = np.zeros(cross.shape)
     sign[cross >= 0] = -1
     sign[cross < 0] = 1
