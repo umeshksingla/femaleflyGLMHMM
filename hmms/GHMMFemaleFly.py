@@ -36,8 +36,6 @@ class GHMMFemaleFly(BaseFemaleFly):
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
 
-        # print("Before:", em_params)
-
         # OR Reindex by the activity index
         _, z_seqs, _, _, _ = self.predict(emissions, inputs)
         emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
