@@ -311,19 +311,9 @@ def get_full_window_to_plot(effective_fps, num_timestamps):
 
 
 def get_chance_logprob(y, mu, cov):
-    """
-    Get log prob of given sequence y under Chance(mu, cov)
-    """
-    # mu = jnp.mean(y, axis=0)
-    # cov = jnp.cov(y.T)
-    # cov = jnp.atleast_2d(cov)
-    assert mu is not None and cov is not None
-    model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
-    p = model.prob(y)
-    p = jnp.maximum(p, 1e-15)
-    log_Y_given_mvn = jnp.sum(jnp.log(p))
-    lp = log_Y_given_mvn.sum()
-    return lp
+    """Total log-likelihood (nats) of y under independent Gaussians with the training means and variances."""
+    model = tfd.MultivariateNormalDiag(loc=mu, scale_diag=jnp.sqrt(jnp.diag(cov)))
+    return jnp.sum(model.log_prob(y))
 
 
 def calc_dwell_times_by_z(z_seqs, num_states):
