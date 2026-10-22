@@ -37,30 +37,28 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
         inputs_to_fit = io.chunk_data(batched_inputs, chunk_size=5000)
 
         lrhmmci = LRHMMCustomInitFemaleFly(self.data_config, self.model_config)
-        lrhmmci.fit(batched_emissions, batched_inputs, batched_output_mn_std)
-
-        W = lrhmmci.learned_params.emissions.weights
-        b = lrhmmci.learned_params.emissions.biases
-        W = W + np.random.random(W.shape) * 1e-4
-        b = b + np.random.random(b.shape) * 1e-4
-
-        init_P = lrhmmci.learned_params.initial.probs
-        tr_b = np.log(lrhmmci.learned_params.transitions.transition_matrix)
-
-        print("LRHMMCI global W and b computed.", W.shape, b.shape)
-        print("ID-GLMHMMCI init_P and tr_b init.", init_P.shape, tr_b.shape)
+        lrhmmci.fit(batched_emissions, batched_inputs, batched_output_mn_std, do_reindex_params=False)
+        p = lrhmmci.learned_params
+        print("LRHMMCI W, b and s computed.")
+        D = inputs_to_fit.shape[-1]
         em_params, em_lps = fitting.fitEMInputDrivenCustomInit(key,
                                                                self.model,
                                                                emissions_to_fit,
                                                                train_inputs=inputs_to_fit,
-                                                               initial_probs=init_P,
-                                                               transition_weights=None, # weights can be initialized from normal in the class itself
-                                                               transition_biases=tr_b,
-                                                               emission_weights=W,
-                                                               emission_biases=b)
+
+                                                               initial_weights=jnp.zeros((self.num_states, D)),
+                                                               initial_biases=jnp.log(jnp.clip(p.initial.probs, 1e-8)),
+
+                                                               transition_weights=np.zeros((self.num_states, self.num_states, D)), # init weights to be 0
+                                                               transition_biases=np.log(p.transitions.transition_matrix),
+
+                                                               emission_weights=p.emissions.weights,
+                                                               emission_biases=p.emissions.biases,
+                                                               emission_covariances=p.emissions.covs)
         self.learned_params = em_params
         self.learned_params = self.reindex_params(em_params, batched_emissions, batched_inputs, batched_output_mn_std)
         self.learned_lps = em_lps
+        print(f'ID-GLMHMMCI training loss: start {float(em_lps[0]):.4f}, end {float(em_lps[-1]):.4f}')
         self.update_status()
         print(f'End fitting {self.__class__.__name__}...')
         return
