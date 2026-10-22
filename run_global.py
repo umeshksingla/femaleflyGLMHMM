@@ -16,7 +16,7 @@ import numpy as np
 
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
-from hmms.GHMMFemaleFly import GHMMFemaleFly
+from hmms.DiagGHMMFemaleFly import DiagGHMMFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.LRHMMCustomInitFemaleFly import LRHMMCustomInitFemaleFly
 from hmms.InputDrivenLRHMMCustomInitFemaleFly import InputDrivenLRHMMCustomInitFemaleFly
@@ -62,7 +62,7 @@ def run(mc, enhance=False, genfig=False):
 
     num_batches = data_config['num_sessions']
     datasplit_seed = mc.get('datasplit_seed', 0)
-    # split = mc['split']
+    split = mc['split']
     num_train_batches = int(num_batches * 0.8)
 
     # Set up reproducible RNG and shuffle indices
@@ -73,9 +73,9 @@ def run(mc, enhance=False, genfig=False):
     train_session_indices = all_indices[:num_train_batches].astype(int)
     test_session_indices = all_indices[num_train_batches:].astype(int)
 
-    # if split == 1:
-    #     # swap the split used for training data
-    #     train_session_indices, test_session_indices = test_session_indices, train_session_indices
+    if split == 1:
+        # swap the split used for training data
+        train_session_indices, test_session_indices = test_session_indices, train_session_indices
 
     train_emissions = [emissions[e] for e in train_session_indices]
     train_inputs = [inputs[e] for e in train_session_indices]
@@ -87,8 +87,8 @@ def run(mc, enhance=False, genfig=False):
     model_prefix = mc['name']
     if model_prefix == 'lrhmm':
         model = LRHMMFemaleFly(data_config, mc)
-    elif model_prefix == 'ghmm':
-        model = GHMMFemaleFly(data_config, mc)
+    elif model_prefix == 'dghmm':
+        model = DiagGHMMFemaleFly(data_config, mc)
     elif model_prefix == 'lrhmmci':
         model = LRHMMCustomInitFemaleFly(data_config, mc)
     elif model_prefix == 'chance':

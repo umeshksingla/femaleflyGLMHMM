@@ -4,6 +4,8 @@
 
 ####################################
 
+import os
+import sys
 import glob
 import random
 import joblib
@@ -114,8 +116,8 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
                     continue
                 if pkl is None: continue
                 datasplit_seed = model_config['datasplit_seed']
-                if datasplit_seed not in [7401, 3930, 6244, 6400, 8116]:
-                    continue
+                # if datasplit_seed not in [7401, 3930, 6244, 6400, 8116]:
+                #     continue
                 init_seed = model_config['seed']
                 name = prefix   # model_path_prefix.split('/')[1]
                 for group in ['train', 'test']:
@@ -132,6 +134,7 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
                     ll_score = pkl[f'{group}_data'][f'{group}_lp'].item() * factor_bits_per_sec
                     row = [name, num_states, group, datasplit_seed, init_seed, r2_score, pearson_score, ll_score, l1_penalty, l2_penalty, split, _]
                     rows.append(row)
+                    # print(row)
                 c += 1
                 # if c == 10: break
     columns=['model', 'num_states', 'group', 'datasplit_seed', 'init_seed', 'r2_score', 'pearson_score', 'll_score', 'l1_penalty', 'l2_penalty', 'split', 'path']
@@ -141,52 +144,48 @@ def loadCV_Scores(path, model_path_prefixes, num_states_configs, precomputed=Fal
 
 
 def plot_scores(
-    df, 
-    model_prefix='id-glm-hmm',
-    num_states=[1, 2, 3, 4, 5, 6, 7, 8, 10], 
-    prefix='',
-    score_type='ll_score'
-):
+    df, num_states=[1, 2, 3, 4, 5, 6, 7, 8, 10], ):
     """
-    Plots ll_score vs num_states for specified models, groups, and seeds.
+    Plots (ll_score vs num_states)
     """
     np.random.seed(0)
     
     # df = df[df['model'] == model_prefix]
-        
+
     plt.figure(figsize=(10, 6), constrained_layout=True)
     ax = plt.gca()
 
-    CLR = '#2271B2'
+    # CLR = '#2271B2'
+    CLR = '#000000'
     
     chance_df = df[df['model'] == 'chance']
     train_df = chance_df[chance_df['group'] == 'train']
     test_df = chance_df[chance_df['group'] == 'test']
     # for chance, plot 0s, as we are plotting relative to chance
-    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df[score_type]-train_df[score_type], color=CLR, edgecolors=CLR, facecolor='none', s=25, label='Train')
-    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df[score_type]-test_df[score_type], color=CLR, edgecolors=CLR, s=25, facecolor=CLR, label='Held-out')
+    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df['ll_score']-train_df['ll_score'], color=CLR, edgecolors=CLR, facecolor='none', s=25, label='Train')
+    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df['ll_score']-test_df['ll_score'], color=CLR, edgecolors=CLR, s=25, facecolor=CLR, label='Held-out')
 
     df = df[df['model'] != 'chance']
     train_df = df[df['group'] == 'train']
     test_df = df[df['group'] == 'test']
-    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df[score_type], color=CLR, edgecolors=CLR, facecolor='none', s=25)
-    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df[score_type], color=CLR, edgecolors=CLR, facecolor=CLR,  s=25)
+    ax.scatter(train_df['num_states'] + np.random.uniform(-0.2, -0.02, size=len(train_df)), train_df['ll_score']+correction['train'], color=CLR, edgecolors=CLR, facecolor='none', s=25)
+    ax.scatter(test_df['num_states'] + np.random.uniform(0.02, 0.2, size=len(test_df)), test_df['ll_score']+correction['test'], color=CLR, edgecolors=CLR, facecolor=CLR,  s=25)
 
     # ax.set_xlabel('Number of States')
-    if score_type == 'll_score':
-        ax.set_ylabel('Normalized LL (bits/s)')
-    elif score_type == 'pearson_score':
-        ax.set_ylabel(r'Pearson $r$')
-    elif score_type == 'r2_score':
-        ax.set_ylabel('Var Explained (%)')
-    else:
-        raise NotImplementedError
+    # if score_type == 'll_score':
+    ax.set_ylabel('Normalized LL (bits/s)')
+    # elif score_type == 'pearson_score':
+    #     ax.set_ylabel(r'Pearson $r$')
+    # elif score_type == 'r2_score':
+    #     ax.set_ylabel('Var Explained (%)')
+    # else:
+    #     raise NotImplementedError
 
     plt.margins(0.1)
     plt.grid(alpha=0.15)
     plt.legend(loc='lower right')
     plt.xlabel('Number of states')
-    plt.title('GLM-HMM')
+    plt.title('Cross-Validation Splits')
     plt.xticks([0] + num_states, labels=['Chance', 'GLM'] + num_states[1:])
 
     # Rotate only the first 2 tick labels
@@ -194,9 +193,9 @@ def plot_scores(
         if i < 2: label.set_rotation(90)
 
     if savefig:
-        filename = f'{prefix}_{dataset}_{model_prefix}_{score_type}.pdf'
+        filename = f'{prefix}_{dataset}_ll_score.pdf'
         print(f'Saved at: {filename}')
-        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300, transparent=True)
+        plt.savefig(f'{fig_dir}/{filename}', bbox_inches='tight', dpi=300, transparent=True)
     if display:
         plt.show()
     return
@@ -208,7 +207,7 @@ def plot_ll_scores(
     # groups=['train', 'test'], 
     num_states=[2, 3, 4, 5, 6, 7, 8, 10], 
     plot_type='mean_sem',   # 'mean_sem' or 'all_points'
-    # group_by_seed=None,     # None, 'datasplit_seed', or 'init_seed'
+    # group_by_seed=None,     # None, 'datasplit_seed', or 'init_`seed'
     prefix='',
     score_type='ll_score'
 ):
@@ -312,7 +311,7 @@ def plot_ll_scores(
     if savefig:
         filename = f'{prefix}_{model_prefixes}_{groups}_{plot_type}_both_wo1.pdf'
         print(f'Saved at: {filename}')
-        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
+        plt.savefig(f'{fig_dir}/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
@@ -344,7 +343,7 @@ def plot_penalty_cv(prefix, df):
     if savefig:
         filename = f'{prefix}_penalty.pdf'
         print(f'Saved at: {filename}')
-        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
+        plt.savefig(f'{fig_dir}/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
@@ -379,7 +378,7 @@ def plot_penalty_cv_perstate(prefix, df, filter_numstates=[]):
     if savefig:
         filename = f'{prefix}_penalty_perstate_{filter_numstates}.pdf'
         print(f'Saved at: {filename}')
-        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
+        plt.savefig(f'{fig_dir}/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
@@ -458,7 +457,7 @@ def plot_penalty_cv_split(prefix, df):
     if savefig:
         filename = f'{prefix}_l1l2penalties_datasplitseeds_split.pdf'
         print(f'Saved at: {filename}')
-        plt.savefig(f'models/cv_figs/{filename}', bbox_inches='tight', dpi=300)
+        plt.savefig(f'{fig_dir}/{filename}', bbox_inches='tight', dpi=300)
     if display:
         plt.show()
     return
@@ -829,85 +828,96 @@ def scores_dump(path, model_prefixes, num_states_configs):
 
 
 if __name__ == '__main__':
-    import sys
 
     savefig = True
     display = False
 
-    # prefix = 'june26l1l2'
-    # dataset = 'wt_fred'
+    dataset = 'wt'
+    prefix = 'jan1'
+    # prefix = 'jan1_initseedscv'
+    fig_dir = 'models/cv_figs2'
+    os.makedirs(fig_dir, exist_ok=True)
 
-    # num_states_configs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10]
-    # scores_dump(prefix, [
-    #     # (f'{prefix}_sweepcv_{dataset}_female', 'ghmm', ''),
-    #     # (f'{prefix}_sweepcv_{dataset}_female', 'lrhmmci_', ''),
-    #     # (f'{prefix}_sweepcv_{dataset}_female', 'id-glm-hmm', ''),
+    if dataset == 'wt':
+        correction = {}
+        correction['train'] = 27.01302357816
+        correction['test'] = 24.2869660944
+    if dataset == 'wt_fred':
+        correction = {}
+        correction['train'] = 15.1177935122
+        correction['test'] = 17.596925783
 
-    #     (f'{prefix}_kfoldcv_{dataset}_female', 'chance', ''),
-    #     (f'{prefix}_kfoldcv_{dataset}_female', 'lr', ''),
-    #     (f'{prefix}_kfoldcv_{dataset}_female', 'id-glm-hmm', ''),
+    num_states_configs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10]
+    scores_dump(prefix, [
+        # (f'{prefix}_sweepcv_{dataset}_female', 'ghmm', ''),
+        # (f'{prefix}_sweepcv_{dataset}_female', 'lrhmmci_', ''),
+        # (f'{prefix}_sweepcv_{dataset}_female', 'id-glm-hmm', ''),
 
-    #     # ('may23_sweepcv_wt_female', 'id-glm-hmm', ''),
-    #     # ('may17_sweepcvcv_wt_female', 'id-glm-hmm', ''),
-    #     # ('apr6_bothcv_wt_female_2', 'lrhmmci_', ''),
-    #     # ('apr11_bothcv_wt_female', 'id-glm-hmm', '')
-    #     ],
-    #     num_states_configs)
+        (f'{prefix}_kfoldcv_{dataset}_female', 'chance', ''),
+        (f'{prefix}_kfoldcv_{dataset}_female', 'lr', ''),
+        (f'{prefix}_kfoldcv_{dataset}_female', 'id-glm-hmm', ''),
+
+        # ('may23_sweepcv_wt_female', 'id-glm-hmm', ''),
+        # ('may17_sweepcvcv_wt_female', 'id-glm-hmm', ''),
+        # ('apr6_bothcv_wt_female_2', 'lrhmmci_', ''),
+        # ('apr11_bothcv_wt_female', 'id-glm-hmm', '')
+        ],
+        num_states_configs)
 
     # df = joblib.load(f'{prefix}_{dataset}_hmm_scores_df.pkl')
-    # df = pd.read_csv(f'{prefix}_{dataset}_hmm_scores_df.csv')
+    df = pd.read_csv(f'{prefix}_{dataset}_hmm_scores_df.csv')
     # print("df ===============\n")
     # print(df)
-    # plot_scores(df, model_prefix='id-glm-hmm', prefix=prefix)
+    plot_scores(df)
+
     # plot_penalty_cv_datasplitseeds(prefix, df)
 
-    df1 = pd.read_csv(f'may31l1l2_wt_hmm_scores_df.csv')
-    df2 = pd.read_csv(f'june26l1l2_wt_fred_hmm_scores_df.csv')
-    plot_penalty_cv_datasplitseeds_2datasets(df1, df2)
+    # df1 = pd.read_csv(f'may31l1l2_wt_hmm_scores_df.csv')
+    # df2 = pd.read_csv(f'june26l1l2_wt_fred_hmm_scores_df.csv')
+    # plot_penalty_cv_datasplitseeds_2datasets(df1, df2)
 
     # plot_penalty_cv_split(prefix, df)
     # plot_penalty_cv_2models(prefix, df)
     sys.exit(0)
 
     df = pd.read_csv(f"{prefix}_hmm_scores_df.csv")
-    # plot_penalty_cv(prefix, df)
-    # plot_penalty_cv_perstate(prefix, df)
+    plot_penalty_cv(prefix, df)
+    plot_penalty_cv_perstate(prefix, df)
     plot_penalty_cv_perstate(prefix, df, filter_numstates=[5])
-    sys.exit(0)
-    print("df ===============\n")
+    # sys.exit(0)
+    # print("df ===============\n")
 
-    # 1. Isolate the training data
-    train_df = df[df['group'] == 'train']
+    # # 1. Isolate the training data
+    # train_df = df[df['group'] == 'train']
+    # # 2. Find the index of the max train ll_score for each setup
+    # best_train_idx = train_df.groupby(['model', 'num_states', 'datasplit_seed'])['ll_score'].idxmax()
+    # # 3. Extract the winning combinations of model, states, datasplit, and the resulting best init_seed
+    # winning_combinations = train_df.loc[best_train_idx, ['model', 'num_states', 'datasplit_seed', 'init_seed']]
+    # # 4. Merge this back with the original dataframe to get both 'train' and 'test' rows for those specific seeds
+    # best_runs_df = pd.merge(
+    #     df, 
+    #     winning_combinations, 
+    #     on=['model', 'num_states', 'datasplit_seed', 'init_seed'], 
+    #     how='inner'
+    # )
+    # print(best_runs_df)
+    # print("best_runs_df ===============\n")
+    # print(winning_combinations)
+    # print("winning_combinations ===============\n")
+    # return_grouped_ll_scores(prefix, best_runs_df,
+    #                          model_prefixes=[
+    #                              'id-glm-hmm',
+    #                             #  'lrhmmci_'
+    #                              ])
+    # sys.exit(0)
+    # print("===============\n")
 
-    # 2. Find the index of the max train ll_score for each setup
-    best_train_idx = train_df.groupby(['model', 'num_states', 'datasplit_seed'])['ll_score'].idxmax()
-
-    # 3. Extract the winning combinations of model, states, datasplit, and the resulting best init_seed
-    winning_combinations = train_df.loc[best_train_idx, ['model', 'num_states', 'datasplit_seed', 'init_seed']]
-
-    # 4. Merge this back with the original dataframe to get both 'train' and 'test' rows for those specific seeds
-    best_runs_df = pd.merge(
-        df, 
-        winning_combinations, 
-        on=['model', 'num_states', 'datasplit_seed', 'init_seed'], 
-        how='inner'
-    )
-    print(best_runs_df)
-    print("best_runs_df ===============\n")
-    print(winning_combinations)
-    print("winning_combinations ===============\n")
-
-    return_grouped_ll_scores(prefix, best_runs_df,
-                             model_prefixes=[
-                                 'id-glm-hmm',
-                                #  'lrhmmci_'
-                                 ])
-    sys.exit(0)
-    print("===============\n")
-
-    plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], plot_type='all_points', prefix=prefix)
+    # plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], plot_type='all_points', prefix=prefix)
     # plot_ll_scores(best_runs_df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points', prefix=prefix)
-    sys.exit(0)
+    # sys.exit(0)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], plot_type='all_points', prefix=prefix)
+    plot_ll_scores(df, model_prefixes=['id-glm-hmm', 'lrhmmci_'], groups=['test'], plot_type='all_points', prefix=prefix)
+
     plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='all_points', prefix=prefix)
     plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['train'], plot_type='mean_sem', prefix=prefix)
     plot_ll_scores(df, model_prefixes=['id-glm-hmm'], groups=['test'], plot_type='all_points', prefix=prefix)
@@ -916,6 +926,3 @@ if __name__ == '__main__':
     plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['train'], plot_type='mean_sem', prefix=prefix)
     plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='all_points', prefix=prefix)
     plot_ll_scores(df, model_prefixes=['lrhmmci_'], groups=['test'], plot_type='mean_sem', prefix=prefix)
-
-    # plotCV_same_model_LL_by_fly(path, 'lrhmmci_', num_states_configs, plot_only_test=True, filesuffix='plot_only_test')
-
