@@ -28,7 +28,6 @@ class ChanceFemaleFly(BaseFemaleFly):
         self.model_config = model_config.copy()
         self.num_states = 0
         self.model_config['num_states'] = self.num_states
-        # self.model = tfd.MultivariateNormalFullCovariance(loc=np.zeros(data_config['emission_dim']), covariance_matrix=np.identity(data_config['emission_dim']))
         self.learned_params = None
         self.learned_lps = None
         super().__init__()
@@ -41,8 +40,9 @@ class ChanceFemaleFly(BaseFemaleFly):
         cov = jnp.atleast_2d(cov)
         print(mu, mu.shape)
         print(cov, cov.shape)
-        # self.model = tfd.MultivariateNormalFullCovariance(loc=mu, covariance_matrix=cov)
         self.learned_params = {'mu': mu, 'cov': cov}
+        self.chance_mu = mu
+        self.chance_cov = cov
         self.update_status()
         return
 
