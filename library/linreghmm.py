@@ -121,6 +121,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
 
             # print(sum_xxT.shape, sum_x.shape)
             # print("max sum_xxT:", jnp.abs(sum_xxT).max())
+            O = sum_yyT.shape[0]
 
             # L2 Regularization
             lambdaL2 = 1e-6  # L2 penalty strength
@@ -130,7 +131,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
 
             # Or, Laplacian Smoothing Regularization
             # Not needed in sparse basis transformed space but if you have too many cosines, then needed.
-            lambda_laplace = 1e-3  # Tune this!
+            lambda_laplace = 10000
 
             B = self.n_bases_per_feature
             num_features = D // B
@@ -156,18 +157,29 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
 
             # Solve for the optimal A, b, and Sigma
             penalty_matrix = lambdaL2 * I + lambda_laplace * L
-            Ab = jnp.linalg.solve(sum_x1x1T + penalty_matrix, sum_x1yT).T
 
+            m_all = jnp.concatenate([jnp.broadcast_to(self.input_mask_by_emission_full[0], (O, D)), 
+                                     jnp.ones((O, 1))], axis=1).astype(sum_x1x1T.dtype)   # bias always allowed
+
+            def solve_one(m, c):   # fit one output using only its allowed inputs
+                return jnp.linalg.solve((sum_x1x1T + penalty_matrix) * jnp.outer(m, m) + jnp.diag(1.0 - m), m * c)
+
+            Ab = vmap(solve_one)(m_all, sum_x1yT.T)                       # (O, D+1); masked weights exactly 0
+            Sigma = (sum_yyT - Ab @ sum_x1yT - sum_x1yT.T @ Ab.T + Ab @ sum_x1x1T @ Ab.T) / sum_w
+            Sigma = jnp.diag(jnp.maximum(jnp.diag(Sigma), 1e-3))    # Floor the variances
+
+            # Ab = jnp.linalg.solve(sum_x1x1T + penalty_matrix, sum_x1yT).T
             # jax.debug.print("sum_x1x1T={x} anynans={y} anynans={z}", x=sum_x1x1T, y=jnp.isnan(sum_x1x1T).any(), z=jnp.isnan(sum_x1yT).any())
             # Ab = jnp.linalg.solve(sum_x1x1T, sum_x1yT).T
             # jax.debug.print("sum_w={x}", x=sum_w)
             # safe_sum_w = jnp.maximum(sum_w, 1e-8)
-            Sigma = 1 / sum_w * (sum_yyT - Ab @ sum_x1yT)
+
+            # Sigma = 1 / sum_w * (sum_yyT - Ab @ sum_x1yT)
             # jax.debug.print("Sigma={x}", x=Sigma)
             # jax.debug.print("sum_yyT={x} Absum_x1yT={y}", x=sum_yyT, y=Ab @ sum_x1yT)
             # jax.debug.print("sum_x1yT={x} Ab={y}", x=sum_x1yT, y=Ab)
-            Sigma = 0.5 * (Sigma + Sigma.T)                 # for numerical stability
-            Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-6      # diagonal
+            # Sigma = 0.5 * (Sigma + Sigma.T)                 # for numerical stability
+            # Sigma = jnp.diag(jnp.diag(Sigma))   + 1e-3 * jnp.eye(Sigma.shape[0])      # diagonal
             return Ab[:, :-1], Ab[:, -1], Sigma
 
         emission_stats = pytree_sum(batch_stats, axis=0)
