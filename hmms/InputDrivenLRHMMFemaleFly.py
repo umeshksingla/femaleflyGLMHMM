@@ -8,11 +8,12 @@ from library.inputdriven_linreg_hmm import InputDrivenLinearRegressionHMM
 from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 
-from utilities.io import get_chance_logprob, ENABLE_FLOAT64
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64, get_state_activity_index
 from utilities import fitting, utils
 
 # print("jax.config", jax.config.values)
 jax.config.update("jax_enable_x64", ENABLE_FLOAT64)
+
 
 
 class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
@@ -23,11 +24,11 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         self.data_config = data_config
         self.model_config = model_config
         self.num_states = model_config['num_states']
-        # print("self.model_config", self.model_config)
         self.seed = model_config.get('seed', 0)
-        self.l2_penalty = model_config.get('l2_penalty', 0.0)
-        self.l1_penalty = model_config.get('l1_penalty', 0.0)
-        print("self.data_config['input_mask_by_emission']", self.data_config['input_mask_by_emission'].shape)
+        self.l2_penalty = model_config['l2_penalty']
+        self.l1_penalty = model_config['l1_penalty']
+        self.emission_l2_penalty = model_config['emission_l2_penalty']
+        # print("self.data_config['input_mask_by_emission']", self.data_config['input_mask_by_emission'].shape)
         self.model = InputDrivenLinearRegressionHMM(num_states=self.model_config['num_states'],
                                     input_dim=self.data_config['input_dim'],
                                     emission_dim=self.data_config['emission_dim'],
@@ -36,6 +37,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
                                     input_mask_first=self.data_config['input_mask_by_emission'][0],
                                     l2_penalty=self.l2_penalty,
                                     l1_penalty=self.l1_penalty,
+                                    emission_l2_penalty=self.emission_l2_penalty,
                                     m_step_num_iters=100,)
         self.learned_params = None
         self.learned_lps = None
@@ -46,15 +48,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
         print('reindexing params...')
-
-        # OR Reindex by the activity index
-        _, z_seqs, _, _, _ = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
-        state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
-        new_index = np.argsort(state_activity_index)[::-1]
-        # print("state_tot_activity_mean", state_activity_index)
-        print("new ordering:", new_index)
-
+        new_index = get_state_activity_index(self, emissions, inputs, output_mn_std)
         params = em_params._replace(
             initial=em_params.initial._replace(
                 weights=em_params.initial.weights[new_index],
@@ -75,6 +69,7 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         return params
 
     def fit(self, emissions, inputs, output_mn_std):
+        print(f'Begin fitting {self.__class__.__name__}...')
         print(f'Begin fitting chance...')
         chance = ChanceFemaleFly(self.data_config, self.model_config)
         chance.fit(emissions, inputs)
@@ -82,7 +77,6 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
         self.chance_mu = chance_params['mu']
         self.chance_cov = chance_params['cov']
         print('chance fit.')
-        print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
         em_params, em_lps = fitting.fitEM(key, self.model, emissions, train_inputs=inputs)
         self.learned_params = em_params
@@ -95,11 +89,11 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
     def check_nan_in_fit_params(self):
         return ~np.any(np.isnan(self.learned_params.transitions.weights))
 
-    def predict(self, emissions, inputs):
-        return self.predict_v4(emissions, inputs)
+    def predict(self, emissions, inputs, full=False):
+        return self.predict_v4(emissions, inputs, full=full)
 
-    def predict_v4(self, emissions, inputs):
-        """Soft predictions"""
+    def predict_v4(self, emissions, inputs, full=False):
+        """Soft predictions. if full is True, use smoothed probs (to depict model)."""
 
         W = self.learned_params.emissions.weights   # shape: (K, D, I) (K=nstates, D=emission_dim, I=input_dim)
         b = self.learned_params.emissions.biases    # shape: (K, D)
@@ -116,6 +110,8 @@ class InputDrivenLRHMMFemaleFly(BaseFemaleFly):
 
             post = self.model.smoother(self.learned_params, y_true, x)
             gamma = post.predicted_probs     # shape: (T, K)
+            if full:
+                gamma = post.smoothed_probs
 
             preds_per_state = np.stack([x @ W[k].T + b[k] for k in range(K)], axis=1)   # (T, K, D)
             soft_predictions = np.sum(gamma[:, :, None] * preds_per_state, axis=1)      # (T, D)

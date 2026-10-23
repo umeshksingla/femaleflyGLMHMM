@@ -3,7 +3,7 @@ import time
 import jax.lax
 import jax.numpy as jnp
 
-from utilities.io import get_chance_logprob, ENABLE_FLOAT64
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64, get_state_activity_index
 from utilities import utils, fitting, io
 from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
@@ -51,13 +51,7 @@ class IDARHMMFemaleFly(BaseFemaleFly):
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
         print('reindexing params...')
-
-        # Reindex by the activity index
-        _, z_seqs, _, _, _ = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
-        state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
-        new_index = np.argsort(state_activity_index)[::-1]
-        print("new ordering:", new_index)
+        new_index = get_state_activity_index(self, emissions, inputs, output_mn_std)
 
         params = em_params._replace(
             initial=em_params.initial._replace(
@@ -105,10 +99,10 @@ class IDARHMMFemaleFly(BaseFemaleFly):
     def check_nan_in_fit_params(self):
         return ~np.any(np.isnan(self.learned_params.transitions.weights))
 
-    def predict(self, emissions, inputs):
-        return self.predict_v4(emissions, inputs)
+    def predict(self, emissions, inputs, full=False):
+        return self.predict_v4(emissions, inputs, full=full)
 
-    def predict_v4(self, emissions, external_inputs):
+    def predict_v4(self, emissions, external_inputs, full=False):
         """Soft predictions
         """
         W = self.learned_params.emissions.weights  # shape: (K, D, I)
@@ -128,6 +122,8 @@ class IDARHMMFemaleFly(BaseFemaleFly):
             x = inputs[btch]
             post = self.model.smoother(self.learned_params, y_true, x)
             gamma = post.predicted_probs
+            if full:
+                gamma = post.smoothed_probs
             preds_per_state = np.stack([(x @ W[k].T + b[k]) for k in range(K)], axis=1)
             soft_predictions = np.sum(gamma[:, :, None] * preds_per_state, axis=1)  # (T, D)
             y_pred = soft_predictions

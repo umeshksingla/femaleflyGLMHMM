@@ -5,9 +5,10 @@ import jax
 import numpy as np
 from jax import vmap
 import jax.random as jr
+import jax.numpy as jnp
 from dynamax.hidden_markov_model import DiagonalGaussianHMM
 
-from utilities.io import get_chance_logprob, ENABLE_FLOAT64
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64, get_state_activity_index
 from utilities import utils, fitting, io
 from hmms.ChanceFemaleFly import ChanceFemaleFly
 from hmms.BaseFemaleFly import BaseFemaleFly
@@ -24,6 +25,7 @@ class DiagGHMMFemaleFly(BaseFemaleFly):
         self.model_config = model_config
         self.num_states = model_config['num_states']
         self.seed = model_config.get('seed', 0)
+        self.init_method = model_config['init_method']
         self.model = DiagonalGaussianHMM(num_states=self.model_config['num_states'],
                                     emission_dim=self.data_config['emission_dim'],
                                     transition_matrix_stickiness=self.model_config['transition_matrix_stickiness'])
@@ -36,15 +38,8 @@ class DiagGHMMFemaleFly(BaseFemaleFly):
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
 
-        # print("Before:", em_params)
-
-        # OR Reindex by the activity index
-        _, z_seqs, _, _, _ = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
-        state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
-        new_index = np.argsort(state_activity_index)[::-1]
-        # print("state_tot_activity_mean", state_activity_index)
-        print("new ordering:", new_index)
+        print('reindexing params...')
+        new_index = get_state_activity_index(self, emissions, inputs, output_mn_std)
 
         params = em_params._replace(
             initial=em_params.initial._replace(
@@ -58,29 +53,39 @@ class DiagGHMMFemaleFly(BaseFemaleFly):
                 scale_diags=em_params.emissions.scale_diags[new_index],
             )
         )
-        # print("After:", params)
+        print('reindexed params.')
         return params
 
     def fit(self, batched_emissions, batched_inputs, batched_output_mn_std, do_reindex_params=True):
+        print(f'Begin fitting {self.__class__.__name__}...')
         print(f'Begin fitting chance...')
-        chance = ChanceFemaleFly(self.data_config, self.model_config)
+        chance = ChanceFemaleFly(self.data_config, self.model_config)   # This will give us same Chance flies for get_data_logprob on train/heldout later
         chance.fit(batched_emissions, batched_inputs)
         chance_params = chance.learned_params
         self.chance_mu = chance_params['mu']
         self.chance_cov = chance_params['cov']
         print('chance fit.')
-        print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
 
         # since the sessions are variable length, chunk the sessions.
         emissions_to_fit = io.chunk_data(batched_emissions, chunk_size=5000)
 
-        em_params, em_lps = fitting.fitEM(key, self.model, emissions_to_fit, train_inputs=None)
+        flat = np.asarray(emissions_to_fit).reshape(-1, np.shape(emissions_to_fit)[-1])
+        if self.init_method == 'kmeans':
+            params, props = self.model.initialize(key, method='kmeans', emissions=emissions_to_fit)
+        else:
+            # Use some frames as init points, as "prior" inits from too far and the second step of EM ends up too identical
+            rng = np.random.default_rng(self.seed)
+            means = flat[rng.choice(len(flat), size=self.num_states, replace=False)]
+            scales = np.tile(flat.std(axis=0), (self.num_states, 1))
+            params, props = self.model.initialize(key, emission_means=jnp.asarray(means), emission_scale_diags=jnp.asarray(scales))
+
+        em_params, em_lps = fitting.fitDiagEM(self.model, params, props, emissions_to_fit, train_inputs=None)
         self.learned_params = em_params
         if do_reindex_params:
             self.learned_params = self.reindex_params(em_params, batched_emissions, batched_inputs, batched_output_mn_std)
         self.learned_lps = em_lps
-        print(f'DGHMM training loss: start {float(em_lps[0]):.4f}, end {float(em_lps[-1]):.4f}')
+        print(f'DGHMM training lps: start {float(em_lps[0]):.4f}, end {float(em_lps[-1]):.4f}')
         self.update_status()
         print(f'End fitting {self.__class__.__name__}...')
         return
@@ -88,11 +93,11 @@ class DiagGHMMFemaleFly(BaseFemaleFly):
     def check_nan_in_fit_params(self):
         return ~np.any(np.isnan(self.learned_params.transitions.transition_matrix))
 
-    def predict(self, emissions, inputs):
-        return self.predict_v4(emissions, inputs)
+    def predict(self, emissions, inputs, full=False):
+        return self.predict_v4(emissions, inputs, full=full)
 
-    def predict_v4(self, emissions, inputs):
-        """Soft predictions"""
+    def predict_v4(self, emissions, inputs, full=False):
+        """Soft predictions. if full is True, use smoothed probs (to depict model)."""
 
         mu = self.learned_params.emissions.means   # shape: (K, D)
         mu = mu[:, :, None]     # shape: (K, D, I)
@@ -112,7 +117,8 @@ class DiagGHMMFemaleFly(BaseFemaleFly):
             gamma = post.predicted_probs     # shape: (T, K)
             # print("x", x.shape, "mu[k]", mu[0].shape)
             # print("gamma", gamma.shape)
-
+            if full:
+                gamma = post.smoothed_probs
             preds_per_state = np.stack([x @ mu[k].T for k in range(K)], axis=1)   # (T, K, D)
             # print(preds_per_state)
             # print("preds_per_state", preds_per_state.shape)

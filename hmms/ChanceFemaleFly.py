@@ -34,12 +34,9 @@ class ChanceFemaleFly(BaseFemaleFly):
 
     def fit(self, emissions, inputs, output_mn_std=None):
         y = np.concatenate(emissions, axis=0)
-        print(y.shape)
         mu = jnp.mean(y, axis=0)
         cov = jnp.cov(y.T)
         cov = jnp.atleast_2d(cov)
-        print(mu, mu.shape)
-        print(cov, cov.shape)
         self.learned_params = {'mu': mu, 'cov': cov}
         self.chance_mu = mu
         self.chance_cov = cov
@@ -68,16 +65,16 @@ class ChanceFemaleFly(BaseFemaleFly):
         total_emissions_size = np.sum([len(_) for _ in emissions])
         chance_mu = self.learned_params['mu']
         chance_cov = self.learned_params['cov']
-        chance_lp = get_chance_logprob(np.concatenate(emissions, axis=0), chance_mu, chance_cov) / total_emissions_size
-        print("chance lp", chance_lp)
-        return chance_lp
+        chance_ll_per_frame = get_chance_logprob(np.concatenate(emissions, axis=0), chance_mu, chance_cov) / total_emissions_size
+        print("chance_ll_per_frame:", chance_ll_per_frame)
+        return chance_ll_per_frame
 
     def get_data_logprob_by_fly(self, emissions, inputs):
         chance_mu = self.learned_params['mu']
         chance_cov = self.learned_params['cov']
-        chance_lps = np.array([get_chance_logprob(yt, chance_mu, chance_cov) / len(yt) for yt in emissions])
-        print("chance lps by fly", chance_lps)
-        return chance_lps
+        chance_lls_per_frame = np.array([get_chance_logprob(yt, chance_mu, chance_cov) / len(yt) for yt in emissions])
+        print("chance_lls_per_frame by fly", chance_lls_per_frame)
+        return chance_lls_per_frame
 
     def score(self, emissions, inputs):
         y_preds = self.predict(None, inputs)[0]

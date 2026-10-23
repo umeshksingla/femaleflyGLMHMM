@@ -7,7 +7,7 @@ from jax import vmap
 import jax.random as jr
 from dynamax.hidden_markov_model import GaussianHMM
 
-from utilities.io import get_chance_logprob, ENABLE_FLOAT64
+from utilities.io import get_chance_logprob, ENABLE_FLOAT64, get_state_activity_index
 from utilities import utils, fitting, io
 from hmms.BaseFemaleFly import BaseFemaleFly
 from hmms.ChanceFemaleFly import ChanceFemaleFly
@@ -35,14 +35,7 @@ class GHMMFemaleFly(BaseFemaleFly):
 
     def reindex_params(self, em_params, emissions, inputs, output_mn_std):
         """Reindex states by some metric"""
-
-        # OR Reindex by the activity index
-        _, z_seqs, _, _, _ = self.predict(emissions, inputs)
-        emissions_z = utils.get_emissions_by_state(emissions, z_seqs, self.num_states, output_mn_std)
-        state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
-        new_index = np.argsort(state_activity_index)[::-1]
-        # print("state_tot_activity_mean", state_activity_index)
-        print("new ordering:", new_index)
+        new_index = get_state_activity_index(self, emissions, inputs, output_mn_std)
 
         params = em_params._replace(
             initial=em_params.initial._replace(
@@ -84,11 +77,11 @@ class GHMMFemaleFly(BaseFemaleFly):
     def check_nan_in_fit_params(self):
         return ~np.any(np.isnan(self.learned_params.transitions.transition_matrix))
 
-    def predict(self, emissions, inputs):
-        return self.predict_v4(emissions, inputs)
+    def predict(self, emissions, inputs, full=False):
+        return self.predict_v4(emissions, inputs, full=full)
 
-    def predict_v4(self, emissions, inputs):
-        """Soft predictions"""
+    def predict_v4(self, emissions, inputs, full=False):
+        """Soft predictions. if full is True, use smoothed probs (to depict model)."""
 
         mu = self.learned_params.emissions.means   # shape: (K, D)
         mu = mu[:, :, None]     # shape: (K, D, I)
@@ -108,7 +101,8 @@ class GHMMFemaleFly(BaseFemaleFly):
             gamma = post.predicted_probs     # shape: (T, K)
             # print("x", x.shape, "mu[k]", mu[0].shape)
             # print("gamma", gamma.shape)
-
+            if full:
+                gamma = post.smoothed_probs
             preds_per_state = np.stack([x @ mu[k].T for k in range(K)], axis=1)   # (T, K, D)
             # print(preds_per_state)
             # print("preds_per_state", preds_per_state.shape)

@@ -16,12 +16,13 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
 
     prefix = 'id-glm-hmm'
 
-    def fit(self, batched_emissions, batched_inputs, batched_output_mn_std):
+    def fit(self, batched_emissions, batched_inputs, batched_output_mn_std, do_reindex_params=True, lrhmmci=None):
         """
             batched_emissions: session by session
             batched_inputs:
             batched_output_mn_std:
         """
+        print(f'Begin fitting {self.__class__.__name__}...')
         print(f'Begin fitting chance...')
         chance = ChanceFemaleFly(self.data_config, self.model_config)
         chance.fit(batched_emissions, batched_inputs)
@@ -29,17 +30,21 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
         self.chance_mu = chance_params['mu']
         self.chance_cov = chance_params['cov']
         print('chance fit.')
-        print(f'Begin fitting {self.__class__.__name__}...')
         key = jr.PRNGKey(self.seed)
 
         # since the sessions are variable length, chunk the sessions.
         emissions_to_fit = io.chunk_data(batched_emissions, chunk_size=5000)
         inputs_to_fit = io.chunk_data(batched_inputs, chunk_size=5000)
 
-        lrhmmci = LRHMMCustomInitFemaleFly(self.data_config, self.model_config)
-        lrhmmci.fit(batched_emissions, batched_inputs, batched_output_mn_std, do_reindex_params=False)
+        if lrhmmci is None:
+            print('LRHMMCI not found.')
+            lrhmmci = LRHMMCustomInitFemaleFly(self.data_config, self.model_config)
+            lrhmmci.fit(batched_emissions, batched_inputs, batched_output_mn_std, do_reindex_params=False)
+            print("LRHMMCI W, b and s computed.")
+        else:
+            print("LRHMMCI found.")
+        self.lrhmmci = lrhmmci
         p = lrhmmci.learned_params
-        print("LRHMMCI W, b and s computed.")
         D = inputs_to_fit.shape[-1]
         em_params, em_lps = fitting.fitEMInputDrivenCustomInit(key,
                                                                self.model,
@@ -56,9 +61,10 @@ class InputDrivenLRHMMCustomInitFemaleFly(InputDrivenLRHMMFemaleFly):
                                                                emission_biases=p.emissions.biases,
                                                                emission_covariances=p.emissions.covs)
         self.learned_params = em_params
-        self.learned_params = self.reindex_params(em_params, batched_emissions, batched_inputs, batched_output_mn_std)
+        if do_reindex_params:
+            self.learned_params = self.reindex_params(em_params, batched_emissions, batched_inputs, batched_output_mn_std)
         self.learned_lps = em_lps
-        print(f'ID-GLMHMMCI training loss: start {float(em_lps[0]):.4f}, end {float(em_lps[-1]):.4f}')
+        print(f'ID-GLMHMMCI training lps: start {float(em_lps[0]):.4f}, end {float(em_lps[-1]):.4f}')
         self.update_status()
         print(f'End fitting {self.__class__.__name__}...')
         return
