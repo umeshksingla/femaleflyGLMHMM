@@ -33,14 +33,14 @@ if __name__ == '__main__':
     else:
         raise Exception(f'Wrong dataset {dataset} specified.')
     mc = {
-        "name": 'idglmhmmci',
+        "name": 'chance',
         "seed": 5427,
         "datasplit_seed": 0,
         "num_states": 5,
         "transition_matrix_stickiness": 100,
-        "l2_penalty": 100000000,
-        "l1_penalty": 1000,
-        'split': 1,
+        # "l2_penalty": 100000000,
+        # "l1_penalty": 1000,
+        'split': 0,
         "path": f'general_{dataset}',
         "data_path": data_path,
     }
