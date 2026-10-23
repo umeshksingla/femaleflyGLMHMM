@@ -59,7 +59,7 @@ class InputDrivenHMMTransitions(HMMTransitions):
         if input_mask_first is None:
             input_mask_first = jnp.ones((self.input_dim,))
         self.input_mask_first_full = jnp.broadcast_to(input_mask_first,(num_states, num_states, input_dim))
-        print("IDHMMTransitions input_mask_by_emission", input_mask_first.shape, "input_mask_by_emission_full", self.input_mask_first_full.shape)
+        # print("IDHMMTransitions input_mask_by_emission", input_mask_first.shape, "input_mask_by_emission_full", self.input_mask_first_full.shape)
 
     def distribution(
             self,

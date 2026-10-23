@@ -27,6 +27,7 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
                  input_dim,
                  emission_dim,
                  n_bases_per_feature,
+                 emission_l2_penalty,
                  input_mask_by_emission=None):
         """_summary_
 
@@ -40,11 +41,12 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
         self.num_states = num_states
         self.input_dim = input_dim
         self.emission_dim = emission_dim
+        self.emission_l2_penalty = emission_l2_penalty
         self.n_bases_per_feature = n_bases_per_feature
         if input_mask_by_emission is None:
             input_mask_by_emission = jnp.ones((self.emission_dim, self.input_dim))
         self.input_mask_by_emission_full = jnp.broadcast_to(input_mask_by_emission, (num_states, emission_dim, input_dim))
-        print("LRHMMEmissions input_mask_by_emission", input_mask_by_emission.shape, "input_mask_by_emission_full", self.input_mask_by_emission_full.shape)
+        # print("LRHMMEmissions input_mask_by_emission", input_mask_by_emission.shape, "input_mask_by_emission_full", self.input_mask_by_emission_full.shape)
 
     @property
     def emission_shape(self):
@@ -119,33 +121,27 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
             sum_xyT = stats['sum_xyT']
             sum_yyT = stats['sum_yyT']
 
-            # print(sum_xxT.shape, sum_x.shape)
-            # print("max sum_xxT:", jnp.abs(sum_xxT).max())
             O = sum_yyT.shape[0]
 
             # L2 Regularization
-            lambdaL2 = 1e-6  # L2 penalty strength
-            D = sum_xxT.shape[1]  # number of features
-            I = jnp.eye(D + 1)  # (D+1)x(D+1), includes bias term
-            I = I.at[-1, -1].set(0.0)   # set l2 for bias term to 0
+            l2 = self.emission_l2_penalty   # L2 penalty strength
+            D = sum_xxT.shape[1]            # number of features
+            I = jnp.eye(D + 1)              # (D+1)x(D+1), includes bias term
+            I = I.at[-1, -1].set(0.0)       # set L2 for bias term to 0
 
-            # Or, Laplacian Smoothing Regularization
-            # Not needed in sparse basis transformed space but if you have too many cosines, then needed.
-            lambda_laplace = 10000
-
-            B = self.n_bases_per_feature
-            num_features = D // B
-
+            # Laplacian Smoothing Regularization
             # Create the Laplacian for a SINGLE feature series (size B x B)
-            diag_main = jnp.full(B, 2.0).at[0].set(1.0).at[-1].set(1.0)     # Main diagonal: [1, 2, 2, ..., 2, 1]
+            # Not needed in sparse basis transformed space but if you have too many cosines, then needed.
+            # Also, not needed for orthoginalized-basis
+            B = self.n_bases_per_feature
+            lambda_laplace = 0
+            num_features = D // B
+            diag_main = jnp.full(B, 2.0).at[0].set(1.0).at[-1].set(1.0)             # Main diagonal: [1, 2, 2, ..., 2, 1]
             diag_off = jnp.full(B - 1, -1.0)                                        # Off-diagonals: [-1, -1, ..., -1]
             L_single = jnp.diag(diag_main) + jnp.diag(diag_off, k=1) + jnp.diag(diag_off, k=-1)
-
-            # Tile it into a block diagonal matrix (size D x D)
-            L = jnp.kron(jnp.eye(num_features), L_single)
-
-            # Pad with 0s for the bias term so it becomes (D+1)x(D+1). We don't want to smooth the bias term.
-            L = jnp.pad(L, ((0, 1), (0, 1)), mode='constant')
+            L = jnp.kron(jnp.eye(num_features), L_single)                           # Tile it into a block diagonal matrix (size D x D)
+            L = jnp.pad(L, ((0, 1), (0, 1)), mode='constant')                       # Pad with 0s for the bias term so it becomes (D+1)x(D+1). We don't want to smooth the bias term.
+            print("lambda_laplace used", lambda_laplace)
 
             # Make block matrices for stacking features (x) and bias (1)
             sum_x1x1T = jnp.block(
@@ -153,20 +149,20 @@ class LinearRegressionHMMEmissionsCustom(HMMEmissions):
                  [jnp.expand_dims(sum_x, 0), jnp.expand_dims(sum_w, (0, 1))]]
             )
             sum_x1yT = jnp.vstack([sum_xyT, sum_y])
-            # print(sum_x1x1T.shape, sum_x1yT.shape)
 
-            # Solve for the optimal A, b, and Sigma
-            penalty_matrix = lambdaL2 * I + lambda_laplace * L
+            penalty_matrix = l2 * I + lambda_laplace * L
 
+            # Fit each output using only its allowed inputs, bias always allowed
             m_all = jnp.concatenate([jnp.broadcast_to(self.input_mask_by_emission_full[0], (O, D)), 
                                      jnp.ones((O, 1))], axis=1).astype(sum_x1x1T.dtype)   # bias always allowed
 
-            def solve_one(m, c):   # fit one output using only its allowed inputs
+            def solve_one(m, c):                                                    # Solve for the optimal A, b, and Sigma
                 return jnp.linalg.solve((sum_x1x1T + penalty_matrix) * jnp.outer(m, m) + jnp.diag(1.0 - m), m * c)
 
-            Ab = vmap(solve_one)(m_all, sum_x1yT.T)                       # (O, D+1); masked weights exactly 0
-            Sigma = (sum_yyT - Ab @ sum_x1yT - sum_x1yT.T @ Ab.T + Ab @ sum_x1x1T @ Ab.T) / sum_w
-            Sigma = jnp.diag(jnp.maximum(jnp.diag(Sigma), 1e-3))    # Floor the variances
+            Ab = vmap(solve_one)(m_all, sum_x1yT.T)                                 # (O, D+1); masked weights exactly 0
+            safe_sum_w = jnp.maximum(sum_w, 1e-8)
+            Sigma = (sum_yyT - Ab @ sum_x1yT - sum_x1yT.T @ Ab.T + Ab @ sum_x1x1T @ Ab.T) / safe_sum_w
+            Sigma = jnp.diag(jnp.maximum(jnp.diag(Sigma), 1e-3))                    # diagonal and floor the variances (so they stay above measurement noise)
 
             # Ab = jnp.linalg.solve(sum_x1x1T + penalty_matrix, sum_x1yT).T
             # jax.debug.print("sum_x1x1T={x} anynans={y} anynans={z}", x=sum_x1x1T, y=jnp.isnan(sum_x1x1T).any(), z=jnp.isnan(sum_x1yT).any())
@@ -196,6 +192,7 @@ class LinearRegressionHMMCustom(HMM):
                  input_dim: int,
                  emission_dim: int,
                  n_bases_per_feature: int,
+                 emission_l2_penalty: float,
                  input_mask_by_emission: Float[Array, "emission_dim input_dim"]=None,
                  initial_probs_concentration: Union[Scalar, Float[Array, "num_states"]]=1.1,
                  transition_matrix_concentration: Union[Scalar, Float[Array, "num_states"]]=1.1,
@@ -204,7 +201,7 @@ class LinearRegressionHMMCustom(HMM):
         self.input_dim = input_dim
         initial_component = StandardHMMInitialState(num_states, initial_probs_concentration=initial_probs_concentration)
         transition_component = StandardHMMTransitions(num_states, concentration=transition_matrix_concentration, stickiness=transition_matrix_stickiness)
-        emission_component = LinearRegressionHMMEmissionsCustom(num_states, input_dim, emission_dim, n_bases_per_feature, input_mask_by_emission)
+        emission_component = LinearRegressionHMMEmissionsCustom(num_states, input_dim, emission_dim, n_bases_per_feature, emission_l2_penalty, input_mask_by_emission)
         super().__init__(num_states, initial_component, transition_component, emission_component)
 
     @property

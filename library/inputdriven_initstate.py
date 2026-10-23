@@ -42,7 +42,7 @@ class InputDrivenHMMInitialState(HMMInitialState):
         if input_mask_first is None:
             input_mask_first = jnp.ones((self.input_dim,))
         self.input_mask_first_full = jnp.broadcast_to(input_mask_first,(num_states, input_dim))
-        print("IDHMMInitState input_mask_by_emission", input_mask_first.shape, "input_mask_by_emission_full", self.input_mask_first_full.shape)
+        # print("IDHMMInitState input_mask_by_emission", input_mask_first.shape, "input_mask_by_emission_full", self.input_mask_first_full.shape)
 
     def distribution(self, params: ParamsInputDrivenHMMInitialState, inputs=Float[Array, " input_dim"]) -> tfd.Distribution:
         """Return the distribution object of the initial distribution."""
