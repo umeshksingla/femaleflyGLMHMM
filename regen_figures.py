@@ -13,26 +13,26 @@ from utilities import utils
 
 if __name__  == '__main__':
 
-    # model_pkl_path = f'../../paper figs/FINAL WT/20260101_235805_duration'  # for wt
-    # model_pkl_path = f'../paper figs/FINAL WT FRED/20260102_135949_spandex'    # for wt_fred
-    model_pkl_path = f'models/apr6_bothcv_wt_female_2/id-glm-hmm_5_cv/20260409_042336_chord/'
+    paths = list(glob.glob('models/octladder_cv_wt_female/id-glm-hmm_5_cv/**/'))
+    # paths = list(glob.glob('models/octladder_cv_wt_fred_female/id-glm-hmm_5_cv/**/'))
+    print(paths)
+    for model_pkl_path in paths:
+        # if ('send' not in model_pkl_path):        # wt all-flies fold
+        #     continue
+        if ('godmother' not in model_pkl_path):     # wt_fred all-flies fold
+                continue
 
-    # utils.enhance(model_pkl_path)
-    # utils.enhance_auxem(model_pkl_path)
-    # utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
-    # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
-    # utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
-    utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
-    # utils.generate_auxem_figures(model_pkl_path, savefig=1, display=0)
+        # utils.enhance(model_pkl_path)
+        utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+        # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
+        # utils.generate_scores_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+
+        # utils.enhance_auxem(model_pkl_path)
+        # utils.generate_auxem_figures(model_pkl_path, savefig=1, display=0)
+        utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
+
+    # utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
     # utils.generate_state_traces(model_pkl_path, dataset='wt', savefig=1, display=0)
     # utils.generate_TAs(model_pkl_path, savefig=1, display=0)
     # utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
-
-    # model_dir = 'models/jan1_kfoldcv_wt_female/id-glm-hmm_5_cv/'
-    # for path in sorted(list(glob.glob(model_dir + '/20260102_*/'))):
-    #     print("path", path)
-    #     utils.generate_figures(path, savefig=1, display=0, override_fig_dir=False)
-    #     utils.generate_state_filters(path, savefig=1, display=0)
-
-    # utils.generate_figures_all_singles_merged(model_dir, savefig=True, display=True, override_fig_dir=False)
 

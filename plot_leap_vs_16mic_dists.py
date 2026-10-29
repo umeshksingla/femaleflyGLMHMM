@@ -3,6 +3,7 @@ from seaborn import xkcd_rgb
 from sklearn.metrics import r2_score
 
 from utilities.io import *
+from dynamax.utils.plotting import CMAP, COLORS
 from preprocess.colors import EC, colors_datasource
 from utilities.utils import update_labels, generate_figures_filters_given_2datasets
 
@@ -292,15 +293,10 @@ def get_filter_amplitudes(weights, data_config, y_labels, input_mask_by_emission
     return w_amps
 
 
-# def get_configs(model_dir):
-#     model_ckp, data_config, model_config = load_specific_path(model_dir)
-#     return model_ckp, data_config, model_config
-
-
 def plot_weight_magnitudes(savefig=True, display=True):
 
-    _, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
-    _, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+    leap_ckp, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
+    new16mic_ckp, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
 
     leap_input_mask_by_emission = leap_data_config['input_mask_by_emission']
     new16mic_input_mask_by_emission = new16mic_data_config['input_mask_by_emission']
@@ -310,14 +306,11 @@ def plot_weight_magnitudes(savefig=True, display=True):
     emission_labels_dict = leap_data_config['emission_labels_dict']
     print("emission_labels_dict", emission_labels_dict)
 
-    # avg_weight_WT = joblib.load(f'{leap_model_dir}/avg_weight_wt.pkl')
-    # avg_weight_WT_FRED =  joblib.load(f'{new16mic_model_dir}/avg_weight_wt_fred.pkl')
+    avg_weight_WT = leap_ckp['learned_params'].emissions.weights
+    avg_weight_WT_FRED = new16mic_ckp['learned_params'].emissions.weights
 
     leap_w_amps = get_filter_amplitudes(avg_weight_WT, leap_data_config, emission_labels, leap_input_mask_by_emission, skip_states=[])
     new16mic_w_amps = get_filter_amplitudes(avg_weight_WT_FRED, new16mic_data_config, emission_labels, new16mic_input_mask_by_emission, skip_states=[])
-
-    # print(leap_w_amps, leap_w_amps[0].shape)
-    # print(new16mic_w_amps)
 
     num_states = avg_weight_WT.shape[0]
     fig, ax = plt.subplots(1, len(emission_labels), figsize=(12+3, 4.1))
@@ -352,84 +345,32 @@ def plot_weights():
     # avg_weight_WT = np.mean(all_weights_wt, axis=0)
     # avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
 
-    _, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
-    _, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+    leap_ckp, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
+    new16mic_ckp, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
+
+    avg_weight_WT = leap_ckp['learned_params'].emissions.weights
+    avg_weight_WT_FRED = new16mic_ckp['learned_params'].emissions.weights
 
     generate_figures_filters_given_2datasets(leap_data_config, new16mic_data_config, avg_weight_WT, avg_weight_WT_FRED, fig_dir, savefig=True, display=False)
     return
 
 
-def get_emp_occ(state_seqs, config):
-    from collections import defaultdict
-    ps_z = defaultdict(list)
-    for i in range(len(state_seqs)):
-        state_z, count_z = np.unique(state_seqs[i], return_counts=True)
-        # print(i, state_z, count_z)
-        percent_z = count_z / np.sum(count_z)
-        s_p_dict = dict(zip(state_z, percent_z))
-        for z in range(config['num_states']):
-            ps_z[z].append(s_p_dict.get(z, 0))
-    return ps_z
-
-
-def plot_empirical_occupancy_2datasets(savefig=True, display=True):
-
-    leap_model_ckp, leap_data_config, leap_model_config = load_specific_path(leap_model_dir)
-    new16mic_model_ckp, new16mic_data_config, new16mic_model_config = load_specific_path(new16mic_model_dir)
-
-    leap_z_seqs = [*leap_model_ckp['train_data']['train_stateseq'], *leap_model_ckp['test_data']['test_stateseq']]
-    new16mic_z_seqs = [*new16mic_model_ckp['train_data']['train_stateseq'], *new16mic_model_ckp['test_data']['test_stateseq']]
-
-    leap_ps_z = get_emp_occ(leap_z_seqs, leap_model_config)
-    new16mic_ps_z = get_emp_occ(new16mic_z_seqs, new16mic_model_config)
-
-    pmax = -1
-    fig = plt.figure(figsize=(6, 4))
-    for z in leap_ps_z:
-        jitter1 = np.random.uniform(-0.1, 0.1, len(leap_ps_z[z]))
-        jitter2 = np.random.uniform(-0.1, 0.1, len(new16mic_ps_z[z]))
-        plt.scatter(z+1-0.2-jitter1, leap_ps_z[z], c=COLORS[z], s=SCATTERSIZE, edgecolors='none', label=f'Dataset 1' if z == 0 else None)
-        plt.scatter(z+1+0.2+jitter2, new16mic_ps_z[z], c=COLORS[z], alpha=0.5, s=SCATTERSIZE, edgecolors='none', label=f'Dataset 2' if z == 0 else None)
-        plt.errorbar(z+1-0.04, np.mean(leap_ps_z[z]), yerr=np.std(leap_ps_z[z]), color='k', alpha=0.8, fmt='o', capsize=0)
-        plt.errorbar(z+1+0.36, np.mean(new16mic_ps_z[z]), yerr=np.std(new16mic_ps_z[z]), color='k', alpha=0.8, fmt='o', capsize=0)
-        pmax = max(pmax, max(np.max(new16mic_ps_z[z]), np.max(leap_ps_z[z])))
-
-    plt.ylabel('Fraction occupancy')
-    plt.legend(loc='upper left')
-    plt.margins(0.1)
-    pmax = np.round(pmax, 1) + 0.2
-    plt.ylim(-0.1, pmax)
-    plt.yticks([0, pmax / 3, 2*pmax/3, pmax])
-    plt.xticks(range(1, 1 + len(leap_ps_z)))
-    plt.xlabel('State')
-    if savefig: fig.savefig(os.path.join(fig_dir, f'empirical_occupancy_2datasets.pdf'), bbox_inches='tight', dpi=300, transparent=True)
-    if display: plt.show()
-    plt.close()
-    return fig
-
 
 if __name__ == '__main__':
 
     model_paths = {
-        'wt': '../FINAL_WT/20260531_183347_obsidian/',       # wt female
-        'wt_16mic': '../FINAL_WT_FRED/20260626_050049_whelp',    # wt female fred
+        'wt': '/scratch/gpfs/MMURTHY/usingla/femaleflystates/models/octladder_cv_wt_female/id-glm-hmm_5_cv/20261023_051734_send',       # wt female
+        'wt_fred': '/scratch/gpfs/MMURTHY/usingla/femaleflystates/models/octladder_cv_wt_fred_female/id-glm-hmm_5_cv/20261023_135451_godmother',    # wt female fred
         'ac_both': 'models/general_ac_both/idarhmm_5_cv/20260814_173744_accounting/',         # ac both female
         'blind_both': 'models/general_blind_both/idarhmm_5_cv/20260814_175044_congregation/',  # blind both female
     }
 
-    # ds1_model_dir = model_paths['wt']
-    # ds2_model_dir = model_paths['ac_both']
+    leap_model_dir = model_paths['wt']
+    new16mic_model_dir = model_paths['wt_fred']
 
-    # all_weights_wt = joblib.load(f'{leap_model_dir}/all_weights_wt.pkl')
-    # all_weights_wt_fred = joblib.load(f'{new16mic_model_dir}/all_weights_wt_fred.pkl')
-    #
-    # avg_weight_WT = np.mean(all_weights_wt, axis=0)
-    # avg_weight_WT_FRED = np.mean(all_weights_wt_fred, axis=0)
-
-    fig_dir = os.path.join('models/cv_figs')
+    fig_dir = os.path.join('models/leap_vs_16mic_figs_OCT')
     os.makedirs(fig_dir, exist_ok=True)
-    make_plots(ds1='wt', ds2='wt_16mic', savefig=True, fig_dir=fig_dir, display=False)
-    # plot_empirical_occupancy_2datasets()
+    # make_plots(ds1='wt', ds2='wt_fred', savefig=True, fig_dir=fig_dir, display=False)
     # plot_weight_magnitudes()
-    # plot_weights()
+    plot_weights()
     # plot_legends(0, 0, savefig=True, fig_dir=fig_dir, display=False)
