@@ -9,7 +9,7 @@ import numpy as np
 import os
 import time
 
-from preprocess.leaprig import WT_DATA, AC_BOTH, AC_LEFT, AC_RIGHT, BLIND_BOTH
+from preprocess.leaprig import WT_DATA, AC_BOTH, BLIND_BOTH
 from preprocess.new16mic import FREDCLEANED_DATA
 from preprocess.preproc_utils import fill_missing_tracks_SR, halfgaussian_filter
 from preprocess import visual_features, female_features
@@ -111,20 +111,13 @@ def get_features(DATA, expt_path, cop_start_frame):
 
 if __name__ == '__main__':
 
-    DATA = WT_DATA
+    # DATA = WT_DATA
     # DATA = AC_BOTH
+    DATA = BLIND_BOTH
     # DATA = FREDCLEANED_DATA
 
     BASE_FOLDER = f'../../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)
-
-    # raw_track_data = joblib.load(os.path.join(BASE_FOLDER, 'raw_track_data_11_jan1.pkl'))
-    # smoothed_track_data = get_smoothed_raw_track_data(raw_track_data)
-    # for s in raw_track_data:
-    #     nan_count = np.count_nonzero(np.isnan(raw_track_data[s]['fTrx']))
-    #     siz = raw_track_data[s]['fTrx'].size
-    #     print(s, nan_count, raw_track_data[s]['fTrx'].size, nan_count/siz * 100)
-    # joblib.dump(smoothed_track_data, os.path.join(BASE_FOLDER, f'smoothed_track_data_{len(raw_track_data)}_jan1.pkl'))
 
     st1 = time.time()
     # Calculate features from all sessions in a dict and dump
@@ -164,10 +157,17 @@ if __name__ == '__main__':
             continue
 
         if len(raw_track_data) % 10 == 0:
-            joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jan1.pkl'))
-            joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_jan1.pkl'))
+            joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_aug14.pkl'))
+            joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_aug14.pkl'))
             print(f'Temp dump.')
 
-    joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_jan1.pkl'))
-    joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_jan1.pkl'))
+    joblib.dump(sessions_features, os.path.join(BASE_FOLDER, f'sessions_features_{len(sessions_features)}_aug14.pkl'))
+    joblib.dump(raw_track_data, os.path.join(BASE_FOLDER, f'raw_track_data_{len(raw_track_data)}_aug14.pkl'))
     print(f"Finished computing all features in: {round(time.time() - st1, 2)}secs. #sessions: {len(raw_track_data)}")
+
+    smoothed_track_data = get_smoothed_raw_track_data(raw_track_data)
+    for s in raw_track_data:
+        nan_count = np.count_nonzero(np.isnan(raw_track_data[s]['fTrx']))
+        siz = raw_track_data[s]['fTrx'].size
+        print(s, nan_count, raw_track_data[s]['fTrx'].size, nan_count/siz * 100)
+    joblib.dump(smoothed_track_data, os.path.join(BASE_FOLDER, f'smoothed_track_data_{len(raw_track_data)}_aug14.pkl'))

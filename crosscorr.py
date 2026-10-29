@@ -16,7 +16,7 @@ def bi_ccf(x, y, nlags=10):
     # Positive lags: Corr(x[t+k], y[t]) for k >= 0
     ccf_xy = sm.tsa.stattools.ccf(x, y, adjusted=False)[:nlags + 1]
 
-    # Negative lags via swapping arguments: Corr(y[t+k], x[t]) = Corr(x[t], y[t-k])
+    # Negative lags via swapping arguments: Corr(y[t+k], x[t]) = Corr(x[t], y[t+k]), i.e. x precedes y by k
     ccf_yx = sm.tsa.stattools.ccf(y, x, adjusted=False)[1:nlags + 1]
 
     # Combine negative lags (reversed order) and positive lags
@@ -94,7 +94,8 @@ def plot_crosscorr(savefig=True, display=False):
                         print(f"{mal_feat_name}-{i}", np.unique(male_series))
                         if len(np.unique(male_series)) == 1:
                             continue
-                        lags, all_ccfs[i, :] = bi_ccf(female_series, male_series, nlags=max_lags)
+                        lags, all_ccfs[i, :] = bi_ccf(female_series, male_series, nlags=max_lags)   # Oct 28, 2026. peak at lag > 0: x leads y
+                        # So peak at positive lags mean the female comes after the male, and negative lags mean she comes before him
 
                     mean_acf = np.mean(all_ccfs, axis=0)
                     std_acf = np.std(all_ccfs, axis=0)

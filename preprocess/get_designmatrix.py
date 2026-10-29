@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 from preprocess.preproc_utils import safe_zscore
 from preprocess.preproc_utils import halfgaussian_filter
-from preprocess.leaprig import WT_DATA
+from preprocess.leaprig import WT_DATA, AC_BOTH, BLIND_BOTH
 from preprocess.new16mic import FREDCLEANED_DATA
 
 
@@ -757,6 +757,12 @@ def extract_female(source, shuffle_inputs=False):
     if source == 'wt':
         sessions_features = joblib.load('../../data/wt/sessions_features_81_jan1.pkl')
         datacls = WT_DATA
+    elif source == 'ac_both':
+        sessions_features = joblib.load('../../data/ac_both/sessions_features_31_jan1.pkl')
+        datacls = AC_BOTH
+    elif source == 'blind_both':
+        sessions_features = joblib.load('../../data/blind_both/sessions_features_10_jan1.pkl')
+        datacls = AC_BOTH
     elif source == 'wt_fred':
         sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_jan1.pkl')
         datacls = FREDCLEANED_DATA
@@ -774,7 +780,7 @@ def extract_female(source, shuffle_inputs=False):
     data_config["predict_window_size"] = fps//30  # averaging emission over this window size
     data_config['effective_fps'] = data_config['orig_fps'] / data_config["predict_window_size"]
     data_config['basis_transformed'] = 'cos'  # 'cos', 'smooth', or 'identity'
-    data_config['ncos'] = 20
+    data_config['ncos'] = 4
 
     # emissions to fit, along with male inputs for each
     data_config['emission_labels'] = OrderedDict({
@@ -819,6 +825,6 @@ def extract_female(source, shuffle_inputs=False):
 
 
 if __name__ == '__main__':
-    src = 'wt'
+    src = 'blind_both'
     extract_female(src, shuffle_inputs=False)
     # extract_male(src)
