@@ -48,10 +48,13 @@ def load_specific_path(model_path):
 
 def load_specific_path_auxem(model_path):
     print('Loading auxem:', model_path)
-    model_pkl = joblib.load(os.path.join(model_path, 'auxem_model.pkl'))
-    with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
-    if fit_success != 'True':
-        print(Warning(f'Unsuccessful model loaded. {model_path}'))
+    try:
+        model_pkl = joblib.load(os.path.join(model_path, 'auxem_model.pkl'))
+        with open(os.path.join(model_path, 'SUCCESS.txt')) as f: fit_success = f.read()
+        if fit_success != 'True':
+            print(Warning(f'Unsuccessful model loaded. {model_path}'))
+            return None
+    except FileNotFoundError:
         return None
     return model_pkl
 
@@ -191,6 +194,17 @@ def get_rescaled_aux(aux_data, aux_mn_std):
         eez = aux_data[btch] * mn_std_btch[:, 1, None].T + mn_std_btch[:, 0, None].T
         aux_data_rescaled_b.append(eez)
     return aux_data_rescaled_b
+
+
+def get_state_activity_index(model, emissions, inputs, output_mn_std):
+    # Reindex states by a total activity index
+    _, z_seqs, _, _, _ = model.predict(emissions, inputs)
+    emissions_z = get_emissions_by_state(emissions, z_seqs, model.num_states, output_mn_std)
+    state_activity_index = [np.mean(np.sqrt(emissions_z[z][:, 0]**2 + emissions_z[z][:, 1]**2)) for z in emissions_z]
+    new_index = np.argsort(state_activity_index)[::-1]
+    print("state_tot_activity_mean", state_activity_index)
+    print("new ordering:", new_index)
+    return new_index
 
 
 def get_feat_windows(true_feat_series, pred_feat_series, event_onsets, window_len):
@@ -392,5 +406,5 @@ def chunk_data(data_list, chunk_size):
 
     # Stack all chunks from all sequences into one massive batch
     chunked_data = jnp.concatenate(chunked_data, axis=0)
-    print("Data shapes (orig, chunked): ", len(data_list), chunked_data.shape)
+    # print("Data shapes (orig, chunked): ", len(data_list), chunked_data.shape)
     return chunked_data

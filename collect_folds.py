@@ -68,12 +68,6 @@ def get_k(t):
     return int(m.group(1)) if m else None
 
 
-# def load_checkpoint(path):
-#     """return (test session indices, per-fly test scores), in the same order."""
-#     ck, data_config, model_config = load_specific_path_v2(path)
-#     return ck['test_data']['test_session_indices'], ck['test_data']['test_lps_by_fly']
-
-
 def load_checkpoint(path):
     """(test session indices, per-fly test scores in nats/frame relative to Chance), same order."""
     with open(os.path.join(path, 'scores.json')) as f:
