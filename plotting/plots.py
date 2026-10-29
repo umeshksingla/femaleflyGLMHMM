@@ -381,7 +381,7 @@ def plot_filters_statewise(orig_weights, data_config, input_labels_list, aux_inp
     print(weights.shape)
 
     eff_num_states = num_states - len(skip_states)
-    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(5 * eff_num_states + 3, 4 * len(y_labels)), sharey=sharey)
+    fig, axs = plt.subplots(emission_dim, eff_num_states, figsize=(2.5 * eff_num_states + 3, 2.4 * len(y_labels)), sharey=sharey)
 
     n_feats = 0
     for d, _ in enumerate(y_labels):
@@ -526,7 +526,7 @@ def plot_filters_separate_emissions(orig_weights, data_config, y_labels, input_l
         print("weights_d before basis tr", weights_d.shape, "n_inputs_d", n_inputs_d)
         weights_d = basis_invtransform_one_by_one(weights_d, basis, n_inputs=n_inputs_d)[:, 0]
         print("weights_d after basis tr", weights_d.shape)      # (num states, n_inputs_d, orig filterlen), e.g. (5, 7, 450)
-        fig, axs = plt.subplots(1, n_inputs_d, figsize=(6 * n_inputs_d, 6), sharey=sharey)
+        fig, axs = plt.subplots(1, n_inputs_d, figsize=(3 * n_inputs_d, 3), sharey=sharey)
 
         stim = 0
         for __ in y_labels[_]:
