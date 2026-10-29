@@ -14,6 +14,7 @@ import joblib
 import json
 import numpy as np
 
+from run_ladder import run_ladder
 from hmms.LRHMMFemaleFly import LRHMMFemaleFly
 from hmms.LRFemaleFly import LRFemaleFly
 from hmms.DiagGHMMFemaleFly import DiagGHMMFemaleFly
@@ -52,6 +53,10 @@ def run(mc, enhance=False, genfig=False):
     if not len(mc): return  # if empty dict is passed
 
     print(f"Fitting {mc['name']} with model_config: {mc}")
+
+    if mc.get('name') == 'ladder':
+        paths = run_ladder(mc)
+        return paths
 
     data = joblib.load(mc['data_path'])
     emissions, inputs, output_mn_std = data['emissions'], data['inputs'], data['output_mn_std']
