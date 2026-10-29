@@ -651,7 +651,7 @@ def generate_state_filters(model_dir, savefig=True, display=False):
 
     model_prefix = model_ckp['prefix']
     print('model_prefix', model_prefix)
-    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_', 'lrhmmci', 'lrhmmci', 'lrhmm_', 'lrhmm_']:
+    if model_prefix in ['lr', 'glm-hmm', 'glmhmm_', 'lrhmmci', 'lrhmmci', 'lrhmm_', 'lrhmm_', 'arhmm']:
         return
 
     fig_dir = os.path.join(model_dir, 'figures')
@@ -665,6 +665,8 @@ def generate_state_filters(model_dir, savefig=True, display=False):
     input_labels = data_config['input_labels']
     learned_params = model_ckp['learned_params']
     reg_weights = learned_params.transitions.weights
+    if 'idarhmm' in model_prefix:
+        reg_weights = reg_weights[..., :-model_config['num_lags'] * data_config['emission_dim']]
 
     input_mask_by_statetrans = data_config['input_mask_by_emission'][0]
     input_list = ['mFV', 'mLS', 'mfDist', 'fmAng_cos', 'pulse_i', 'sine_i', 'tap2']
@@ -746,6 +748,9 @@ def generate_together_figures(model_dir, savefig=True, display=False):
         if 'ghmm' in model_prefix:
             return
         reg_weights = learned_params.emissions.weights
+        print("reg_weights", reg_weights.shape)
+        if 'idarhmm' in model_prefix:
+            reg_weights = reg_weights[..., :-model_config['num_lags'] * data_config['emission_dim']]
     elif model_prefix == 'lr':
         reg_weights = learned_params['w']
     else:

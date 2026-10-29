@@ -124,7 +124,7 @@ def calculate_empirical_transition_matrix(state_seqs, n_states):
     return mat / row_sums
 
 
-def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None):
+def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, rescaled=False, effective_fps=None, keep_btchs_separate=False):
     """
     Return a dictionary of states mapped to emission values in that state.
     :param emissions:
@@ -146,8 +146,9 @@ def get_emissions_by_state(emissions, stateseq, num_states, output_mn_std=None, 
             else:
                 eez = emissions[btch][stateseq[btch] == z]
             emissions_z[z].append(eez)
-    for z in emissions_z:
-        emissions_z[z] = np.vstack(emissions_z[z])
+    if not keep_btchs_separate:
+        for z in emissions_z:
+            emissions_z[z] = np.vstack(emissions_z[z])
     return emissions_z
 
 
@@ -161,7 +162,7 @@ def get_rescaled_emissions(emissions, output_mn_std, effective_fps):
     return emissions_rescaled_b
 
 
-def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False):
+def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=False, keep_btchs_separate=False):
     """
     Return a dictionary of states mapped to emission values in that state.
     :param aux_data:
@@ -182,8 +183,9 @@ def get_aux_by_state(aux_data, stateseq, num_states, aux_mn_std=None, rescaled=F
             else:
                 eez = aux_data[btch][stateseq[btch] == z]
             aux_data_z[z].append(eez)
-    for z in aux_data_z:
-        aux_data_z[z] = np.vstack(aux_data_z[z])
+    if not keep_btchs_separate:
+        for z in aux_data_z:
+            aux_data_z[z] = np.vstack(aux_data_z[z])
     return aux_data_z
 
 
