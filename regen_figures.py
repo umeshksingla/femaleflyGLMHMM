@@ -24,15 +24,12 @@ if __name__  == '__main__':
 
         # utils.enhance(model_pkl_path)
         utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
-        # utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
-        # utils.generate_scores_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)
+        utils.generate_state_filters(model_pkl_path, savefig=1, display=0)
 
         # utils.enhance_auxem(model_pkl_path)
-        # utils.generate_auxem_figures(model_pkl_path, savefig=1, display=0)
         utils.generate_together_figures(model_pkl_path, savefig=1, display=0)
 
-    # utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
-    # utils.generate_state_traces(model_pkl_path, dataset='wt', savefig=1, display=0)
-    # utils.generate_TAs(model_pkl_path, savefig=1, display=0)
-    # utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
+        utils.generate_trajs(model_pkl_path, savefig=1, display=0, gen_corr_video=False)
+        utils.generate_state_traces(model_pkl_path, dataset='wt', savefig=1, display=0)
+        utils.generate_state_clips(model_pkl_path, savefig=1, display=0, gen_corr_video=True)
 

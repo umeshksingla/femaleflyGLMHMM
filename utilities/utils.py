@@ -435,79 +435,6 @@ def update_labels(data_config):
     return
 
 
-def generate_scores_figures(model_dir, savefig=True, display=False, override_fig_dir=False):
-    """This uses cv folds to plot the scores on held-out flies from the fold they were held out in"""
-
-    print(f'Generating "scores" figures for {model_dir}...')
-
-    model_ckp, data_config, model_config = load_specific_path(model_dir)
-    if model_ckp is None:
-        return
-
-    if not isinstance(model_config['fold'], int):
-        return
-
-    update_labels(data_config)
-
-    fig_dir = os.path.join(model_dir, 'figures')
-    if os.path.exists(fig_dir) and override_fig_dir:
-        shutil.rmtree(fig_dir)
-    os.makedirs(fig_dir, exist_ok=True)
-    scores_fig_dir = os.path.join(fig_dir, 'scores_figures')
-    os.makedirs(scores_fig_dir, exist_ok=True)
-
-    emission_labels_jr = data_config['emission_labels_jr']
-    model_prefix = model_ckp['prefix']
-    print("model_prefix", model_prefix)
-
-    def plot_func(prefix):
-        print("prefix", prefix)
-        data_key = f'{prefix}_data'
-        # emissions = model_ckp[data_key][f'{prefix}_emissions']
-        # inputs = model_ckp[data_key][f'{prefix}_inputs']
-        # aux_data = model_ckp[data_key][f'{prefix}_aux_data']
-        # aux_emissions = model_ckp[data_key][f'{prefix}_aux_emissions']
-        # stateseq = model_ckp[data_key][f'{prefix}_stateseq']
-        # output_mn_std = model_ckp[data_key][f'{prefix}_output_mn_std']
-
-        # plots.plot_var_explained_by_z(model_ckp[data_key][f'{prefix}_score_by_z_soft'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_by_fly_soft'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-        # plots.plot_var_explained_by_o(model_ckp[data_key][f'{prefix}_score_by_o_soft'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-        # plots.plot_var_explained_by_z_o(model_ckp[data_key][f'{prefix}_score_by_z_and_o_soft'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_var_explained_by_z_o_by_fly(model_ckp[data_key][f'{prefix}_score_by_z_and_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-
-        # plots.plot_pearson_by_z(model_ckp[data_key][f'{prefix}_pearson_by_z'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        # plots.plot_pearson_by_z_vs_all(model_ckp[data_key][f'{prefix}_pearson'], model_ckp[data_key][f'{prefix}_pearson_by_z'], title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        # plots.plot_pearson_by_z_by_fly(model_ckp[data_key][f'{prefix}_pearson_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-        plots.plot_pearson_by_z_by_fly_vs_all(model_ckp[data_key][f'{prefix}_pearson_by_fly'], model_ckp[data_key][f'{prefix}_pearson_by_z_by_fly'], title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-        # plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_by_o_soft'], emission_labels_jr, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_by_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data (lag=0)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-        # plots.plot_pearson_by_z_o(model_ckp[data_key][f'{prefix}_pearson_by_z_and_o_soft'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_pearson_by_z_o_by_fly(model_ckp[data_key][f'{prefix}_pearson_by_z_and_o_by_fly'], emission_labels_jr, title=f'{prefix} data', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-
-        # plots.plot_correlation_by_o(model_ckp[data_key][f'{prefix}_correlation_max_by_o_soft'], emission_labels_jr, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
-        plots.plot_correlation_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_by_o_by_fly_soft'], emission_labels_jr, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-
-        # plots.plot_correlation_lags_by_o(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_soft'], emission_labels_jr, effective_fps, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=fig_dir, display=display)
-        # plots.plot_correlation_lags_by_o_by_fly(model_ckp[data_key][f'{prefix}_correlation_max_lags_by_o_by_fly_soft'], emission_labels_jr, effective_fps, title=f'{prefix} data (max lag)', savefig=savefig, fig_dir=scores_fig_dir, display=display)
-
-        return
-
-    plot_func('train')
-    plot_func('test')
-
-    # overall scores
-    plots.plot_var_explained(model_ckp['train_data']['train_score'], model_ckp['test_data']['test_score'], savefig=savefig, fig_dir=scores_fig_dir, display=display)
-    plots.plot_var_explained_by_fly(model_ckp['train_data']['train_score_by_fly'], model_ckp['test_data']['test_score_by_fly'], savefig=savefig, fig_dir=scores_fig_dir, display=display)
-    plots.plot_pearson(model_ckp['train_data']['train_pearson'], model_ckp['test_data']['test_pearson'], savefig=savefig, fig_dir=scores_fig_dir, display=display)
-    plots.plot_pearson_by_fly(model_ckp['train_data']['train_pearson_by_fly'], model_ckp['test_data']['test_pearson_by_fly'], savefig=savefig, fig_dir=scores_fig_dir, display=display)
-    plots.plot_ll(model_ckp['train_data']['train_lp'], model_ckp['test_data']['test_lp'], data_config, savefig=savefig, fig_dir=scores_fig_dir, display=display)
-    plots.plot_ll_by_fly(model_ckp['train_data']['train_lps_by_fly'], model_ckp['test_data']['test_lps_by_fly'], data_config, savefig=savefig, fig_dir=scores_fig_dir, display=display)
-
-    return
-
-
 def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=False):
     """This uses the "all" fold to plot where all the flies are in training."""
 
@@ -606,37 +533,6 @@ def generate_figures(model_dir, savefig=True, display=False, override_fig_dir=Fa
     plots.plot_state_aux_dists(
         get_aux_by_state(all_aux_data, all_stateseq, num_states, rescaled=False),
         auxiliary_labels, title=f'all data', savefig=savefig, fig_dir=dists_fig_dir, display=display)
-    return
-
-
-def generate_auxem_figures(model_dir, savefig=True, display=False):
-
-    model_ckp, data_config, model_config = load_specific_path(model_dir)
-    auxem_model_ckp = load_specific_path_auxem(model_dir)
-    if (model_ckp is None) or (auxem_model_ckp is None):
-        return
-
-    fig_dir = os.path.join(model_dir, 'auxem_figures')
-    # auxem_filters_fig_dir = os.path.join(fig_dir, 'auxem_filters_fig_dir')
-    os.makedirs(fig_dir, exist_ok=True)
-    # os.makedirs(auxem_filters_fig_dir, exist_ok=True)
-
-    train_predict_probas = auxem_model_ckp['train_data']['train_probs_z_and_auxo']
-    train_f1score_z_and_auxo = auxem_model_ckp['train_data']['train_f1score_z_and_auxo']
-    train_preds_z_and_auxo = auxem_model_ckp['train_data']['train_preds_z_and_auxo']
-    train_true_z_and_auxo = auxem_model_ckp['train_data']['train_true_z_and_auxo']
-    test_predict_probas = auxem_model_ckp['test_data']['test_probs_z_and_auxo']
-    test_f1score_z_and_auxo = auxem_model_ckp['test_data']['test_f1score_z_and_auxo']
-    test_preds_z_and_auxo = auxem_model_ckp['test_data']['test_preds_z_and_auxo']
-    test_true_z_and_auxo = auxem_model_ckp['test_data']['test_true_z_and_auxo']
-
-    update_labels(data_config)
-    auxiliary_emission_labels = data_config['auxiliary_emission_labels']
-
-    plots.plot_auxem_frac_full_precomputed(train_true_z_and_auxo, test_true_z_and_auxo, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_auxem_frac_by_z_o_traintest_precomputed(train_true_z_and_auxo, test_true_z_and_auxo, model_config, auxiliary_emission_labels, skip_states=[], title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_auxem_acc_full_precomputed(train_true_z_and_auxo, train_preds_z_and_auxo, test_true_z_and_auxo, test_preds_z_and_auxo, title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
-    plots.plot_auxem_acc_by_z_o_traintest_precomputed(train_f1score_z_and_auxo, test_f1score_z_and_auxo, model_config, auxiliary_emission_labels, skip_states=[], title=f'all data', savefig=savefig, fig_dir=fig_dir, display=display)
     return
 
 
@@ -794,69 +690,6 @@ def generate_together_figures(model_dir, savefig=True, display=False):
                                      sharey='row', only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey=sharey, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey=sharey, skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-    return
-
-
-def generate_together_figures_filters_given(model_dir, all_weights, savefig=True, display=False):
-    """Plots, such as filters, that need to be together for emissions and aux-emissions. """
-
-    model_ckp, data_config, _ = load_specific_path(model_dir)
-    auxem_model_ckp = load_specific_path_auxem(model_dir)
-    if (model_ckp is None) or (auxem_model_ckp is None):
-        return
-
-    fig_dir = os.path.join(model_dir, 'figures')
-    together_filters_fig_dir = os.path.join(fig_dir, 'together_filters_avgd_fig_dir')
-    os.makedirs(fig_dir, exist_ok=True)
-    os.makedirs(together_filters_fig_dir, exist_ok=True)
-
-    update_labels(data_config)
-    input_labels = data_config['input_labels']
-    # model_prefix = model_ckp['prefix']
-    num_states = model_ckp['num_states']
-    animal = data_config['animal']
-
-    # plot filters for regular+auxem emissions
-    input_mask_by_emission = data_config['input_mask_by_emission']
-    input_mask_by_auxemission = np.array(auxem_model_ckp['input_mask_by_auxemission'])
-    input_mask_by_allemission = np.concatenate((input_mask_by_emission, input_mask_by_auxemission))
-    print("input_mask_by_emission", input_mask_by_emission, input_mask_by_emission.shape)
-    print("input_mask_by_auxemission", input_mask_by_auxemission, input_mask_by_auxemission.shape)
-    print("input_mask_by_allemission", input_mask_by_allemission, input_mask_by_allemission.shape)
-
-    emission_labels = data_config['emission_labels']
-    auxiliary_emission_labels = data_config['auxiliary_emission_labels']
-
-    all_emission_labels = OrderedDict()
-    all_emission_labels.update(emission_labels)
-    all_emission_labels.update(auxiliary_emission_labels)
-    print(emission_labels)
-    print(auxiliary_emission_labels)
-    print(all_emission_labels)
-
-    input_labels_list = data_config['input_labels_list']
-    auxiliary_input_labels_list = data_config['auxiliary_input_labels_list']
-    # all_input_labels_list = data_config['input_labels_list'] + data_config['auxiliary_input_labels_list']
-
-    print(data_config['input_labels_list'])
-    print(data_config['auxiliary_input_labels_list'])
-    # print(all_input_labels_list)
-
-    print(data_config['input_labels'])
-
-    only_plot_inputs = ['fFV', 'mfDist'] if animal == 'male' else ['mFV', 'pulse_i', 'sine_i', 'tap2', 'mfDist']
-
-    for skip_states in [[0], []]:
-        if num_states <= 1 and skip_states:
-            continue    # skip skip_states if there's only state
-        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters(all_weights, data_config, all_emission_labels, filesuffix='allemissions', skip_states=skip_states, sharey='row', savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_separate_emissions(all_weights, data_config, all_emission_labels, input_labels, input_mask_by_allemission, filesuffix='allemissions', sharey='row', skip_states=skip_states, saveindividual=True, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
-        plots.plot_filters_statewise(all_weights, data_config, input_labels_list, auxiliary_input_labels_list, data_config['input_labels'], all_emission_labels, auxiliary_emission_labels, prefix='allemissions',
-                                     only_plot_inputs=only_plot_inputs, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
         plots.plot_filter_amplitudes(all_weights, data_config, data_config['input_labels'], all_emission_labels, input_mask_by_allemission, prefix='allemissions', plot_top_k=5, skip_states=skip_states, savefig=savefig, fig_dir=together_filters_fig_dir, display=display)
     return
