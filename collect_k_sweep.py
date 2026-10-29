@@ -87,8 +87,8 @@ def main(results_dir):
     print('Held-out bits/s over Chance by number of states (K = 1 is the single-state GLM):')
     print(table.to_string())
 
-    os.makedirs(f'{results_dir}/csv_results', exist_ok=True)
-    df.to_csv(f'{results_dir}/csv_results/per_fly_by_K.csv', index=False)
+    os.makedirs(f'{results_dir}', exist_ok=True)
+    df.to_csv(f'{results_dir}/per_fly_by_K.csv', index=False)
     print('\nWrote per_fly_by_K.csv')
 
 

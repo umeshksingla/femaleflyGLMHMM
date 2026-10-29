@@ -141,8 +141,8 @@ def main(results_dir, k=5):
     }
     for label, d in comparisons.items():
         wide[label] = d * BITS
-    os.makedirs(f'{results_dir}/csv_results', exist_ok=True)
-    wide.to_csv(f'{results_dir}/csv_results/per_fly_scores_k={k}.csv')
+    os.makedirs(f'{results_dir}', exist_ok=True)
+    wide.to_csv(f'{results_dir}/per_fly_scores_k={k}.csv')
 
     pd.set_option('display.width', 200)
     pd.set_option('display.float_format', lambda x: f'{x:.3g}')
@@ -161,3 +161,4 @@ def main(results_dir, k=5):
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else '.', int(sys.argv[2]) if len(sys.argv) > 2 else 5)
+
