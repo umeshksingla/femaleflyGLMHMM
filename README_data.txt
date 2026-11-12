@@ -31,7 +31,7 @@ SHARING/ACCESS INFORMATION
 
 3. Links to other publicly accessible locations of the data: None
 
-4. Links/relationships to ancillary data sets: Analysis code: https://github.com/umeshksingla/femaleflystates
+4. Links/relationships to ancillary data sets: Pose estimation with SLEAP (Pereira et al. 2022, Nature Methods)
 
 5. Was data derived from another source? No
 
