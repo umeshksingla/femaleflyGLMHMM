@@ -174,9 +174,6 @@ def enhance_auxem(model_dir):
     
     if model_ckp is None or model_ckp['prefix'] == 'chance':
         return
-
-    if os.path.exists(os.path.join(model_dir, 'auxem_model.pkl')):
-        return
     
     mask, fps, K = data_config['input_mask_by_auxemission'], data_config['effective_fps'], model_ckp['num_states']
     
@@ -809,7 +806,7 @@ def generate_state_traces(model_dir, dataset='wt', savefig=True, display=False):
     if dataset == 'wt':
         smoothed_track_data = joblib.load('../data/wt/smoothed_track_data_81_jan1.pkl')
     elif dataset == 'wt_fred':
-        smoothed_track_data = joblib.load('../data/wt_fredcleaned/smoothed_track_data_11_jan1.pkl')
+        smoothed_track_data = joblib.load('../data/wt_fred/smoothed_track_data_11_jan1.pkl')
 
     def f(prefix):
 

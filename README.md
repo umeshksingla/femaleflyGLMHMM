@@ -105,7 +105,7 @@ The pipeline has four stages. Each one saves its output, so you can start from w
 
 ### Step by step
 
-**1. Extract features.** Set `DATA` to `WT_DATA` (Dataset 1) or `FREDCLEANED_DATA` (Dataset 2), then run
+**1. Extract features.** Set `DATA` to `WT_DATA` (Dataset 1) or `FRED_DATA` (Dataset 2), then run
 
 ```bash
 python preprocess/extract_data_from_h5.py

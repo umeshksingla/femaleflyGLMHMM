@@ -10,7 +10,7 @@ import os
 import time
 
 from preprocess.leaprig import WT_DATA, AC_BOTH, BLIND_BOTH
-from preprocess.new16mic import FREDCLEANED_DATA
+from preprocess.new16mic import FRED_DATA
 from preprocess.preproc_utils import fill_missing_tracks_SR, halfgaussian_filter
 from preprocess import visual_features, female_features
 
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     # DATA = WT_DATA
     # DATA = AC_BOTH
     DATA = BLIND_BOTH
-    # DATA = FREDCLEANED_DATA
+    # DATA = FRED_DATA
 
     BASE_FOLDER = f'../../data/{DATA.dataset}/'
     os.makedirs(BASE_FOLDER, exist_ok=True)

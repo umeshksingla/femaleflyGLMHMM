@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from preprocess.preproc_utils import safe_zscore
 from preprocess.preproc_utils import halfgaussian_filter
 from preprocess.leaprig import WT_DATA, AC_BOTH, BLIND_BOTH
-from preprocess.new16mic import FREDCLEANED_DATA
+from preprocess.new16mic import FRED_DATA
 
 
 def transform_single_input(inp, basis, input_raw_each_dim):
@@ -691,8 +691,8 @@ def extract_male(source):
         sessions_features = joblib.load('../../data/wt/sessions_features_81_jan1.pkl')
         datacls = WT_DATA
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_jan1.pkl')
-        datacls = FREDCLEANED_DATA
+        sessions_features = joblib.load('../../data/wt_fred/sessions_features_11_jan1.pkl')
+        datacls = FRED_DATA
     else:
         raise Exception('Wrong data source.')
 
@@ -764,8 +764,8 @@ def extract_female(source, shuffle_inputs=False):
         sessions_features = joblib.load('../../data/blind_both/sessions_features_10_jan1.pkl')
         datacls = AC_BOTH
     elif source == 'wt_fred':
-        sessions_features = joblib.load('../../data/wt_fredcleaned/sessions_features_11_jan1.pkl')
-        datacls = FREDCLEANED_DATA
+        sessions_features = joblib.load('../../data/wt_fred/sessions_features_11_jan1.pkl')
+        datacls = FRED_DATA
     else:
         raise Exception('Wrong data source.')
 

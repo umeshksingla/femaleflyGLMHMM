@@ -7,14 +7,14 @@ from preprocess import preproc_utils
 from preprocess.preproc_utils import h5read
 
 
-class FREDCLEANED_DATA:
+class FRED_DATA:
 
     # data and rig constants
     fps = 60
     smooth_window = 2
     PIXEL_TO_MM = 18.56
     RADIUS = 21
-    dataset = 'wt_fredcleaned'
+    dataset = 'wt_fred'
 
     copulation_frame_idxs = {
         '20190927_161548_right': 12750,
@@ -36,14 +36,14 @@ class FREDCLEANED_DATA:
 
     @staticmethod
     def get_copulation_frame(session_path):
-        session = FREDCLEANED_DATA.get_session_name(session_path)
-        cop_frame = FREDCLEANED_DATA.copulation_frame_idxs.get(session, None)
+        session = FRED_DATA.get_session_name(session_path)
+        cop_frame = FRED_DATA.copulation_frame_idxs.get(session, None)
         print("Getting copulation frame:", session, "cop_frame=", cop_frame)
         return cop_frame
 
     @staticmethod
     def get_copulation_bool_from_session(session, session_len):
-        return session in FREDCLEANED_DATA.copulation_frame_idxs
+        return session in FRED_DATA.copulation_frame_idxs
 
     @staticmethod
     def get_circle_estimator_helper(trxM=None, trxF=None):
@@ -87,7 +87,7 @@ class FREDCLEANED_DATA:
     @staticmethod
     def get_all_individual_song(expt_path):
         """TODO: Locate individual song elements for new16mic data"""
-        return FREDCLEANED_DATA.get_all_song(expt_path)
+        return FRED_DATA.get_all_song(expt_path)
 
     @staticmethod
     def get_tap_feature(expt_path, cop_start_frame, mTrx=None, fTrx=None, fTheta=None):

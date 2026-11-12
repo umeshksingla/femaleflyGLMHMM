@@ -141,7 +141,7 @@ def flick_performance(train, test, mask, fps):
 
 
 def flick_filters(inputs, flicks, probs, mask):
-    """Filters for figures, fit on all flies with smoothed state probabilities."""
+    """Filters for figures, fit on all flies with state sequences/probabilities."""
     X_all, Y, P, flies = _stack(inputs), _stack(flicks).astype(int), _stack(probs), _fly_ids(inputs)
     K, n_out, D = P.shape[1], Y.shape[1], X_all.shape[1]
     w, b, chosen = np.zeros((K, n_out, D)), np.zeros((K, n_out)), {}
