@@ -17,10 +17,6 @@ if __name__  == '__main__':
     # paths = list(glob.glob('models/octladder_cv_wt_fred_female/id-glm-hmm_5_cv/**/'))
     print(paths)
     for model_pkl_path in paths:
-        # if ('send' not in model_pkl_path):        # wt all-flies fold
-        #     continue
-        if ('godmother' not in model_pkl_path):     # wt_fred all-flies fold
-                continue
 
         # utils.enhance(model_pkl_path)
         utils.generate_figures(model_pkl_path, savefig=1, display=0, override_fig_dir=False)

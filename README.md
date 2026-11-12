@@ -2,7 +2,7 @@
 
 This repository contains the code for
 
-> Singla et al. (2026). **Latent state dynamics underlying female behavior during *Drosophila* courtship interactions.** [Link]
+> Singla et al. (2026). **Latent state dynamics underlying female behavior during *Drosophila* courtship interactions.** [FILL: DOI]
 
 We model the female's locomotion during courtship (her forward, lateral and angular velocity, in 33-ms bins) with an input-driven GLM-HMM. Its inputs are cues from the male: his movement and position relative to her, his song and his taps. Each latent state has its own GLM from the male cues to her velocity, and the cues also change the probability of switching between states. Wing flicks, a discrete rejection behavior, are predicted afterwards within each state.
 
@@ -86,7 +86,7 @@ pip install tfp-nightly==0.26.0.dev20251231
 
 For the model, both datasets are binned at 30 Hz (33 ms).
 
-**Getting the data:** [Link to the deposited data: to be added]. With the raw SLEAP tracking files you can run every stage below. If you have the design matrices from stage 2, start at stage 3; if you have the fitted models, start at stage 4.
+**Getting the data:** [FILL: DOI] With the raw SLEAP tracking files you can run every stage below. If you have the design matrices from stage 2, start at stage 3; if you have the fitted models, start at stage 4.
 
 Set the paths to the raw data in `preprocess/leaprig.py` (Dataset 1) and `preprocess/new16mic.py` (Dataset 2). We used cluster storage paths such as `/cup` or `/tigress`.
 
@@ -169,13 +169,13 @@ The `CustomInit` classes start from the fitted parameters of the previous model 
 
 ## Contact
 
-- **Lead Contact:** Mala Murthy (mmurthy@princeton.edu)
+- **Lead Contact:** Mala Murthy (mmurthy[at]princeton.edu)
 - **Lab Website:** [murthylab.princeton.edu](https://murthylab.princeton.edu)
-- **Code Issues:** Please open an issue on GitHub.
+- **Code Issues:** Please open an issue on GitHub or contact Umesh Singla (umeshksingla[at]gmail.com).
 
 ## Citation
 
-If you use this code, please cite the paper above. The model builds on [Dynamax](https://github.com/probml/dynamax) and on the GLM-HMM of Calhoun et al. (2019), *Unsupervised identification of the internal states that shape natural behavior*, Nature Neuroscience. Dataset 2 is from Roemschied et al. (2023), *Flexible circuit mechanisms for context-dependent song sequencing*, Nature.
+If you use this code, please cite the paper above.
 
 ## License
 
